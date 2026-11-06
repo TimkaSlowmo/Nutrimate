@@ -6,6 +6,9 @@ import 'package:flutter/scheduler.dart' show Ticker;
 
 void main() => runApp(const CalorieApp());
 
+// Номер версии: ночной агент увеличивает его на 1 при каждом обновлении.
+const appVersion = 8;
+
 const burgundy = Color(0xFF6A041C);
 const cream = Color(0xFFF5F1E5);
 const sand = Color(0xFFEAE2CF);
@@ -6805,6 +6808,8 @@ class ProfilePage extends StatelessWidget {
               icon: const Icon(Icons.logout, color: burgundy),
               label: const Text('Log out', style: TextStyle(color: burgundy)),
             ),
+            Center(child: Text('NutriMate Pro v$appVersion', style: TextStyle(color: Colors.grey.shade600, fontSize: 12))),
+            const SizedBox(height: 24),
           ],
         ),
       ),
