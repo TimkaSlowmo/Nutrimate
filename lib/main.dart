@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show Ticker;
 
 void main() => runApp(const CalorieApp());
 
@@ -20,20 +22,64 @@ class FoodItem {
   const FoodItem(this.emoji, this.name, this.kcal, this.category, this.shelf);
 }
 
+enum Storage { fridge, freezer, pantry }
+
+const storageLabel = {Storage.fridge: '🧊 Fridge', Storage.freezer: '❄️ Freezer', Storage.pantry: '🫙 Pantry'};
+const _shelfStable = {'Grains', 'Pantry', 'Spices', 'Canned', 'Nuts & Legumes', 'Snacks', 'Sweets', 'Drinks', 'World Foods', 'Plant-Based'};
+const _freezable = {'Meat', 'Seafood', 'Bakery', 'Fruits', 'Berries', 'Vegetables', 'Ready Meals', 'Dairy', 'Plant-Based'};
+
+Storage defaultStorage(FoodItem f) => f.category == 'Frozen'
+    ? Storage.freezer
+    : _shelfStable.contains(f.category) && f.shelf > 14
+    ? Storage.pantry
+    : Storage.fridge;
+bool canFreeze(FoodItem f) => _freezable.contains(f.category) && !{'Eggs', 'Lettuce', 'Cucumber', 'Salad Mix', 'Yogurt', 'Sour Cream', 'Mayonnaise'}.contains(f.name);
+
 class PantryItem {
   final int id;
   final FoodItem food;
-  final DateTime added, expiry;
-  PantryItem(this.id, this.food, this.added, this.expiry);
+  final DateTime added;
+  DateTime expiry;
+  Storage storage;
+  PantryItem(this.id, this.food, this.added, this.expiry, this.storage);
 
   int get daysLeft {
     final n = now();
     return DateTime.utc(expiry.year, expiry.month, expiry.day).difference(DateTime.utc(n.year, n.month, n.day)).inDays;
   }
 
-  double get fresh => (daysLeft / food.shelf).clamp(0.0, 1.0).toDouble();
-  String get status => daysLeft < 0 ? 'Expired' : daysLeft == 0 ? 'Last day!' : '$daysLeft d left';
-  Color get color => daysLeft <= 0 ? Colors.red.shade800 : daysLeft <= 2 ? Colors.orange.shade800 : Colors.green.shade800;
+  int get shelf => max(1, DateTime.utc(expiry.year, expiry.month, expiry.day).difference(DateTime.utc(added.year, added.month, added.day)).inDays);
+  double get fresh => (daysLeft / shelf).clamp(0.0, 1.0).toDouble();
+  String get status => daysLeft < 0
+      ? 'Expired ${-daysLeft} ${daysLeft == -1 ? 'day' : 'days'} ago'
+      : daysLeft == 0
+      ? 'Use today!'
+      : daysLeft == 1
+      ? 'Expires tomorrow'
+      : '$daysLeft days left';
+  Color get color => daysLeft < 0
+      ? Colors.red.shade800
+      : daysLeft <= 2
+      ? Colors.orange.shade800
+      : Colors.green.shade800;
+}
+
+// Почему еда оказалась в мусоре — из этого строится аналитика и советы.
+enum WasteReason { expired, forgot, tooMuch, spoiled, disliked }
+
+const reasonInfo = {
+  WasteReason.expired: ('⏰', 'It expired', 'Check "Use these first" on Home every morning — it takes 5 seconds.'),
+  WasteReason.forgot: ('🙈', 'Forgot about it', 'Keep older products at the front of the shelf, new ones at the back (FIFO).'),
+  WasteReason.tooMuch: ('🛒', 'Bought too much', 'Plan 3 meals before shopping and buy only what the shopping list says.'),
+  WasteReason.spoiled: ('🦠', 'Went bad early', 'Check storage tips in AI Chef — many products last longer when stored right.'),
+  WasteReason.disliked: ('😖', 'Did not like it', 'Tell AI Chef what you dislike — it will stop suggesting it.'),
+};
+
+class WasteEntry {
+  final FoodItem food;
+  final WasteReason reason;
+  final double money;
+  WasteEntry(this.food, this.reason, this.money);
 }
 
 class LogEntry {
@@ -60,7 +106,8 @@ class Recipe {
   final int servings;
   final List<Ing> ingredients;
   final List<String> steps;
-  Recipe(this.name, this.emoji, this.time, this.servings, this.ingredients, this.steps, this.staples);
+  final bool zeroWaste; // рецепт специально для «спасения» остатков
+  Recipe(this.name, this.emoji, this.time, this.servings, this.ingredients, this.steps, this.staples, {this.zeroWaste = false});
 
   List<String> missing(Set<String> have) => ingredients.where((i) => !have.contains(i.name)).map((i) => i.name).toList();
   int get kcal => (ingredients.fold<double>(0, (s, i) => s + i.g * foodByName[i.name]!.kcal / 100) / servings).round();
@@ -70,23 +117,25 @@ class Recipe {
 // Формат: Категория|эмодзи Название,ккал на 100 г,дней хранения;...
 
 const _raw = '''
-Vegetables|🍅 Tomato,18,7;🥒 Cucumber,15,7;🥔 Potato,77,30;🍠 Sweet Potato,86,21;🥕 Carrot,41,21;🧅 Onion,40,30;🧄 Garlic,149,60;🥬 Cabbage,25,21;🥦 Broccoli,34,5;🥬 Spinach,23,4;🫑 Bell Pepper,31,7;🍆 Eggplant,25,7;🥒 Zucchini,17,6;🎃 Pumpkin,26,30;🌽 Corn,86,5;🥬 Lettuce,15,5;🍄 Mushrooms,22,5;🌿 Dill,43,5;🌿 Parsley,36,6;🟣 Beetroot,43,21;🫛 Green Peas,81,5;🥦 Cauliflower,25,6;🥬 Celery,16,10;🌶️ Chili Pepper,40,7;⚪ Radish,16,8;🫛 Green Beans,31,5;🌱 Asparagus,20,4;🫚 Ginger,80,21;🥬 Leek,61,10;🥬 Turnip,28,20;🥬 Arugula,25,4;🥬 Bok Choy,13,5;🥬 Brussels Sprouts,43,7;🌿 Artichoke,47,5;🌿 Fennel,31,7;🥬 Kohlrabi,27,10;🧅 Spring Onion,32,7;🥬 Red Cabbage,31,21;🌶️ Jalapeno,29,7;🌿 Horseradish,48,30;🥒 Okra,33,5;🎃 Butternut Squash,45,30;🥕 Parsnip,75,20;🌿 Sorrel,22,4;🌿 Cilantro,23,5;🌿 Basil,23,5;🌿 Mint,70,5;🧅 Shallot,72,30;🧅 Red Onion,40,30;🍅 Cherry Tomato,18,7;🥒 Pattypan Squash,16,6;⚪ Daikon,18,14;🫛 Edamame,121,5;🥬 Salad Mix,17,4;🥬 Swiss Chard,19,5;🥬 Watercress,11,3;🍄 Champignons,22,5;🍄 Oyster Mushrooms,33,5;🍄 Porcini Mushrooms,34,4;🥔 Red Potato,70,30;🌶️ Hot Pepper,40,7;🥬 Chinese Cabbage,16,10;🥬 Romaine Lettuce,17,5
-Fruits|🍎 Apple,52,14;🍌 Banana,89,4;🍊 Orange,47,10;🍋 Lemon,29,14;🍐 Pear,57,7;🍇 Grapes,69,7;🍑 Peach,39,4;🍒 Cherry,50,4;🍍 Pineapple,50,5;🥭 Mango,60,5;🍉 Watermelon,30,5;🍈 Melon,34,5;🥝 Kiwi,61,7;🥑 Avocado,160,4;🍑 Apricot,48,4;🍑 Plum,46,5;🍊 Tangerine,53,10;🍎 Pomegranate,83,30;🍊 Grapefruit,42,14;🥭 Papaya,43,5;🍈 Fig,74,3;🌴 Dates,282,180;🍋 Lime,30,14;🍑 Nectarine,44,5;🍊 Persimmon,70,7;🍈 Guava,68,5;🍈 Passion Fruit,97,7;🐉 Dragon Fruit,60,5;🍈 Lychee,66,5;🍐 Quince,57,14;🥥 Coconut,354,30;🍇 Raisins,299,365;🍑 Dried Apricots,241,365;🍑 Prunes,240,365;🍈 Dried Figs,249,365;🍊 Pomelo,38,14;🍏 Green Apple,52,14;🍌 Plantain,122,5;🍍 Dried Pineapple,340,180;🍈 Cantaloupe,34,5;🍐 Asian Pear,42,10;🍊 Clementine,47,10;🍋 Yuzu,30,10
-Berries|🍓 Strawberry,32,3;🫐 Blueberry,57,5;🍇 Raspberry,52,3;🫐 Blackberry,43,3;🍒 Cranberry,46,10;🍇 Currant,56,4;🍇 Gooseberry,44,4;🍒 Lingonberry,43,7;🍊 Sea Buckthorn,82,5;🍇 Mulberry,43,3;🍒 Goji Berries,349,180;🍒 Sweet Cherry,63,4;🍒 Sour Cherry,50,4;🍇 Black Currant,63,4;🍇 Red Currant,56,4;🌹 Rosehip,162,30;🍓 Wild Strawberry,32,3;🫐 Bilberry,44,4;🍒 Cloudberry,51,4
-Dairy|🥛 Milk,60,5;🥛 Kefir,51,7;🥛 Ryazhenka,67,7;🥛 Yogurt,61,7;🥛 Sour Cream,206,7;🧈 Butter,717,30;🧀 Cheddar Cheese,403,21;🧀 Mozzarella,280,10;🧀 Parmesan,431,60;🧀 Feta,264,14;🧀 Cream Cheese,342,10;🧀 Cottage Cheese,98,5;🧀 Processed Cheese,300,30;🥚 Eggs,143,21;🥛 Heavy Cream,340,7;🥛 Oat Milk,45,7;🧀 Ricotta,174,7;🧀 Gouda,356,30;🧀 Brie,334,14;🧀 Swiss Cheese,380,30;🧀 Brynza,260,14;🧀 Suluguni,290,14;🧀 Blue Cheese,353,30;🧀 Goat Cheese,364,14;🥛 Light Cream,205,7;🥛 Whipped Cream,257,5;🧈 Margarine,717,60;🥛 Ayran,40,7;🥛 Soy Milk,33,7;🥛 Almond Milk,24,7;🥛 Greek Yogurt,97,10;🥛 Skyr,63,10;🧈 Ghee,900,90;🥚 Quail Eggs,158,21;🧀 Mascarpone,429,10;🧀 Halloumi,321,30;🧀 Camembert,300,14;🥛 Coconut Milk,230,5;🥛 Lactose-Free Milk,45,7;🥛 Drinking Yogurt,72,10;🧀 Cheese Curds,98,5;🧀 Provolone,351,30;🧀 Parmigiano Slices,400,30;🥛 Condensed Cream,300,60
-Meat|🍗 Chicken Breast,165,2;🍗 Chicken Thighs,209,2;🥩 Beef,250,3;🥩 Pork,242,3;🥩 Ground Beef,254,2;🍖 Lamb,294,3;🦃 Turkey,135,2;🌭 Sausages,301,7;🥓 Bacon,541,7;🍖 Ham,145,7;🥩 Boiled Sausage,257,7;🥓 Salo,770,60;🥩 Liver,135,2;🦆 Duck,337,3;🥩 Veal,172,3;🐇 Rabbit,173,3;🍗 Chicken Wings,203,2;🍗 Chicken Drumsticks,172,2;🍗 Whole Chicken,215,2;🍖 Pork Ribs,277,3;🥩 Steak,271,3;🍖 Meatballs,230,3;🥩 Minced Pork,263,2;🌭 Kielbasa,320,10;🍕 Salami,336,21;🍕 Pepperoni,504,30;🥓 Prosciutto,250,30;🥫 Liver Pate,300,7;🍗 Chicken Liver,119,2;🥩 Beef Tongue,224,3;🌭 Smoked Sausage,420,21;🌭 Hot Dog Sausages,260,10;🥓 Pork Belly,518,3;🦃 Turkey Breast,104,2;🍗 Chicken Hearts,153,2;🥩 Ground Turkey,148,2;🥩 Ground Chicken,143,2;🥩 Pork Neck,240,3;🥩 Beef Ribeye,291,3;🥩 Beef Brisket,250,3;🥓 Smoked Bacon,550,14;🥩 Doctor Sausage,257,7;🥩 Cervelat,460,30
-Seafood|🐟 Salmon,208,2;🐟 Cod,82,2;🐟 Herring,158,5;🍤 Shrimp,99,2;🥫 Canned Tuna,116,365;🐟 Mackerel,205,3;🐟 Trout,148,2;🦀 Crab Sticks,95,14;🐟 Tilapia,96,2;🐟 Pollock,72,2;🐟 Sea Bass,97,2;🐟 Carp,127,2;🐟 Pike,84,2;🐟 Catfish,95,2;🐟 Halibut,111,2;🐟 Fresh Sardines,208,2;🐟 Smoked Salmon,172,10;🦑 Squid,92,2;🦪 Mussels,86,2;🦪 Oysters,68,2;🦀 Crab,97,2;🦞 Lobster,89,2;🐙 Octopus,82,2;🐚 Scallops,88,2;🥚 Red Caviar,260,14;🐟 Dried Fish,250,90;🐟 Salted Herring,217,14;🐟 Smoked Mackerel,221,10;🐟 Pangasius,90,2;🐟 Sturgeon,160,2;🍤 Tiger Prawns,106,2;🐟 Anchovies,131,30;🐟 Eel,184,2;🐟 Capelin,157,2
-Grains|🍝 Pasta,350,365;🍚 Rice,360,365;🌾 Buckwheat,343,365;🥣 Oats,389,270;🌾 Millet,378,365;🌾 Semolina,360,365;🌾 Couscous,376,365;🌾 Pearl Barley,352,365;🌾 Flour,364,270;🥣 Cornflakes,357,180;🍜 Instant Noodles,450,270;🌾 Bulgur,342,365;🍚 Brown Rice,362,365;🍚 Basmati Rice,350,365;🍚 Jasmine Rice,355,365;🍚 Wild Rice,357,365;🌾 Quinoa,368,365;🌽 Corn Grits,337,365;🌽 Cornmeal,362,365;🌾 Wheat Groats,335,365;🥣 Muesli,363,180;🥣 Granola,471,180;🍝 Spaghetti,350,365;🍝 Penne,350,365;🍝 Fusilli,350,365;🍜 Egg Noodles,384,365;🍜 Rice Noodles,364,365;🍜 Vermicelli,350,365;🌾 Whole Wheat Flour,340,270;🌾 Rye Flour,325,270;🌽 Corn Starch,381,365;🥔 Potato Starch,333,365;🍞 Breadcrumbs,395,180;🍜 Udon Noodles,127,14;🍝 Lasagna Sheets,350,365;🌾 Spelt,338,365;🌾 Oat Bran,246,180;🍚 Sushi Rice,360,365;🥣 Rolled Oats,379,270;🍜 Soba Noodles,336,365;🌾 Hercules Flakes,352,270;🌾 Wheat Bran,216,180
-Bakery|🍞 White Bread,265,4;🍞 Rye Bread,259,5;🥖 Baguette,270,2;🥐 Croissant,406,3;🫓 Lavash,275,5;🫓 Tortilla,237,10;🍞 Toast Bread,270,7;🥯 Bagel,250,3;🫓 Pita,275,4;🫓 Naan,310,4;🍞 Ciabatta,271,3;🥐 Brioche,375,3;🍩 Donut,452,2;🧁 Muffin,377,3;🥧 Apple Pie,237,3;🥨 Pretzel,380,5;🥞 Burger Bun,260,4;🍞 Sourdough Bread,260,4;🍞 Whole Grain Bread,247,5;🍞 Borodinsky Bread,208,5;🍞 Bread Loaf,266,4;🥖 Breadsticks,410,30;🍘 Crispbread,330,180;🍞 Cornbread,270,3;🍪 Gingerbread,350,30;🧇 Waffles,291,14;🥟 Puff Pastry,558,30;🍕 Pizza Dough,271,5;🥟 Phyllo Dough,300,14;🥐 Pain au Chocolat,414,2;🍞 Bun with Poppy Seeds,330,3;🍰 Pirozhki Dough,280,3
-Nuts & Legumes|🥜 Peanuts,567,180;🌰 Almonds,579,180;🌰 Walnuts,654,180;🌰 Cashews,553,180;🫘 Beans,333,365;🫘 Lentils,353,365;🫘 Chickpeas,364,365;🥜 Peanut Butter,588,90;🌻 Sunflower Seeds,584,180;🥜 Pistachios,560,180;🌰 Hazelnuts,628,180;🌰 Pecans,691,180;🥜 Macadamia,718,180;🌰 Pine Nuts,673,180;🥜 Brazil Nuts,659,180;🎃 Pumpkin Seeds,559,180;🌱 Sesame Seeds,573,180;🌱 Chia Seeds,486,365;🌱 Flax Seeds,534,365;🫘 Kidney Beans,333,365;🫘 Black Beans,341,365;🫘 White Beans,333,365;🫘 Green Lentils,353,365;🫘 Split Peas,341,365;🫘 Soybeans,446,365;🫘 Mung Beans,347,365;🥜 Tahini,595,180;🥜 Almond Butter,614,90;🥥 Coconut Flakes,660,180;🌰 Chestnuts,213,30;🫘 Red Lentils,358,365;🥜 Salted Peanuts,585,180;🌰 Mixed Nuts,607,180;🫘 Broad Beans,341,365
-Pantry|🫒 Olive Oil,884,365;🌻 Vegetable Oil,884,365;🥫 Ketchup,101,90;🥫 Mayonnaise,680,60;🥫 Tomato Paste,82,90;🥫 Mustard,66,90;🥫 Soy Sauce,53,180;🍯 Honey,304,365;🧂 Sugar,387,365;🥒 Pickles,11,30;🍓 Jam,250,365;🥬 Sauerkraut,19,30;🍶 Balsamic Vinegar,88,365;🍶 Vinegar,18,365;🍶 Apple Cider Vinegar,21,365;🫒 Sesame Oil,884,365;🥥 Coconut Oil,862,365;🌻 Sunflower Oil,884,365;🥫 BBQ Sauce,150,90;🌶️ Hot Sauce,30,180;🌶️ Sriracha,93,180;🌶️ Adjika,70,60;🍅 Tkemali,100,60;🌿 Pesto,420,14;🥫 Tartar Sauce,300,30;🥫 Salad Dressing,350,90;🍅 Tomato Sauce,35,90;🍝 Pasta Sauce,60,90;🥫 Worcestershire Sauce,78,365;🥫 Teriyaki Sauce,89,180;🌿 Wasabi,109,90;🍁 Maple Syrup,260,365;🧂 Brown Sugar,380,365;🧂 Powdered Sugar,389,365;🍫 Chocolate Spread,539,90;🥄 Baking Powder,53,365;🥄 Baking Soda,0,365;🍞 Yeast,325,180;🍬 Vanilla Sugar,390,365;🥄 Gelatin,335,365;☕ Ground Coffee,2,180;☕ Coffee Beans,2,180;☕ Instant Coffee,2,365;🍵 Black Tea,1,365;🍵 Green Tea,1,365;🍫 Cocoa Powder,228,365;🥫 Horseradish Sauce,70,60;🥫 Garlic Sauce,300,30;🥫 Fish Sauce,35,365;🥫 Oyster Sauce,51,180;🥫 Hoisin Sauce,220,180;🥫 Miso Paste,199,180;🥫 Cream Soup Base,350,180;🍯 Dulce de Leche,328,60;🥫 Apple Sauce,42,14;🍯 Fruit Syrup,260,180;🍯 Agave Syrup,310,365;🥫 Pickled Beets,43,60;🥫 Pickled Cabbage,33,30;🥫 Tomato Ketchup Spicy,110,90
-Sweets|🍫 Chocolate,546,180;🍪 Cookies,480,90;🍰 Cake,350,3;🍬 Candy,390,180;🍦 Ice Cream,207,60;🥫 Condensed Milk,321,180;🥜 Halva,516,90;🍫 Dark Chocolate,546,180;🍫 Milk Chocolate,535,180;🍫 White Chocolate,539,180;🍫 Chocolate Bar,520,180;🍬 Caramel,382,180;🍭 Lollipop,380,365;🍬 Marshmallow,318,90;🍬 Zefir,326,30;🍬 Pastila,310,60;🐻 Gummy Bears,343,180;🍮 Jelly,60,14;🍫 Brownie,466,5;🍰 Cheesecake,321,4;🍰 Eclair,262,2;🍫 Chocolate Candies,500,180;🍧 Sorbet,131,60;🍦 Popsicle,100,60;🍪 Wafers,520,90;🍬 Marmalade,321,90;🍬 Turkish Delight,320,90;🥮 Baklava,430,10;🍰 Tiramisu,283,3;🍮 Pudding,115,5;🍮 Panna Cotta,200,4;🍰 Napoleon Cake,380,3;🍰 Honey Cake,370,4;🍪 Oatmeal Cookies,430,60;🍪 Shortbread,502,60;🍫 Truffles,510,30;🍨 Gelato,185,60;🍬 Toffee,436,180;🥜 Nut Brittle,480,90;🍬 Candied Fruit,322,180;🍬 Halva Sunflower,523,90;🍯 Chikki,480,90;🍰 Carrot Cake,415,4
-Drinks|🧃 Orange Juice,45,7;🧃 Apple Juice,46,7;🥤 Kvass,27,7;🥤 Cola,42,180;💧 Mineral Water,0,365;💧 Sparkling Water,0,365;🍋 Lemonade,40,30;🍵 Iced Tea,30,30;⚡ Energy Drink,45,180;🥤 Lemon-Lime Soda,41,180;🍅 Tomato Juice,17,7;🍇 Grape Juice,60,7;🧃 Multivitamin Juice,48,7;🍍 Pineapple Juice,53,7;🥥 Coconut Water,19,30;🥤 Smoothie,60,2;🥤 Compote,45,5;🥤 Kissel,60,5;🥤 Mors,40,5;🍫 Hot Chocolate,89,1;🍺 Beer,43,180;🍷 Red Wine,85,365;🍷 White Wine,82,365;🥂 Champagne,76,365;🥃 Whiskey,250,365;🍸 Vodka,231,365;🍎 Cider,50,180;🥛 Milkshake,112,2;🍵 Matcha Latte,60,2;🥤 Fruit Juice Box,47,180;🍊 Fresh Orange Juice,45,2;🥤 Tarragon Soda,45,180;🥤 Birch Sap,24,5;🍷 Sangria,80,5;🧃 Peach Juice,50,7
-Frozen|🥟 Pelmeni,250,180;🥟 Vareniki,200,180;🍕 Frozen Pizza,266,180;🥦 Frozen Vegetables,65,180;🍟 French Fries,312,180;🍓 Frozen Berries,50,180;🍗 Chicken Nuggets,296,180;🐟 Fish Fingers,230,180;🌽 Frozen Corn,81,180;🥬 Frozen Spinach,23,180;🫛 Frozen Peas,77,180;🐟 Frozen Fish Fillet,100,180;🍤 Frozen Shrimp,99,180;🍗 Frozen Chicken,165,180;🍖 Frozen Meatballs,230,180;🥩 Frozen Cutlets,240,180;🥞 Frozen Blini,200,180;🥟 Frozen Cheburek,300,180;🥐 Frozen Dough,270,180;🍄 Frozen Mushrooms,25,180;🥭 Frozen Mango,60,180;🧇 Frozen Waffles,290,180;🌯 Frozen Burrito,230,180;🍝 Frozen Lasagna,135,180;🥔 Frozen Hash Browns,150,180;🥟 Pierogi,190,180;🥟 Manti,210,180;🥟 Khinkali,220,180;🥟 Gyoza,200,180;🥟 Dumplings with Cherry,190,180;🥬 Frozen Broccoli,35,180;🥕 Frozen Carrot,35,180;🫑 Frozen Bell Pepper,30,180;🍓 Frozen Strawberries,32,180;🫐 Frozen Blueberries,57,180;🍨 Frozen Yogurt,127,60;🥟 Frozen Syrniki,220,180;🍕 Frozen Calzone,250,180
-Spices|🧂 Salt,0,365;🌶️ Black Pepper,251,365;🌶️ Paprika,282,365;🌿 Cinnamon,247,365;🌿 Bay Leaf,313,365;🌿 Oregano,265,365;🌿 Cumin,375,365;🌿 Turmeric,312,365;🌿 Coriander,298,365;🌿 Vanilla,288,365;🌿 Nutmeg,525,365;🌿 Cloves,274,365;🍛 Curry Powder,325,365;🌶️ Chili Flakes,282,365;🌿 Dried Dill,253,365;🧄 Dried Garlic,331,365;🌿 Rosemary,131,14;🌿 Thyme,101,14;🌿 Saffron,310,365;🌿 Cardamom,311,365;🌿 Italian Herbs,265,365;🌿 Suneli Hops,250,365;🌿 Ginger Powder,335,365;🌿 Mustard Seeds,508,365;🌿 Star Anise,337,365
-Canned|🌽 Canned Corn,76,365;🫛 Canned Peas,70,365;🫘 Canned Beans,90,365;🍅 Canned Tomatoes,21,365;🐟 Sprats in Oil,363,365;🥫 Beef Stew,250,365;🐟 Canned Sardines,208,365;🐟 Canned Salmon,140,365;🫒 Green Olives,115,365;🫒 Black Olives,115,365;🍄 Pickled Mushrooms,22,365;🍑 Canned Peaches,60,365;🍍 Canned Pineapple,60,365;🌶️ Pickled Peppers,20,365;🍄 Canned Mushrooms,22,365;🍆 Eggplant Caviar,90,365;🥫 Canned Chickpeas,119,365;🥫 Canned Lentils,116,365;🥫 Canned Coconut Milk,230,365;🥫 Condensed Soup,60,365;🐟 Pink Salmon Canned,136,365;🥫 Canned Pate,230,365;🥫 Canned Carrot,30,365;🍒 Canned Cherries,70,365;🥫 Canned Pumpkin,34,365
-Ready Meals|🥙 Hummus,177,5;🍣 Sushi,150,1;🍣 Sushi Rolls,140,1;🌯 Shawarma,215,1;🍔 Burger,295,1;🌭 Hot Dog,290,1;🍕 Pizza Slice,266,2;🍗 Fried Chicken,246,2;🍖 Cutlets,230,3;🥟 Pirozhki,260,2;🥟 Cheburek,300,1;🥟 Samsa,280,1;🥞 Blini,230,3;🧀 Syrniki,220,3;🥔 Mashed Potatoes,88,3;🍚 Fried Rice,163,3;🥗 Pasta Salad,150,3;🥗 Caesar Salad,120,2;🥗 Greek Salad,105,2;🥗 Olivier Salad,198,3;🐟 Herring Under Fur Coat,180,3;🍲 Borscht Soup,49,4;🍲 Chicken Soup,40,4;🍲 Solyanka,75,4;🥣 Okroshka,60,2;🍜 Lagman,105,3;🍚 Plov Ready,190,3;🧀 Mac and Cheese,164,3;🍝 Lasagna,135,3;🧆 Falafel,333,3;🥬 Cabbage Rolls,120,3;🍃 Dolma,180,4;🥘 Goulash,150,3;🥘 Beef Stroganoff,170,3;🍳 Scrambled Eggs,148,1;🌮 Tacos,226,2;🥪 Sandwich,250,2;🥪 Club Sandwich,230,2;🍟 Fries Takeaway,312,1;🍲 Mushroom Soup,60,4
-Snacks|🥔 Potato Chips,536,90;🍿 Popcorn,387,30;🌮 Nachos,489,90;🥨 Salted Crackers,430,180;🍫 Granola Bar,450,180;💪 Protein Bar,380,180;🍘 Rice Cakes,387,180;🥜 Trail Mix,462,180;🥩 Beef Jerky,410,180;🥨 Pretzel Sticks,380,180;🧀 Cheese Snacks,500,90;🥜 Roasted Chickpeas,380,90;🍫 Energy Bar,400,180;🥜 Peanut Bar,480,180;🍪 Cracker Sandwich,480,180;🧁 Sunflower Halva Bar,516,180;🫘 Dried Edamame,430,180;🍌 Banana Chips,519,90;🍎 Apple Chips,240,90;🥥 Coconut Chips,600,90
+Vegetables|🍅 Tomato,18,7;🥒 Cucumber,15,7;🥔 Potato,77,30;🍠 Sweet Potato,86,21;🥕 Carrot,41,21;🧅 Onion,40,30;🧄 Garlic,149,60;🥬 Cabbage,25,21;🥦 Broccoli,34,5;🥬 Spinach,23,4;🫑 Bell Pepper,31,7;🍆 Eggplant,25,7;🥒 Zucchini,17,6;🎃 Pumpkin,26,30;🌽 Corn,86,5;🥬 Lettuce,15,5;🍄 Mushrooms,22,5;🌿 Dill,43,5;🌿 Parsley,36,6;🟣 Beetroot,43,21;🫛 Green Peas,81,5;🥦 Cauliflower,25,6;🥬 Celery,16,10;🌶️ Chili Pepper,40,7;⚪ Radish,16,8;🫛 Green Beans,31,5;🌱 Asparagus,20,4;🫚 Ginger,80,21;🥬 Leek,61,10;⚪ Turnip,28,20;🥬 Arugula,25,4;🥬 Bok Choy,13,5;🥬 Brussels Sprouts,43,7;🌿 Artichoke,47,5;🌿 Fennel,31,7;🥬 Kohlrabi,27,10;🧅 Spring Onion,32,7;🥬 Red Cabbage,31,21;🌶️ Jalapeno,29,7;🌿 Horseradish,48,30;🥒 Okra,33,5;🎃 Butternut Squash,45,30;🥕 Parsnip,75,20;🌿 Sorrel,22,4;🌿 Cilantro,23,5;🌿 Basil,23,5;🌿 Mint,70,5;🧅 Shallot,72,30;🧅 Red Onion,40,30;🍅 Cherry Tomato,18,7;🥒 Pattypan Squash,16,6;⚪ Daikon,18,14;🫛 Edamame,121,5;🥬 Salad Mix,17,4;🥬 Swiss Chard,19,5;🥬 Watercress,11,3;🍄 Champignons,22,5;🍄 Oyster Mushrooms,33,5;🍄 Porcini Mushrooms,34,4;🥔 Red Potato,70,30;🥬 Chinese Cabbage,16,10;🥬 Romaine Lettuce,17,5;🥬 Kale,49,5;🥬 Collard Greens,32,5;🫑 Red Bell Pepper,31,7;🫑 Yellow Bell Pepper,27,7;🫑 Green Bell Pepper,20,7;🥕 Baby Carrots,35,14;🥔 New Potatoes,70,14;🥒 Gherkins,12,7;🌽 Baby Corn,26,5;🥬 Iceberg Lettuce,14,7;🥬 Endive,17,6;🥬 Radicchio,23,7;🌿 Chives,30,5;🌿 Tarragon,50,5;🌿 Lemongrass,99,14;🌱 Microgreens,25,4;🌱 Bean Sprouts,30,3;🌱 Alfalfa Sprouts,23,4;🍄 Shiitake Mushrooms,34,6;🍄 Chanterelles,38,4;🍄 Enoki Mushrooms,37,6;🍄 King Oyster Mushrooms,35,6;🍄 Portobello,22,5;🍠 Yam,118,21;🥔 Jerusalem Artichoke,73,14;🥕 Purple Carrot,41,21;🫛 Snow Peas,42,5;🫛 Sugar Snap Peas,42,5;🥬 Mustard Greens,27,4;🧄 Wild Garlic,35,4;🧅 Pearl Onions,40,30;🥒 Chayote,19,14;🍅 Plum Tomatoes,18,7;🍅 Heirloom Tomatoes,18,6;🍅 Green Tomatoes,23,10;🥦 Broccolini,35,5;🥦 Romanesco,31,6;🎃 Acorn Squash,40,30;🎃 Spaghetti Squash,31,30;🥕 Rutabaga,37,30;🌿 Rhubarb,21,7;🥔 Celery Root,42,30;🥬 Savoy Cabbage,27,14;🥔 Taro,112,14;🌶️ Habanero,40,10;🌶️ Serrano Pepper,32,7;🌶️ Poblano Pepper,20,7;🍆 Baby Eggplant,25,6
+Fruits|🍎 Apple,52,14;🍌 Banana,89,4;🍊 Orange,47,10;🍋 Lemon,29,14;🍐 Pear,57,7;🍇 Grapes,69,7;🍑 Peach,39,4;🍒 Cherry,50,4;🍍 Pineapple,50,5;🥭 Mango,60,5;🍉 Watermelon,30,5;🍈 Melon,34,5;🥝 Kiwi,61,7;🥑 Avocado,160,4;🍑 Apricot,48,4;🍑 Plum,46,5;🍊 Tangerine,53,10;🔴 Pomegranate,83,30;🍊 Grapefruit,42,14;🥭 Papaya,43,5;🍈 Fig,74,3;🌴 Dates,282,180;🍋 Lime,30,14;🍑 Nectarine,44,5;🍊 Persimmon,70,7;🍈 Guava,68,5;🍈 Passion Fruit,97,7;🐉 Dragon Fruit,60,5;🍈 Lychee,66,5;🍐 Quince,57,14;🥥 Coconut,354,30;🍇 Raisins,299,365;🍑 Dried Apricots,241,365;🍑 Prunes,240,365;🍈 Dried Figs,249,365;🍊 Pomelo,38,14;🍏 Green Apple,52,14;🍌 Plantain,122,5;🍍 Dried Pineapple,340,180;🍈 Cantaloupe,34,5;🍐 Asian Pear,42,10;🍊 Clementine,47,10;🍋 Yuzu,30,10;🥭 Dried Mango,319,180;🍒 Dried Cherries,333,180;🍌 Baby Bananas,89,4;🍋 Bergamot,30,10;🍊 Kumquat,71,14;🍊 Blood Orange,50,10;🍈 Honeydew Melon,36,7;🍈 Jackfruit,95,5;🍈 Durian,147,4;🍈 Rambutan,82,5;🍈 Mangosteen,73,5;🍈 Feijoa,61,7;🍈 Kiwano,44,14;⭐ Star Fruit,31,7;🍑 Loquat,47,4;🍈 Cherimoya,75,4;🍇 Green Grapes,69,7;🍇 Red Grapes,69,7;🍇 Black Grapes,69,7;🍑 Flat Peach,39,4;🍑 Mirabelle Plum,60,5;🍎 Crab Apples,76,14;🍋 Meyer Lemon,29,14;🥥 Young Coconut,354,14;🍇 Sultanas,299,365;🌴 Medjool Dates,277,180;🍎 Dried Apples,243,365;🍐 Dried Pears,262,365;🍌 Dried Bananas,346,180;🍈 Dried Melon,341,180;🍏 Granny Smith Apple,58,21;🍎 Gala Apple,57,14;🍐 Conference Pear,57,7
+Berries|🍓 Strawberry,32,3;🫐 Blueberry,57,5;🍇 Raspberry,52,3;🫐 Blackberry,43,3;🍒 Cranberry,46,10;🍇 Gooseberry,44,4;🍒 Lingonberry,43,7;🍊 Sea Buckthorn,82,5;🍇 Mulberry,43,3;🍒 Goji Berries,349,180;🍒 Sweet Cherry,63,4;🍒 Sour Cherry,50,4;🍇 Black Currant,63,4;🍇 Red Currant,56,4;🌹 Rosehip,162,30;🍓 Wild Strawberry,32,3;🫐 Bilberry,44,4;🍒 Cloudberry,51,4;🍇 Elderberry,73,3;🫐 Honeyberry,55,4;🍇 Boysenberry,50,3;🍇 Loganberry,55,3;🍒 Dried Barberry,316,180;🫐 Aronia,47,10;🍒 Viburnum,26,10;🍇 White Currant,56,4;🫐 Dried Blueberries,317,180;🍒 Dried Cranberries,308,180;🍓 Freeze-Dried Strawberries,350,365;🫐 Acai Berries,70,2;🍒 Physalis,53,10;🍇 Dewberry,43,3;🍓 Garden Strawberry,32,3
+Dairy|🥛 Milk,60,5;🥛 Kefir,51,7;🥛 Ryazhenka,67,7;🥛 Yogurt,61,7;🥛 Sour Cream,206,7;🧈 Butter,717,30;🧀 Cheddar Cheese,403,21;🧀 Mozzarella,280,10;🧀 Parmesan,431,60;🧀 Feta,264,14;🧀 Cream Cheese,342,10;🧀 Cottage Cheese,98,5;🧀 Processed Cheese,300,30;🥚 Eggs,143,21;🥛 Heavy Cream,340,7;🥛 Oat Milk,45,7;🧀 Ricotta,174,7;🧀 Gouda,356,30;🧀 Brie,334,14;🧀 Swiss Cheese,380,30;🧀 Brynza,260,14;🧀 Suluguni,290,14;🧀 Blue Cheese,353,30;🧀 Goat Cheese,364,14;🥛 Light Cream,205,7;🥛 Whipped Cream,257,5;🧈 Margarine,717,60;🥛 Ayran,40,7;🥛 Soy Milk,33,7;🥛 Almond Milk,24,7;🥛 Greek Yogurt,97,10;🥛 Skyr,63,10;🧈 Ghee,900,90;🥚 Quail Eggs,158,21;🧀 Mascarpone,429,10;🧀 Halloumi,321,30;🧀 Camembert,300,14;🥛 Coconut Milk,230,5;🥛 Lactose-Free Milk,45,7;🥛 Drinking Yogurt,72,10;🧀 Cheese Curds,98,5;🧀 Provolone,351,30;🧀 Edam,357,30;🧀 Emmental,380,30;🧀 Gruyere,413,60;🧀 Manchego,390,60;🧀 Pecorino,387,60;🧀 Roquefort,369,30;🧀 Gorgonzola,353,21;🧀 Burrata,330,4;🧀 Paneer,321,7;🧀 Smoked Cheese,330,30;🧀 String Cheese,300,30;🧀 Cheese Slices,330,30;🧀 Grated Cheese,400,14;🧀 Adyghe Cheese,240,7;🥛 Buttermilk,40,10;🥛 Chocolate Milk,83,7;🥛 Baked Milk,67,7;🥛 Skim Milk,34,7;🥛 Whole Milk,64,7;🥛 Goat Milk,69,7;🥛 Evaporated Milk,134,180;🥛 Matsoni,63,7;🥛 Fruit Yogurt,85,14;🥛 Vanilla Yogurt,95,14;🥛 Low-Fat Kefir,40,7;🍫 Glazed Curd Bar,407,14;🧈 Salted Butter,717,45;🥛 Creme Fraiche,292,14;🥛 Clotted Cream,586,7;🥚 Egg Whites,52,7;🥚 Duck Eggs,185,21;🥛 Prostokvasha,58,5;🧀 Tvorog 9%,159,5
+Meat|🍗 Chicken Breast,165,2;🍗 Chicken Thighs,209,2;🥩 Beef,250,3;🥩 Pork,242,3;🥩 Ground Beef,254,2;🍖 Lamb,294,3;🦃 Turkey,135,2;🌭 Sausages,301,7;🥓 Bacon,541,7;🍖 Ham,145,7;🥩 Boiled Sausage,257,7;🥓 Salo,770,60;🥩 Liver,135,2;🦆 Duck,337,3;🥩 Veal,172,3;🐇 Rabbit,173,3;🍗 Chicken Wings,203,2;🍗 Chicken Drumsticks,172,2;🍗 Whole Chicken,215,2;🍖 Pork Ribs,277,3;🥩 Steak,271,3;🍖 Meatballs,230,3;🥩 Minced Pork,263,2;🌭 Kielbasa,320,10;🍕 Salami,336,21;🍕 Pepperoni,504,30;🥓 Prosciutto,250,30;🥫 Liver Pate,300,7;🍗 Chicken Liver,119,2;🥩 Beef Tongue,224,3;🌭 Smoked Sausage,420,21;🌭 Hot Dog Sausages,260,10;🥓 Pork Belly,518,3;🦃 Turkey Breast,104,2;🍗 Chicken Hearts,153,2;🥩 Ground Turkey,148,2;🥩 Ground Chicken,143,2;🥩 Pork Neck,240,3;🥩 Beef Ribeye,291,3;🥩 Beef Brisket,250,3;🥓 Smoked Bacon,550,14;🥩 Doktorskaya Sausage,257,7;🥩 Cervelat,460,30;🍗 Chicken Legs,184,2;🍗 Chicken Gizzards,94,2;🦃 Turkey Thighs,144,2;🦃 Turkey Wings,197,2;🥩 Lamb Chops,282,3;🥩 Ground Lamb,282,2;🥩 Beef Tenderloin,218,3;🥩 Beef Sirloin,206,3;🥩 Beef Shank,201,3;🥩 Beef Liver,135,2;🥩 Pork Loin,143,3;🥩 Pork Chops,231,3;🥩 Pork Shoulder,236,3;🥩 Pork Tenderloin,143,3;🍖 Pork Knuckle,260,3;🥩 Venison,158,3;🦆 Duck Breast,201,3;🪿 Goose,305,3;🐦 Quail,227,2;🌭 Chorizo,455,30;🌭 Bratwurst,297,10;🌭 Frankfurters,305,10;🌭 Chicken Sausages,172,7;🥓 Pancetta,458,30;🥓 Turkey Bacon,226,14;🍖 Roast Beef,175,5;🍗 Smoked Chicken,190,7;🍖 Smoked Ham,145,10;🥫 Corned Beef,251,7;🥩 Bresaola,151,30;🥩 Basturma,250,30;🍔 Beef Burger Patties,254,2;🍖 Marinated Shashlik,220,2;🍗 Chicken Fillet,113,2
+Seafood|🐟 Salmon,208,2;🐟 Cod,82,2;🐟 Herring,158,5;🍤 Shrimp,99,2;🥫 Canned Tuna,116,365;🐟 Mackerel,205,3;🐟 Trout,148,2;🦀 Crab Sticks,95,14;🐟 Tilapia,96,2;🐟 Pollock,72,2;🐟 Sea Bass,97,2;🐟 Carp,127,2;🐟 Pike,84,2;🐟 Catfish,95,2;🐟 Halibut,111,2;🐟 Fresh Sardines,208,2;🐟 Smoked Salmon,172,10;🦑 Squid,92,2;🦪 Mussels,86,2;🦪 Oysters,68,2;🦀 Crab,97,2;🦞 Lobster,89,2;🐙 Octopus,82,2;🐚 Scallops,88,2;🥚 Red Caviar,260,14;🐟 Dried Fish,250,90;🐟 Salted Herring,217,14;🐟 Smoked Mackerel,221,10;🐟 Pangasius,90,2;🐟 Sturgeon,160,2;🍤 Tiger Prawns,106,2;🐟 Anchovies,131,30;🐟 Eel,184,2;🐟 Capelin,157,2;🐟 Tuna Steak,144,2;🐟 Haddock,74,2;🐟 Hake,86,2;🐟 Sole,91,2;🐟 Flounder,91,2;🐟 Perch,91,2;🐟 Zander,84,2;🐟 Dorado,96,2;🐟 Red Snapper,100,2;🐟 Swordfish,144,2;🐟 Mahi-Mahi,85,2;🐟 Arctic Char,140,2;🐟 Coho Salmon,146,2;🐟 Pink Salmon,127,2;🐟 Chum Salmon,120,2;🐟 Smelt,97,2;🐟 Baltic Sprats,137,2;🐟 Kippers,217,10;🐟 Pickled Herring,262,21;🍤 Cooked Shrimp,99,3;🍤 King Prawns,85,2;🦞 Crayfish,77,2;🦑 Calamari Rings,92,2;🦪 Clams,86,2;🦀 King Crab,84,2;⚫ Black Caviar,264,30;🐟 Fish Roe,143,4;🐙 Baby Octopus,82,2;🦐 Seafood Mix,90,2;🐟 Salted Salmon,202,7
+Grains|🍝 Pasta,350,365;🍚 Rice,360,365;🌾 Buckwheat,343,365;🥣 Oats,389,270;🌾 Millet,378,365;🌾 Semolina,360,365;🌾 Couscous,376,365;🌾 Pearl Barley,352,365;🌾 Flour,364,270;🥣 Cornflakes,357,180;🍜 Instant Noodles,450,270;🌾 Bulgur,342,365;🍚 Brown Rice,362,365;🍚 Basmati Rice,350,365;🍚 Jasmine Rice,355,365;🍚 Wild Rice,357,365;🌾 Quinoa,368,365;🌽 Corn Grits,337,365;🌽 Cornmeal,362,365;🌾 Wheat Groats,335,365;🥣 Muesli,363,180;🥣 Granola,471,180;🍝 Spaghetti,350,365;🍝 Penne,350,365;🍝 Fusilli,350,365;🍜 Egg Noodles,384,365;🍜 Rice Noodles,364,365;🍜 Vermicelli,350,365;🌾 Whole Wheat Flour,340,270;🌾 Rye Flour,325,270;🌽 Corn Starch,381,365;🥔 Potato Starch,333,365;🍞 Breadcrumbs,395,180;🍜 Udon Noodles,127,14;🍝 Lasagna Sheets,350,365;🌾 Spelt,338,365;🌾 Oat Bran,246,180;🍚 Sushi Rice,360,365;🥣 Rolled Oats,379,270;🍜 Soba Noodles,336,365;🌾 Wheat Bran,216,180;🍚 Arborio Rice,349,365;🍚 Black Rice,356,365;🍚 Red Rice,355,365;🍚 Parboiled Rice,374,365;🌾 Amaranth,371,365;🌾 Teff,367,365;🌾 Farro,340,365;🌾 Sorghum,329,365;🌾 Freekeh,325,365;🌾 Barley Groats,343,365;🌾 Rye Flakes,338,270;🌾 Buckwheat Flour,335,270;🌾 Rice Flour,366,270;🌾 Almond Flour,571,180;🥥 Coconut Flour,443,180;🌾 Chickpea Flour,387,270;🌽 Polenta,370,365;🍝 Tagliatelle,358,365;🍝 Farfalle,350,365;🍝 Rigatoni,350,365;🍝 Linguine,350,365;🍝 Macaroni,350,365;🍝 Orzo,357,365;🍝 Whole Wheat Pasta,348,365;🍝 Gluten-Free Pasta,357,365;🍝 Fresh Pasta,288,7;🥟 Gnocchi,133,14;🍜 Ramen Noodles,436,270;🍜 Glass Noodles,351,365;🥣 Bran Flakes,357,180;🥣 Chocolate Cereal,388,180;🥣 Puffed Rice,383,180;🥣 Instant Oatmeal,367,270;🌾 Bread Flour,361,270;🌾 Self-Raising Flour,353,270
+Bakery|🍞 White Bread,265,4;🍞 Rye Bread,259,5;🥖 Baguette,270,2;🥐 Croissant,406,3;🫓 Lavash,275,5;🫓 Tortilla,237,10;🍞 Toast Bread,270,7;🥯 Bagel,250,3;🫓 Pita,275,4;🫓 Naan,310,4;🍞 Ciabatta,271,3;🥐 Brioche,375,3;🍩 Donut,452,2;🧁 Muffin,377,3;🥧 Apple Pie,237,3;🥨 Pretzel,380,5;🥞 Burger Bun,260,4;🍞 Sourdough Bread,260,4;🍞 Whole Grain Bread,247,5;🍞 Borodinsky Bread,208,5;🍞 Bread Loaf,266,4;🥖 Breadsticks,410,30;🍘 Crispbread,330,180;🍞 Cornbread,270,3;🍪 Gingerbread,350,30;🧇 Waffles,291,14;🥟 Puff Pastry,558,30;🍕 Pizza Dough,271,5;🥟 Phyllo Dough,300,14;🥐 Pain au Chocolat,414,2;🍞 Poppy Seed Bun,330,3;🍰 Yeast Dough,280,3;🍞 Multigrain Bread,265,5;🍞 Gluten-Free Bread,246,5;🍔 Brioche Buns,350,4;🥐 Almond Croissant,420,2;🥐 Cinnamon Roll,390,3;🥯 Sesame Bagel,270,3;🫓 Focaccia,249,3;🫓 Flatbread,290,5;🫓 Chapati,297,4;🧁 English Muffin,227,7;🥞 Crumpets,198,5;🍞 Banana Bread,326,4;🍰 Sponge Cake,297,4;🧁 Cupcake,305,3;🥧 Cherry Pie,260,3;🥧 Quiche,300,3;🫓 Khachapuri,300,2;🥖 Garlic Bread,350,3;🥨 Soft Pretzel,338,2;🌭 Hot Dog Buns,280,5;🫓 Matzo,395,365;🍪 Biscotti,410,90;🍞 Kulich,350,7;🍞 Raisin Bread,274,4;🥐 Rugelach,420,5
+Nuts & Legumes|🥜 Peanuts,567,180;🌰 Almonds,579,180;🌰 Walnuts,654,180;🌰 Cashews,553,180;🫘 Beans,333,365;🫘 Lentils,353,365;🫘 Chickpeas,364,365;🥜 Peanut Butter,588,90;🌻 Sunflower Seeds,584,180;🥜 Pistachios,560,180;🌰 Hazelnuts,628,180;🌰 Pecans,691,180;🥜 Macadamia,718,180;🌰 Pine Nuts,673,180;🥜 Brazil Nuts,659,180;🎃 Pumpkin Seeds,559,180;🌱 Sesame Seeds,573,180;🌱 Chia Seeds,486,365;🌱 Flax Seeds,534,365;🫘 Kidney Beans,333,365;🫘 Black Beans,341,365;🫘 White Beans,333,365;🫘 Green Lentils,353,365;🫘 Split Peas,341,365;🫘 Soybeans,446,365;🫘 Mung Beans,347,365;🥜 Tahini,595,180;🥜 Almond Butter,614,90;🥥 Coconut Flakes,660,180;🌰 Chestnuts,213,30;🫘 Red Lentils,358,365;🥜 Salted Peanuts,585,180;🌰 Mixed Nuts,607,180;🫘 Broad Beans,341,365;🫘 Pinto Beans,347,365;🫘 Navy Beans,337,365;🫘 Lima Beans,338,365;🫘 Adzuki Beans,329,365;🫘 Black-Eyed Peas,336,365;🫘 Yellow Lentils,345,365;🫘 Black Lentils,352,365;🌰 Roasted Almonds,598,180;🥜 Cashew Butter,587,90;🌱 Hemp Seeds,553,365;🌱 Poppy Seeds,525,365;🥜 Crunchy Peanut Butter,597,90;🌰 Tiger Nuts,409,180;🌰 Candied Pecans,620,90;🥜 Smoked Almonds,600,180
+Pantry|🫒 Olive Oil,884,365;🌻 Vegetable Oil,884,365;🥫 Ketchup,101,90;🥫 Mayonnaise,680,60;🥫 Tomato Paste,82,90;🥫 Mustard,66,90;🥫 Soy Sauce,53,180;🍯 Honey,304,365;🧂 Sugar,387,365;🥒 Pickles,11,30;🍓 Jam,250,365;🥬 Sauerkraut,19,30;🍶 Balsamic Vinegar,88,365;🍶 Vinegar,18,365;🍶 Apple Cider Vinegar,21,365;🫒 Sesame Oil,884,365;🥥 Coconut Oil,862,365;🌻 Sunflower Oil,884,365;🥫 BBQ Sauce,150,90;🌶️ Hot Sauce,30,180;🌶️ Sriracha,93,180;🌶️ Adjika,70,60;🍅 Tkemali,100,60;🌿 Pesto,420,14;🥫 Tartar Sauce,300,30;🥫 Salad Dressing,350,90;🍅 Tomato Sauce,35,90;🍝 Pasta Sauce,60,90;🥫 Worcestershire Sauce,78,365;🥫 Teriyaki Sauce,89,180;🌿 Wasabi,109,90;🍁 Maple Syrup,260,365;🧂 Brown Sugar,380,365;🧂 Powdered Sugar,389,365;🍫 Chocolate Spread,539,90;🥄 Baking Powder,53,365;🥄 Baking Soda,0,365;🍞 Yeast,325,180;🍬 Vanilla Sugar,390,365;🥄 Gelatin,335,365;☕ Ground Coffee,2,180;☕ Coffee Beans,2,180;☕ Instant Coffee,353,365;🍵 Black Tea,1,365;🍵 Green Tea,1,365;🍫 Cocoa Powder,228,365;🥫 Horseradish Sauce,70,60;🥫 Garlic Sauce,300,30;🥫 Fish Sauce,35,365;🥫 Oyster Sauce,51,180;🥫 Hoisin Sauce,220,180;🥫 Miso Paste,199,180;🥫 Cream Soup Base,350,180;🍯 Dulce de Leche,328,60;🥫 Apple Sauce,42,14;🍯 Fruit Syrup,260,180;🍯 Agave Syrup,310,365;🥫 Pickled Beets,43,60;🥫 Pickled Cabbage,33,30;🥫 Spicy Ketchup,110,90;🫒 Avocado Oil,884,365;🫒 Flaxseed Oil,884,180;🫒 Pumpkin Seed Oil,884,180;🍶 Rice Vinegar,18,365;🍶 Wine Vinegar,19,365;🥫 Dijon Mustard,66,180;🥫 Grainy Mustard,150,180;🌶️ Sweet Chili Sauce,210,180;🥫 Salsa,36,30;🥑 Guacamole,160,5;🥒 Tzatziki,95,7;🥫 Ranch Dressing,430,60;🥫 Caesar Dressing,450,60;🥫 Thousand Island Dressing,370,60;🌿 Red Pesto,360,14;🥫 Curry Paste,140,180;🌶️ Harissa,90,180;🌶️ Gochujang,220,365;🌶️ Tabasco,12,365;🍯 Golden Syrup,325,365;🍯 Molasses,290,365;🍯 Date Syrup,280,365;🧂 Stevia,0,365;🧂 Cane Sugar,380,365;🍫 Chocolate Chips,480,365;🥥 Coconut Cream,330,7;🥣 Vegetable Broth,10,7;🥣 Chicken Broth,15,7;🧊 Bouillon Cubes,250,365;🥫 Tomato Puree,38,90;🍅 Sun-Dried Tomatoes,258,180;🫒 Capers,23,365;🥄 Vanilla Extract,288,365;🥄 Agar-Agar,26,365;🍋 Citric Acid,0,365;🍋 Lemon Curd,320,30;🍒 Cherry Jam,250,365;🍑 Apricot Jam,250,365;🍊 Orange Marmalade,246,365;🫐 Blueberry Jam,250,365;🍓 Strawberry Jam,250,365;🌰 Chestnut Puree,170,180
+Sweets|🍫 Chocolate,546,180;🍪 Cookies,480,90;🍰 Cake,350,3;🍬 Candy,390,180;🍦 Ice Cream,207,60;🥫 Condensed Milk,321,180;🥜 Halva,516,90;🍫 Dark Chocolate,546,180;🍫 Milk Chocolate,535,180;🍫 White Chocolate,539,180;🍫 Chocolate Bar,520,180;🍬 Caramel,382,180;🍭 Lollipop,380,365;🍬 Marshmallow,318,90;🍬 Zefir,326,30;🍬 Pastila,310,60;🐻 Gummy Bears,343,180;🍮 Jelly,60,14;🍫 Brownie,466,5;🍰 Cheesecake,321,4;🍰 Eclair,262,2;🍫 Chocolate Candies,500,180;🍧 Sorbet,131,60;🍦 Popsicle,100,60;🍪 Wafers,520,90;🍬 Marmalade,321,90;🍬 Turkish Delight,320,90;🥮 Baklava,430,10;🍰 Tiramisu,283,3;🍮 Pudding,115,5;🍮 Panna Cotta,200,4;🍰 Napoleon Cake,380,3;🍰 Honey Cake,370,4;🍪 Oatmeal Cookies,430,60;🍪 Shortbread,502,60;🍫 Truffles,510,30;🍨 Gelato,185,60;🍬 Toffee,436,180;🥜 Nut Brittle,480,90;🍬 Candied Fruit,322,180;🍬 Sunflower Halva,523,90;🍯 Chikki,480,90;🍰 Carrot Cake,415,4;🍪 Chocolate Chip Cookies,488,60;🍪 Macarons,404,7;🥖 Churros,390,1;🍰 Red Velvet Cake,367,4;🍰 Chocolate Cake,371,4;🍰 Swiss Roll,350,7;🍮 Creme Brulee,310,3;🍮 Flan,150,4;🍨 Ice Cream Sandwich,240,60;🍬 Licorice,375,365;🍬 Jelly Beans,375,365;🍬 Mints,390,365;🍫 Fudge,411,90;🍫 Praline,530,90;🍬 Nougat,398,90;🍥 Meringues,390,90;🥧 Pumpkin Pie,243,3;🍰 Bird's Milk Cake,420,7;🍩 Ponchiki,410,2;🍯 Kozinaki,576,90;🍚 Rice Pudding,118,4;🍡 Mochi,240,3;🍭 Cotton Candy,390,365;🥧 Strudel,274,4;🍰 Lemon Tart,350,3
+Drinks|🧃 Orange Juice,45,7;🧃 Apple Juice,46,7;🥤 Kvass,27,7;🥤 Cola,42,180;💧 Mineral Water,0,365;💧 Sparkling Water,0,365;🍋 Lemonade,40,30;🍵 Iced Tea,30,30;⚡ Energy Drink,45,180;🥤 Lemon-Lime Soda,41,180;🍅 Tomato Juice,17,7;🍇 Grape Juice,60,7;🧃 Multifruit Juice,48,7;🍍 Pineapple Juice,53,7;🥥 Coconut Water,19,30;🥤 Smoothie,60,2;🥤 Compote,45,5;🥤 Kissel,60,5;🥤 Mors,40,5;🍫 Hot Chocolate,89,1;🍺 Beer,43,180;🍷 Red Wine,85,365;🍷 White Wine,82,365;🥂 Champagne,76,365;🥃 Whiskey,250,365;🍸 Vodka,231,365;🍎 Cider,50,180;🥛 Milkshake,112,2;🍵 Matcha Latte,60,2;🥤 Juice Box,47,180;🍊 Fresh Orange Juice,45,2;🥤 Tarragon Soda,45,180;🥤 Birch Sap,24,5;🍷 Sangria,80,5;🧃 Peach Juice,50,7;☕ Cold Brew,2,14;☕ Iced Coffee,60,7;🧋 Bubble Tea,90,1;🍵 Kombucha,13,30;🥤 Ginger Ale,34,180;🥤 Tonic Water,34,180;🥤 Root Beer,41,180;🥤 Diet Cola,0,180;🧃 Cranberry Juice,46,7;🧃 Pomegranate Juice,54,7;🥕 Carrot Juice,40,5;🧃 Grapefruit Juice,39,7;🧃 Cherry Juice,50,7;🥭 Mango Nectar,60,7;🥤 Sports Drink,26,180;💧 Flavored Water,15,180;🍺 Non-Alcoholic Beer,26,180;🍺 Dark Beer,51,180;🍸 Gin,263,365;🥃 Rum,231,365;🥃 Cognac,239,365;🍷 Rose Wine,80,365;🥛 Protein Shake,70,3;🥤 Green Smoothie,40,2;🍵 Herbal Tea,1,365;🥛 Tan,25,7;🍵 Chai Latte,60,2;☕ Cappuccino,40,1
+Frozen|🥟 Pelmeni,250,180;🥟 Vareniki,200,180;🍕 Frozen Pizza,266,180;🥦 Frozen Vegetables,65,180;🍟 French Fries,312,180;🍓 Frozen Berries,50,180;🍗 Chicken Nuggets,296,180;🐟 Fish Fingers,230,180;🌽 Frozen Corn,81,180;🥬 Frozen Spinach,23,180;🫛 Frozen Peas,77,180;🐟 Frozen Fish Fillet,100,180;🍤 Frozen Shrimp,99,180;🍗 Frozen Chicken,165,180;🍖 Frozen Meatballs,230,180;🥩 Frozen Cutlets,240,180;🥞 Frozen Blini,200,180;🥟 Frozen Cheburek,300,180;🥐 Frozen Dough,270,180;🍄 Frozen Mushrooms,25,180;🥭 Frozen Mango,60,180;🧇 Frozen Waffles,290,180;🌯 Frozen Burrito,230,180;🍝 Frozen Lasagna,135,180;🥔 Frozen Hash Browns,150,180;🥟 Pierogi,190,180;🥟 Manti,210,180;🥟 Khinkali,220,180;🥟 Gyoza,200,180;🥟 Cherry Vareniki,190,180;🥬 Frozen Broccoli,35,180;🥕 Frozen Carrot,35,180;🫑 Frozen Bell Pepper,30,180;🍓 Frozen Strawberries,32,180;🫐 Frozen Blueberries,57,180;🍨 Frozen Yogurt,127,60;🥟 Frozen Syrniki,220,180;🍕 Frozen Calzone,250,180;🫛 Frozen Green Beans,31,180;🍠 Frozen Sweet Potato Fries,180,180;🧅 Frozen Onion Rings,280,180;🥬 Frozen Kale,30,180;🥑 Frozen Avocado,160,180;🍍 Frozen Pineapple,50,180;🍒 Frozen Cherries,50,180;🍇 Frozen Raspberries,52,180;🍒 Frozen Cranberries,46,180;🍌 Frozen Bananas,89,90;🥧 Frozen Pie,280,180;🦑 Frozen Squid,92,180;🐟 Frozen Salmon,208,180;🍗 Frozen Chicken Wings,203,180;🥩 Frozen Minced Meat,254,180;🍔 Frozen Burgers,250,180;🌯 Frozen Spring Rolls,220,180;🥟 Frozen Samosas,260,180;🍚 Frozen Fried Rice,160,180;🥟 Frozen Ravioli,180,180;🥞 Frozen Pancakes,230,180;🥦 Frozen Cauliflower Rice,25,180;🥣 Frozen Soup Mix,40,180;🧊 Frozen Herbs,30,180
+Spices|🧂 Salt,0,365;🌶️ Black Pepper,251,365;🌶️ Paprika,282,365;🌿 Cinnamon,247,365;🌿 Bay Leaf,313,365;🌿 Oregano,265,365;🌿 Cumin,375,365;🌿 Turmeric,312,365;🌿 Coriander,298,365;🌿 Vanilla,288,365;🌿 Nutmeg,525,365;🌿 Cloves,274,365;🍛 Curry Powder,325,365;🌶️ Chili Flakes,282,365;🌿 Dried Dill,253,365;🧄 Dried Garlic,331,365;🌿 Rosemary,131,14;🌿 Thyme,101,14;🌿 Saffron,310,365;🌿 Cardamom,311,365;🌿 Italian Herbs,265,365;🌿 Khmeli-Suneli,250,365;🌿 Ginger Powder,335,365;🌿 Mustard Seeds,508,365;🌿 Star Anise,337,365;🌿 Dried Basil,233,365;🌿 Dried Parsley,292,365;🌿 Dried Mint,285,365;🌿 Sage,315,365;🌿 Marjoram,271,365;🌿 Fenugreek,323,365;🌿 Allspice,263,365;🍛 Garam Masala,379,365;🌶️ Cajun Seasoning,280,365;🌿 Ras el Hanout,300,365;🌿 Zaatar,300,365;🌿 Sumac,240,365;🌿 Five Spice,347,365;🌶️ Cayenne Pepper,318,365;🌶️ Smoked Paprika,282,365;🌶️ White Pepper,296,365;🌶️ Pink Peppercorns,250,365;🧂 Sea Salt,0,365;🧂 Himalayan Salt,0,365;🧂 Garlic Salt,10,365;🧅 Onion Powder,341,365;🌿 Celery Seeds,392,365;🌿 Caraway Seeds,333,365;🌿 Fennel Seeds,345,365;🌿 Dill Seeds,305,365;🍋 Lemon Pepper,250,365;🍗 Chicken Seasoning,250,365;🥒 Pickling Spice,280,365
+Canned|🌽 Canned Corn,76,365;🫛 Canned Peas,70,365;🫘 Canned Beans,90,365;🍅 Canned Tomatoes,21,365;🐟 Sprats in Oil,363,365;🥫 Beef Stew,250,365;🐟 Canned Sardines,208,365;🐟 Canned Salmon,140,365;🫒 Green Olives,115,365;🫒 Black Olives,115,365;🍄 Pickled Mushrooms,22,365;🍑 Canned Peaches,60,365;🍍 Canned Pineapple,60,365;🌶️ Pickled Peppers,20,365;🍄 Canned Mushrooms,22,365;🍆 Eggplant Caviar,90,365;🥫 Canned Chickpeas,119,365;🥫 Canned Lentils,116,365;🥫 Canned Coconut Milk,230,365;🥫 Condensed Soup,60,365;🐟 Canned Pink Salmon,136,365;🥫 Canned Pate,230,365;🥫 Canned Carrot,30,365;🍒 Canned Cherries,70,365;🥫 Canned Pumpkin,34,365;🐟 Canned Mackerel,200,365;🐟 Canned Cod Liver,613,365;🫛 Canned Green Beans,20,365;🥫 Canned Artichokes,45,365;🥫 Canned Asparagus,19,365;🍐 Canned Pears,50,365;🍑 Canned Apricots,48,365;🍊 Canned Mandarins,61,365;🍒 Fruit Cocktail,60,365;🎋 Canned Bamboo Shoots,19,365;🥫 Canned Water Chestnuts,50,365;🥫 Canned Jackfruit,30,365;🫘 Baked Beans,94,365;🌶️ Canned Chili,110,365;🥫 Canned Ravioli,90,365;🍗 Canned Chicken,185,365;🍖 Canned Ham,180,365;🥒 Squash Caviar,97,365;🫑 Lecho,60,365;🌶️ Pickled Jalapenos,27,365;🍅 Canned Tomato Soup,30,365;🥫 Canned Lychees,70,365;🦀 Canned Crab,85,365;🐟 Canned Anchovies,210,365;🟣 Canned Beets,30,365;🐟 Tuna in Water,116,365
+Ready Meals|🥙 Hummus,177,5;🍣 Sushi,150,1;🍣 Sushi Rolls,140,1;🌯 Shawarma,215,1;🍔 Burger,295,1;🌭 Hot Dog,290,1;🍕 Pizza Slice,266,2;🍗 Fried Chicken,246,2;🍖 Cutlets,230,3;🥟 Pirozhki,260,2;🥟 Cheburek,300,1;🥟 Samsa,280,1;🥞 Blini,230,3;🧀 Syrniki,220,3;🥔 Mashed Potatoes,88,3;🍚 Fried Rice,163,3;🥗 Pasta Salad,150,3;🥗 Caesar Salad,120,2;🥗 Greek Salad,105,2;🥗 Olivier Salad,198,3;🐟 Herring Under Fur Coat,180,3;🍲 Borscht Soup,49,4;🍲 Chicken Soup,40,4;🍲 Solyanka,75,4;🥣 Okroshka,60,2;🍜 Lagman,105,3;🍚 Plov,190,3;🧀 Mac and Cheese,164,3;🍝 Lasagna,135,3;🧆 Falafel,333,3;🥬 Cabbage Rolls,120,3;🍃 Dolma,180,4;🥘 Goulash,150,3;🥘 Beef Stroganoff,170,3;🍳 Scrambled Eggs,148,1;🌮 Tacos,226,2;🥪 Sandwich,250,2;🥪 Club Sandwich,230,2;🍟 Takeaway Fries,312,1;🍲 Mushroom Soup,60,4;🍕 Margherita Pizza,250,2;🍝 Spaghetti Bolognese,130,3;🍝 Carbonara,190,2;🍛 Chicken Curry,150,3;🍛 Butter Chicken,160,3;🍜 Pho,60,2;🍜 Ramen Bowl,90,2;🍱 Bento Box,170,1;🥘 Paella,160,2;🌶️ Chili Con Carne,120,3;🍲 Minestrone,40,4;🍲 Lentil Soup,70,4;🍅 Tomato Soup,40,4;🍲 Shchi,35,4;🍲 Ukha,45,3;🥗 Vinegret,90,3;🥗 Crab Salad,180,2;🥗 Coleslaw,150,3;🥗 Potato Salad,140,3;🥗 Tabbouleh,120,3;🌯 Burrito,210,2;🌯 Wrap,220,2;🥙 Gyro,215,1;🍝 Pasta Bake,160,3;🥧 Shepherd's Pie,120,3;🥟 Dim Sum,200,1;🍤 Tempura,250,1;🍣 Poke Bowl,140,1;🍗 Chicken Kiev,270,3;🍚 Risotto,150,2;🍆 Moussaka,140,3;🥞 Stuffed Blini,220,3;🥔 Draniki,200,2;🥔 Baked Potato,93,2;🍲 Kharcho,70,3;🍲 Ragout,110,3;🍳 Quiche Lorraine,290,3;🥘 Leftover Stew,110,3
+Snacks|🥔 Potato Chips,536,90;🍿 Popcorn,387,30;🌮 Nachos,489,90;🥨 Salted Crackers,430,180;🍫 Granola Bar,450,180;💪 Protein Bar,380,180;🍘 Rice Cakes,387,180;🥜 Trail Mix,462,180;🥩 Beef Jerky,410,180;🥨 Pretzel Sticks,380,180;🧀 Cheese Snacks,500,90;🥜 Roasted Chickpeas,380,90;🍫 Energy Bar,400,180;🥜 Peanut Bar,480,180;🍪 Sandwich Crackers,480,180;🧁 Halva Bar,516,180;🫘 Dried Edamame,430,180;🍌 Banana Chips,519,90;🍎 Apple Chips,240,90;🥥 Coconut Chips,600,90;🍘 Rice Crackers,390,180;🥕 Vegetable Chips,500,90;🫓 Pita Chips,450,90;🌽 Tortilla Chips,489,90;🥜 Honey Roasted Peanuts,560,180;🫛 Wasabi Peas,410,180;🍿 Caramel Popcorn,400,60;🧀 Cheese Crackers,490,180;🥩 Biltong,300,180;🦑 Dried Squid,300,180;🥓 Pork Rinds,544,90;🍪 Protein Cookies,400,180;🍎 Fruit Leather,350,180;🍬 Fruit Snacks,330,180;🥕 Veggie Sticks,40,3;🌻 Seed Mix,560,180;🍘 Senbei,380,180;🍿 Microwave Popcorn,480,180;🌰 Roasted Chestnuts,245,5;🍫 Rice Crispy Bar,410,180
+Plant-Based|⬜ Tofu,76,7;⬜ Silken Tofu,55,7;🟫 Smoked Tofu,140,14;🟫 Tempeh,192,10;🥩 Seitan,370,10;🍔 Veggie Burger,180,5;🌭 Vegan Sausages,250,10;🧀 Vegan Cheese,280,30;🥛 Rice Milk,47,7;🥥 Coconut Yogurt,110,10;🥛 Soy Yogurt,66,10;🧈 Plant Butter,600,60;🥩 Plant-Based Mince,200,7;🍗 Vegan Nuggets,230,180;🥛 Pea Milk,40,7;🥛 Cashew Milk,25,7;🥛 Hemp Milk,46,7;🥛 Hazelnut Milk,30,7;🌱 Textured Soy Protein,330,365;🌱 Nutritional Yeast,325,365;🥛 Oat Cream,150,30;🥛 Soy Cream,180,30;🥚 Vegan Mayo,450,60;🥚 Plant-Based Egg,120,10
+World Foods|🌿 Nori Sheets,35,365;🍚 Rice Paper,333,365;🥬 Kimchi,15,60;🫚 Pickled Ginger,20,180;🥣 Miso Soup Mix,40,365;🌿 Wakame,45,365;🍡 Tteok,230,14;🥟 Wonton Wrappers,290,7;🌮 Taco Shells,467,180;🍛 Curry Roux,500,365;🫘 Refried Beans,90,365;🌶️ Enchilada Sauce,30,180;🧀 Queso Dip,180,30;🍜 Laksa Paste,200,180;🍵 Matcha Powder,324,365;🥟 Spring Roll Wrappers,290,30;🫒 Kalamata Olives,230,365;🧆 Falafel Mix,330,365;🥙 Tahini Sauce,450,30;🍚 Glutinous Rice,370,365;🍶 Mirin,240,365;🍶 Ponzu,60,180;🥫 Tamarind Paste,240,180;🌶️ Sambal Oelek,40,365;🫓 Papadums,370,365;🥟 Bao Buns,240,7;🍜 Pad Thai Noodles,360,365;🍙 Onigiri,170,1
 ''';
 
 final foodDatabase = _raw.trim().split('\n').expand((line) {
@@ -102,94 +151,1027 @@ final foodDatabase = _raw.trim().split('\n').expand((line) {
 final foodByName = {for (final f in foodDatabase) f.name: f};
 final categories = foodDatabase.map((f) => f.category).toSet().toList();
 const catEmoji = {
-  'Vegetables': '🥕', 'Fruits': '🍎', 'Berries': '🍓', 'Dairy': '🧀', 'Meat': '🥩', 'Seafood': '🐟',
-  'Grains': '🌾', 'Bakery': '🍞', 'Nuts & Legumes': '🥜', 'Pantry': '🫙', 'Sweets': '🍫', 'Drinks': '🥤', 'Frozen': '🧊', 'Spices': '🧂', 'Canned': '🥫', 'Ready Meals': '🍱', 'Snacks': '🍿',
+  'Vegetables': '🥕',
+  'Fruits': '🍎',
+  'Berries': '🍓',
+  'Dairy': '🧀',
+  'Meat': '🥩',
+  'Seafood': '🐟',
+  'Grains': '🌾',
+  'Bakery': '🍞',
+  'Nuts & Legumes': '🥜',
+  'Pantry': '🫙',
+  'Sweets': '🍫',
+  'Drinks': '🥤',
+  'Frozen': '🧊',
+  'Spices': '🧂',
+  'Canned': '🥫',
+  'Ready Meals': '🍱',
+  'Snacks': '🍿',
+  'Plant-Based': '🌱',
+  'World Foods': '🌏',
 };
 
 // ───────────────────────── РЕЦЕПТЫ (граммы на всё блюдо) ─────────────────────────
 
 final recipes = <Recipe>[
-  Recipe('Classic Omelette', '🍳', '10 min', 1, [Ing('Eggs', 180), Ing('Milk', 60), Ing('Butter', 10)], [
-    'Crack the eggs into a bowl, add the milk and a pinch of salt, whisk until smooth.',
-    'Melt the butter in a non-stick pan over medium heat.',
-    'Pour in the mixture and cook 2–3 minutes until the edges set.',
-    'Fold in half, cook 1 more minute and serve hot.',
-  ], 'salt'),
-  Recipe('Creamy Cheese Pasta', '🍝', '20 min', 2, [Ing('Pasta', 200), Ing('Cheddar Cheese', 80), Ing('Butter', 20), Ing('Milk', 100)], [
-    'Boil 2 liters of salted water and cook the pasta 9–10 minutes. Drain.',
-    'Melt the butter in a pan on low heat, pour in the milk.',
-    'Add grated cheese and stir 2–3 minutes until the sauce is smooth.',
-    'Toss the pasta in the sauce and serve immediately.',
-  ], 'salt, black pepper'),
-  Recipe('Fresh Summer Salad', '🥗', '5 min', 2, [Ing('Tomato', 250), Ing('Cucumber', 200), Ing('Sour Cream', 60)], [
-    'Wash the vegetables and cut into bite-size pieces.',
-    'Mix in a bowl, add the sour cream, salt and pepper.',
-    'Stir gently and serve right away.',
-  ], 'salt, black pepper'),
-  Recipe('Mashed Potatoes with Chicken', '🍽️', '35 min', 2, [Ing('Potato', 400), Ing('Chicken Breast', 300), Ing('Milk', 80), Ing('Butter', 20)], [
-    'Peel and cut the potatoes, boil in salted water 15–20 minutes until soft.',
-    'Slice the chicken, season and fry in a pan 6–8 minutes until golden.',
-    'Drain the potatoes, mash with warm milk and butter until creamy.',
-    'Serve the chicken on top of the mash.',
-  ], 'salt, pepper'),
-  Recipe('Fruit Yogurt Bowl', '🥣', '5 min', 2, [Ing('Apple', 150), Ing('Banana', 120), Ing('Orange', 130), Ing('Yogurt', 200)], [
-    'Wash and core the apple, peel the banana and orange.',
-    'Cut all fruit into small pieces.',
-    'Divide into two bowls and pour the yogurt over.',
-  ], 'optional: honey'),
-  Recipe('Buckwheat with Chicken', '🍲', '35 min', 2, [Ing('Buckwheat', 200), Ing('Chicken Breast', 300), Ing('Onion', 100), Ing('Carrot', 100), Ing('Vegetable Oil', 15)], [
-    'Rinse the buckwheat. Boil it in 400 ml of salted water, covered, for 15 minutes.',
-    'Dice the onion and grate the carrot, fry them in oil for 5 minutes.',
-    'Add the diced chicken and cook 8–10 minutes until done.',
-    'Mix with the buckwheat and let it rest 5 minutes under a lid.',
-  ], 'salt, pepper'),
-  Recipe('Syrniki (Cottage Cheese Pancakes)', '🥞', '25 min', 3, [Ing('Cottage Cheese', 400), Ing('Eggs', 60), Ing('Flour', 60), Ing('Sugar', 30), Ing('Vegetable Oil', 30)], [
-    'Mash the cottage cheese, mix with the egg, sugar and a pinch of salt.',
-    'Add the flour and knead a soft dough.',
-    'Shape into small patties and dip in a little flour.',
-    'Fry in oil 3 minutes per side on medium heat. Serve with sour cream or jam.',
-  ], 'salt'),
-  Recipe('Classic Borscht', '🍅', '2 h', 4, [Ing('Beef', 400), Ing('Beetroot', 250), Ing('Cabbage', 250), Ing('Potato', 250), Ing('Carrot', 100), Ing('Onion', 100), Ing('Sour Cream', 80)], [
-    'Cover the beef with 2.5 liters of cold water, bring to a boil and simmer 1 hour 15 minutes.',
-    'Grate the beetroot and carrot, dice the onion, fry 10 minutes.',
-    'Add the diced potatoes to the broth, cook 10 minutes.',
-    'Add the shredded cabbage and the fried vegetables, cook 15 more minutes.',
-    'Season, rest 10 minutes and serve with sour cream.',
-  ], 'salt, bay leaf, pepper'),
-  Recipe('Pelmeni with Sour Cream', '🥟', '15 min', 2, [Ing('Pelmeni', 500), Ing('Sour Cream', 60), Ing('Butter', 10)], [
-    'Boil 2 liters of salted water with a bay leaf.',
-    'Add the frozen pelmeni and stir. Cook 8–10 minutes after they float up.',
-    'Drain, add the butter and serve with sour cream.',
-  ], 'salt, bay leaf'),
-  Recipe('Baked Salmon with Potatoes', '🐟', '40 min', 2, [Ing('Salmon', 300), Ing('Potato', 400), Ing('Lemon', 40), Ing('Olive Oil', 20)], [
-    'Preheat the oven to 200 °C. Slice the potatoes thinly.',
-    'Toss the potatoes with half of the oil and salt, bake 15 minutes.',
-    'Place the salmon on top, drizzle with the remaining oil and lemon juice.',
-    'Bake 15–18 more minutes until the fish flakes easily.',
-  ], 'salt, pepper'),
-  Recipe('Olivier Salad', '🥗', '45 min', 4, [Ing('Potato', 300), Ing('Carrot', 150), Ing('Eggs', 180), Ing('Boiled Sausage', 250), Ing('Pickles', 120), Ing('Green Peas', 150), Ing('Mayonnaise', 100)], [
-    'Boil the potatoes and carrots in their skins 25 minutes, hard-boil the eggs 10 minutes.',
-    'Cool everything, then peel and dice into equal small cubes.',
-    'Dice the sausage and pickles, add the peas.',
-    'Mix with mayonnaise, season, and chill for 30 minutes before serving.',
-  ], 'salt, pepper'),
-  Recipe('Beef Plov', '🍚', '1 h 30 min', 4, [Ing('Rice', 400), Ing('Beef', 400), Ing('Carrot', 300), Ing('Onion', 200), Ing('Garlic', 30), Ing('Vegetable Oil', 80)], [
-    'Heat the oil in a heavy pot and fry the diced onion until golden.',
-    'Add the beef cubes and brown for 10 minutes, then add the carrot strips and cook 10 more.',
-    'Season, pour in 100 ml of water and simmer covered for 40 minutes.',
-    'Spread the washed rice on top, add water 1.5 cm above the rice and push the garlic in.',
-    'Cook on low heat covered for 20 minutes without stirring, then mix and serve.',
-  ], 'salt, cumin, pepper'),
+  Recipe(
+    'Classic Omelette',
+    '🍳',
+    '10 min',
+    1,
+    [Ing('Eggs', 180), Ing('Milk', 60), Ing('Butter', 10)],
+    [
+      'Crack the eggs into a bowl, add the milk and a pinch of salt, whisk until smooth.',
+      'Melt the butter in a non-stick pan over medium heat.',
+      'Pour in the mixture and cook 2–3 minutes until the edges set.',
+      'Fold in half, cook 1 more minute and serve hot.',
+    ],
+    'salt',
+  ),
+  Recipe(
+    'Creamy Cheese Pasta',
+    '🍝',
+    '20 min',
+    2,
+    [Ing('Pasta', 200), Ing('Cheddar Cheese', 80), Ing('Butter', 20), Ing('Milk', 100)],
+    [
+      'Boil 2 liters of salted water and cook the pasta 9–10 minutes. Drain.',
+      'Melt the butter in a pan on low heat, pour in the milk.',
+      'Add grated cheese and stir 2–3 minutes until the sauce is smooth.',
+      'Toss the pasta in the sauce and serve immediately.',
+    ],
+    'salt, black pepper',
+  ),
+  Recipe(
+    'Fresh Summer Salad',
+    '🥗',
+    '5 min',
+    2,
+    [Ing('Tomato', 250), Ing('Cucumber', 200), Ing('Sour Cream', 60)],
+    ['Wash the vegetables and cut into bite-size pieces.', 'Mix in a bowl, add the sour cream, salt and pepper.', 'Stir gently and serve right away.'],
+    'salt, black pepper',
+  ),
+  Recipe(
+    'Mashed Potatoes with Chicken',
+    '🍽️',
+    '35 min',
+    2,
+    [Ing('Potato', 400), Ing('Chicken Breast', 300), Ing('Milk', 80), Ing('Butter', 20)],
+    [
+      'Peel and cut the potatoes, boil in salted water 15–20 minutes until soft.',
+      'Slice the chicken, season and fry in a pan 6–8 minutes until golden.',
+      'Drain the potatoes, mash with warm milk and butter until creamy.',
+      'Serve the chicken on top of the mash.',
+    ],
+    'salt, pepper',
+  ),
+  Recipe(
+    'Fruit Yogurt Bowl',
+    '🥣',
+    '5 min',
+    2,
+    [Ing('Apple', 150), Ing('Banana', 120), Ing('Orange', 130), Ing('Yogurt', 200)],
+    ['Wash and core the apple, peel the banana and orange.', 'Cut all fruit into small pieces.', 'Divide into two bowls and pour the yogurt over.'],
+    'optional: honey',
+  ),
+  Recipe(
+    'Buckwheat with Chicken',
+    '🍲',
+    '35 min',
+    2,
+    [Ing('Buckwheat', 200), Ing('Chicken Breast', 300), Ing('Onion', 100), Ing('Carrot', 100), Ing('Vegetable Oil', 15)],
+    [
+      'Rinse the buckwheat. Boil it in 400 ml of salted water, covered, for 15 minutes.',
+      'Dice the onion and grate the carrot, fry them in oil for 5 minutes.',
+      'Add the diced chicken and cook 8–10 minutes until done.',
+      'Mix with the buckwheat and let it rest 5 minutes under a lid.',
+    ],
+    'salt, pepper',
+  ),
+  Recipe(
+    'Syrniki (Cottage Cheese Pancakes)',
+    '🥞',
+    '25 min',
+    3,
+    [Ing('Cottage Cheese', 400), Ing('Eggs', 60), Ing('Flour', 60), Ing('Sugar', 30), Ing('Vegetable Oil', 30)],
+    [
+      'Mash the cottage cheese, mix with the egg, sugar and a pinch of salt.',
+      'Add the flour and knead a soft dough.',
+      'Shape into small patties and dip in a little flour.',
+      'Fry in oil 3 minutes per side on medium heat. Serve with sour cream or jam.',
+    ],
+    'salt',
+  ),
+  Recipe(
+    'Classic Borscht',
+    '🍅',
+    '2 h',
+    4,
+    [Ing('Beef', 400), Ing('Beetroot', 250), Ing('Cabbage', 250), Ing('Potato', 250), Ing('Carrot', 100), Ing('Onion', 100), Ing('Sour Cream', 80)],
+    [
+      'Cover the beef with 2.5 liters of cold water, bring to a boil and simmer 1 hour 15 minutes.',
+      'Grate the beetroot and carrot, dice the onion, fry 10 minutes.',
+      'Add the diced potatoes to the broth, cook 10 minutes.',
+      'Add the shredded cabbage and the fried vegetables, cook 15 more minutes.',
+      'Season, rest 10 minutes and serve with sour cream.',
+    ],
+    'salt, bay leaf, pepper',
+  ),
+  Recipe(
+    'Pelmeni with Sour Cream',
+    '🥟',
+    '15 min',
+    2,
+    [Ing('Pelmeni', 500), Ing('Sour Cream', 60), Ing('Butter', 10)],
+    ['Boil 2 liters of salted water with a bay leaf.', 'Add the frozen pelmeni and stir. Cook 8–10 minutes after they float up.', 'Drain, add the butter and serve with sour cream.'],
+    'salt, bay leaf',
+  ),
+  Recipe(
+    'Baked Salmon with Potatoes',
+    '🐟',
+    '40 min',
+    2,
+    [Ing('Salmon', 300), Ing('Potato', 400), Ing('Lemon', 40), Ing('Olive Oil', 20)],
+    [
+      'Preheat the oven to 200 °C. Slice the potatoes thinly.',
+      'Toss the potatoes with half of the oil and salt, bake 15 minutes.',
+      'Place the salmon on top, drizzle with the remaining oil and lemon juice.',
+      'Bake 15–18 more minutes until the fish flakes easily.',
+    ],
+    'salt, pepper',
+  ),
+  Recipe(
+    'Olivier Salad',
+    '🥗',
+    '45 min',
+    4,
+    [Ing('Potato', 300), Ing('Carrot', 150), Ing('Eggs', 180), Ing('Boiled Sausage', 250), Ing('Pickles', 120), Ing('Green Peas', 150), Ing('Mayonnaise', 100)],
+    [
+      'Boil the potatoes and carrots in their skins 25 minutes, hard-boil the eggs 10 minutes.',
+      'Cool everything, then peel and dice into equal small cubes.',
+      'Dice the sausage and pickles, add the peas.',
+      'Mix with mayonnaise, season, and chill for 30 minutes before serving.',
+    ],
+    'salt, pepper',
+  ),
+  Recipe(
+    'Beef Plov',
+    '🍚',
+    '1 h 30 min',
+    4,
+    [Ing('Rice', 400), Ing('Beef', 400), Ing('Carrot', 300), Ing('Onion', 200), Ing('Garlic', 30), Ing('Vegetable Oil', 80)],
+    [
+      'Heat the oil in a heavy pot and fry the diced onion until golden.',
+      'Add the beef cubes and brown for 10 minutes, then add the carrot strips and cook 10 more.',
+      'Season, pour in 100 ml of water and simmer covered for 40 minutes.',
+      'Spread the washed rice on top, add water 1.5 cm above the rice and push the garlic in.',
+      'Cook on low heat covered for 20 minutes without stirring, then mix and serve.',
+    ],
+    'salt, cumin, pepper',
+  ),
+  // ── Zero-waste рецепты: превращают «почти испорченное» в еду ──
+  Recipe(
+    'Overripe Banana Bread',
+    '🍌',
+    '1 h 10 min',
+    8,
+    [Ing('Banana', 360), Ing('Flour', 250), Ing('Eggs', 120), Ing('Sugar', 120), Ing('Butter', 100)],
+    [
+      'Preheat the oven to 180 °C. The browner the bananas, the sweeter the bread!',
+      'Mash the bananas with a fork, mix in the melted butter, sugar and eggs.',
+      'Fold in the flour with a pinch of salt and baking soda until just combined.',
+      'Pour into a lined loaf tin and bake 55–60 minutes until a toothpick comes out clean.',
+    ],
+    'salt, baking soda',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Leftover Fried Rice',
+    '🍚',
+    '15 min',
+    2,
+    [Ing('Rice', 150), Ing('Eggs', 120), Ing('Carrot', 80), Ing('Green Peas', 80), Ing('Soy Sauce', 30), Ing('Vegetable Oil', 15)],
+    [
+      'Cook the rice (or use yesterday\'s — cold rice fries best).',
+      'Fry the diced carrot and peas in hot oil for 3 minutes.',
+      'Push the veggies aside, scramble the eggs in the same pan.',
+      'Add the rice and soy sauce, stir-fry on high heat for 3–4 minutes.',
+    ],
+    'any leftover veggies',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Fridge-Clearing Frittata',
+    '🍳',
+    '20 min',
+    3,
+    [Ing('Eggs', 300), Ing('Potato', 200), Ing('Bell Pepper', 120), Ing('Cheddar Cheese', 60), Ing('Spinach', 60)],
+    [
+      'Boil or fry the diced potato until soft. Any leftover veggies work here!',
+      'Whisk the eggs with salt and grated cheese.',
+      'Fry the pepper and spinach 2 minutes, add potatoes, pour the eggs over.',
+      'Cook on low heat 5 minutes, then finish under the oven grill for 3 minutes.',
+    ],
+    'salt, pepper',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Everything Veggie Soup',
+    '🥣',
+    '40 min',
+    4,
+    [Ing('Potato', 300), Ing('Carrot', 150), Ing('Onion', 100), Ing('Cabbage', 200), Ing('Zucchini', 200)],
+    [
+      'Soft or wrinkly vegetables are perfect here — just cut off any bad spots.',
+      'Fry the onion and carrot in a pot for 5 minutes.',
+      'Add the diced potato, cabbage and zucchini, cover with 1.5 liters of water.',
+      'Simmer 25 minutes, season. Blend it if you like it creamy.',
+    ],
+    'salt, bay leaf, herbs',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Rescue Smoothie',
+    '🥤',
+    '5 min',
+    2,
+    [Ing('Banana', 120), Ing('Frozen Berries', 150), Ing('Kefir', 300)],
+    ['Freeze bananas and berries before they go bad — they make smoothies extra thick.', 'Put everything into a blender.', 'Blend 1 minute until smooth and drink right away.'],
+    'optional: honey, oats',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Stale Bread Croutons',
+    '🍞',
+    '15 min',
+    4,
+    [Ing('White Bread', 200), Ing('Olive Oil', 30), Ing('Garlic', 10)],
+    [
+      'Cut the dry bread into small cubes — stale bread works even better.',
+      'Toss with oil, crushed garlic and a pinch of salt.',
+      'Bake at 190 °C for 10–12 minutes, stirring once, until golden.',
+      'Keep in a jar for up to a week. Great for soups and salads!',
+    ],
+    'salt, dried herbs',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Kefir Pancakes (Oladyi)',
+    '🥞',
+    '25 min',
+    3,
+    [Ing('Kefir', 400), Ing('Flour', 250), Ing('Eggs', 60), Ing('Sugar', 30), Ing('Vegetable Oil', 30)],
+    [
+      'Sour or old kefir is perfect — it makes pancakes fluffier.',
+      'Mix kefir, egg, sugar, a pinch of salt and soda. Add flour to make a thick batter.',
+      'Spoon small pancakes onto a hot oiled pan.',
+      'Fry 2 minutes per side until golden. Serve with jam or sour cream.',
+    ],
+    'salt, baking soda',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Shakshuka',
+    '🍅',
+    '25 min',
+    2,
+    [Ing('Eggs', 240), Ing('Tomato', 400), Ing('Bell Pepper', 150), Ing('Onion', 80)],
+    [
+      'Soft tomatoes are ideal — chop them together with the pepper and onion.',
+      'Fry the onion and pepper 5 minutes, add tomatoes and simmer 10 minutes into a sauce.',
+      'Make 4 little wells and crack an egg into each.',
+      'Cover and cook 5–6 minutes until the whites are set.',
+    ],
+    'salt, paprika, cumin',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Apple Crumble',
+    '🍏',
+    '45 min',
+    4,
+    [Ing('Apple', 500), Ing('Oats', 100), Ing('Butter', 80), Ing('Sugar', 60)],
+    [
+      'Wrinkly apples are welcome! Core and slice them, put into a baking dish.',
+      'Rub the butter, oats and sugar together into crumbs.',
+      'Cover the apples with the crumbs.',
+      'Bake at 180 °C for 30–35 minutes until golden and bubbling.',
+    ],
+    'cinnamon',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Tomato Bruschetta',
+    '🥖',
+    '10 min',
+    2,
+    [Ing('Baguette', 150), Ing('Tomato', 200), Ing('Garlic', 10), Ing('Olive Oil', 20), Ing('Basil', 10)],
+    ['Slice a day-old baguette and toast the slices in a dry pan.', 'Rub each slice with a cut garlic clove.', 'Top with diced tomatoes, torn basil, salt and a drizzle of oil.'],
+    'salt',
+    zeroWaste: true,
+  ),
+  // ── Классика на каждый день ──
+  Recipe(
+    'Greek Salad',
+    '🥗',
+    '10 min',
+    3,
+    [Ing('Tomato', 300), Ing('Cucumber', 250), Ing('Bell Pepper', 150), Ing('Red Onion', 60), Ing('Feta', 150), Ing('Black Olives', 60), Ing('Olive Oil', 30)],
+    [
+      'Cut the tomatoes, cucumber and pepper into large chunks, slice the onion thinly.',
+      'Put everything in a bowl and add the olives.',
+      'Place the feta on top as a whole block or in big cubes.',
+      'Drizzle with olive oil, sprinkle with oregano and serve.',
+    ],
+    'salt, oregano',
+  ),
+  Recipe(
+    'Chicken Caesar Salad',
+    '🥗',
+    '25 min',
+    2,
+    [Ing('Romaine Lettuce', 300), Ing('Chicken Breast', 250), Ing('Parmesan', 40), Ing('White Bread', 100), Ing('Caesar Dressing', 60)],
+    [
+      'Cut the bread into cubes and toast in a dry pan until golden.',
+      'Season the chicken and fry 6–7 minutes per side, then slice.',
+      'Tear the lettuce, toss with the dressing.',
+      'Top with chicken, croutons and shaved Parmesan.',
+    ],
+    'salt, pepper',
+  ),
+  Recipe(
+    'Chicken Noodle Soup',
+    '🍜',
+    '45 min',
+    4,
+    [Ing('Chicken Thighs', 400), Ing('Egg Noodles', 150), Ing('Carrot', 120), Ing('Onion', 100), Ing('Celery', 80)],
+    [
+      'Cover the chicken with 2 liters of water, bring to a boil and skim the foam.',
+      'Add the whole onion and simmer 25 minutes, then take out the chicken and shred it.',
+      'Add sliced carrot and celery, cook 8 minutes.',
+      'Add the noodles and the chicken, cook 5 more minutes and season.',
+    ],
+    'salt, pepper, bay leaf',
+  ),
+  Recipe(
+    'Spaghetti Bolognese',
+    '🍝',
+    '50 min',
+    4,
+    [Ing('Spaghetti', 400), Ing('Ground Beef', 400), Ing('Canned Tomatoes', 400), Ing('Onion', 100), Ing('Carrot', 80), Ing('Garlic', 10), Ing('Olive Oil', 20)],
+    [
+      'Fry the finely chopped onion, carrot and garlic in oil for 6 minutes.',
+      'Add the beef and brown it, breaking it up with a spoon.',
+      'Pour in the tomatoes and simmer on low heat for 30 minutes.',
+      'Cook the spaghetti, drain and toss with the sauce.',
+    ],
+    'salt, pepper, oregano',
+  ),
+  Recipe(
+    'Pasta Carbonara',
+    '🍝',
+    '20 min',
+    3,
+    [Ing('Spaghetti', 300), Ing('Bacon', 150), Ing('Eggs', 120), Ing('Parmesan', 60)],
+    [
+      'Cook the spaghetti in salted water. Save a cup of the pasta water.',
+      'Fry the diced bacon until crispy.',
+      'Whisk the eggs with grated Parmesan and lots of black pepper.',
+      'Off the heat, toss the hot pasta with bacon and the egg mix, adding pasta water until creamy.',
+    ],
+    'salt, black pepper',
+  ),
+  Recipe(
+    'Pesto Pasta',
+    '🍝',
+    '15 min',
+    3,
+    [Ing('Penne', 300), Ing('Pesto', 100), Ing('Parmesan', 30), Ing('Cherry Tomato', 200)],
+    ['Cook the penne in salted water.', 'Halve the cherry tomatoes.', 'Drain the pasta and mix with pesto and tomatoes.', 'Serve with grated Parmesan on top.'],
+    'salt',
+  ),
+  Recipe(
+    'Homemade Mac and Cheese',
+    '🧀',
+    '30 min',
+    4,
+    [Ing('Macaroni', 300), Ing('Cheddar Cheese', 200), Ing('Milk', 400), Ing('Butter', 40), Ing('Flour', 30)],
+    [
+      'Cook the macaroni and drain.',
+      'Melt the butter, stir in the flour and cook 1 minute.',
+      'Slowly whisk in the milk and cook until it thickens.',
+      'Melt in the grated cheese, mix with the pasta and serve.',
+    ],
+    'salt, mustard, pepper',
+  ),
+  Recipe(
+    'Chicken Stir-Fry',
+    '🥢',
+    '25 min',
+    3,
+    [
+      Ing('Chicken Breast', 400),
+      Ing('Broccoli', 250),
+      Ing('Bell Pepper', 150),
+      Ing('Carrot', 100),
+      Ing('Soy Sauce', 40),
+      Ing('Garlic', 10),
+      Ing('Ginger', 10),
+      Ing('Rice', 250),
+      Ing('Vegetable Oil', 20),
+    ],
+    [
+      'Cook the rice.',
+      'Fry thin chicken strips in hot oil for 5 minutes, take them out.',
+      'Stir-fry the vegetables with garlic and ginger for 4 minutes.',
+      'Return the chicken, add soy sauce, toss 1 minute and serve with rice.',
+    ],
+    'sesame seeds, chili',
+  ),
+  Recipe(
+    'Beef Stroganoff',
+    '🥘',
+    '35 min',
+    4,
+    [Ing('Beef', 500), Ing('Mushrooms', 250), Ing('Onion', 120), Ing('Sour Cream', 200), Ing('Butter', 30), Ing('Flour', 15)],
+    [
+      'Cut the beef into thin strips and dust with flour.',
+      'Brown the beef quickly in butter and take it out.',
+      'Fry the onion and mushrooms 8 minutes.',
+      'Return the beef, stir in the sour cream and simmer 5 minutes. Great with mashed potatoes.',
+    ],
+    'salt, pepper, paprika',
+  ),
+  Recipe(
+    'Chicken Curry',
+    '🍛',
+    '40 min',
+    4,
+    [Ing('Chicken Thighs', 500), Ing('Onion', 150), Ing('Canned Tomatoes', 400), Ing('Coconut Milk', 200), Ing('Curry Powder', 15), Ing('Garlic', 10), Ing('Ginger', 10), Ing('Rice', 300)],
+    [
+      'Fry the onion until soft, add garlic, ginger and curry powder for 1 minute.',
+      'Add the chicken pieces and brown them.',
+      'Pour in the tomatoes and coconut milk, simmer 25 minutes.',
+      'Serve with rice.',
+    ],
+    'salt, oil',
+  ),
+  Recipe(
+    'Red Lentil Soup',
+    '🍲',
+    '35 min',
+    4,
+    [Ing('Red Lentils', 250), Ing('Carrot', 150), Ing('Onion', 120), Ing('Potato', 200), Ing('Tomato Paste', 30), Ing('Olive Oil', 20)],
+    [
+      'Fry the onion and carrot in oil for 5 minutes, stir in the tomato paste.',
+      'Add rinsed lentils, diced potato and 1.5 liters of water.',
+      'Simmer 25 minutes until everything is soft.',
+      'Blend until smooth and season. Add a squeeze of lemon.',
+    ],
+    'salt, cumin, lemon',
+  ),
+  Recipe(
+    'Chili Con Carne',
+    '🌶️',
+    '50 min',
+    4,
+    [Ing('Ground Beef', 500), Ing('Canned Beans', 400), Ing('Canned Tomatoes', 400), Ing('Onion', 150), Ing('Bell Pepper', 150), Ing('Chili Pepper', 10)],
+    [
+      'Fry the onion and pepper, add the beef and brown it.',
+      'Add chopped chili, tomatoes and spices.',
+      'Simmer 30 minutes, then add the beans and cook 10 more.',
+      'Serve with rice, bread or tortilla chips.',
+    ],
+    'salt, cumin, paprika',
+  ),
+  Recipe(
+    'Mushroom Risotto',
+    '🍚',
+    '40 min',
+    3,
+    [Ing('Arborio Rice', 300), Ing('Champignons', 300), Ing('Onion', 100), Ing('Parmesan', 50), Ing('Butter', 40), Ing('White Wine', 100)],
+    [
+      'Fry the sliced mushrooms in half the butter and set aside.',
+      'Soften the onion, add the rice and toast 2 minutes. Pour in the wine.',
+      'Add hot water or stock one ladle at a time, stirring, for 18–20 minutes.',
+      'Stir in mushrooms, the rest of the butter and Parmesan.',
+    ],
+    'salt, stock',
+  ),
+  Recipe(
+    'Tuna Pasta Salad',
+    '🥗',
+    '20 min',
+    3,
+    [Ing('Fusilli', 250), Ing('Canned Tuna', 160), Ing('Canned Corn', 150), Ing('Cucumber', 150), Ing('Mayonnaise', 60)],
+    ['Cook the pasta, rinse with cold water.', 'Dice the cucumber, drain the tuna and corn.', 'Mix everything with mayonnaise and season.'],
+    'salt, pepper, lemon',
+  ),
+  Recipe(
+    'Stuffed Peppers',
+    '🫑',
+    '1 h',
+    4,
+    [Ing('Bell Pepper', 600), Ing('Ground Beef', 300), Ing('Rice', 100), Ing('Onion', 80), Ing('Carrot', 80), Ing('Tomato Paste', 40), Ing('Sour Cream', 100)],
+    [
+      'Half-cook the rice for 8 minutes. Fry the onion and carrot.',
+      'Mix the beef, rice and half of the vegetables, season.',
+      'Cut the tops off the peppers, remove seeds and stuff them.',
+      'Put in a pot, cover with water mixed with tomato paste and the rest of the vegetables. Simmer 40 minutes. Serve with sour cream.',
+    ],
+    'salt, pepper',
+  ),
+  Recipe(
+    'Golubtsy (Cabbage Rolls)',
+    '🥬',
+    '1 h 20 min',
+    4,
+    [Ing('Cabbage', 800), Ing('Minced Pork', 400), Ing('Rice', 100), Ing('Onion', 80), Ing('Carrot', 80), Ing('Tomato Paste', 50)],
+    [
+      'Blanch the cabbage head in boiling water and separate the soft leaves.',
+      'Mix the meat with half-cooked rice and fried onion.',
+      'Wrap a spoon of filling in each leaf.',
+      'Lay in a pot, add carrot, tomato paste and water. Simmer 50 minutes.',
+    ],
+    'salt, pepper, bay leaf',
+  ),
+  Recipe(
+    'Chicken Caesar Wrap',
+    '🌯',
+    '15 min',
+    2,
+    [Ing('Tortilla', 240), Ing('Chicken Breast', 250), Ing('Romaine Lettuce', 100), Ing('Parmesan', 30), Ing('Caesar Dressing', 50)],
+    ['Fry and slice the chicken.', 'Spread dressing on the tortillas.', 'Add lettuce, chicken and Parmesan, roll up tightly and cut in half.'],
+    'pepper',
+  ),
+  Recipe(
+    'Egg Fried Noodles',
+    '🍜',
+    '15 min',
+    2,
+    [Ing('Egg Noodles', 250), Ing('Eggs', 120), Ing('Bok Choy', 200), Ing('Soy Sauce', 30), Ing('Spring Onion', 30), Ing('Vegetable Oil', 15)],
+    ['Cook the noodles and drain.', 'Scramble the eggs in hot oil, push aside.', 'Add bok choy and fry 2 minutes, then add noodles and soy sauce.', 'Toss everything together, top with spring onion.'],
+    'chili flakes',
+  ),
+  Recipe(
+    'Teriyaki Salmon Bowl',
+    '🐟',
+    '30 min',
+    2,
+    [Ing('Salmon', 400), Ing('Teriyaki Sauce', 80), Ing('Rice', 250), Ing('Broccoli', 250), Ing('Sesame Seeds', 10)],
+    [
+      'Cook the rice and steam the broccoli.',
+      'Fry the salmon skin-side down 4 minutes, flip and cook 2 more.',
+      'Pour the teriyaki sauce in the pan and glaze the fish for 1 minute.',
+      'Serve on rice with broccoli and sesame seeds.',
+    ],
+    '',
+  ),
+  Recipe(
+    'Fish Tacos',
+    '🌮',
+    '25 min',
+    3,
+    [Ing('Cod', 400), Ing('Tortilla', 240), Ing('Red Cabbage', 150), Ing('Lime', 60), Ing('Sour Cream', 100), Ing('Cilantro', 15)],
+    [
+      'Season the fish with salt, paprika and lime zest, fry 3 minutes per side.',
+      'Shred the cabbage thinly and mix with lime juice.',
+      'Warm the tortillas, add fish, cabbage, sour cream and cilantro.',
+    ],
+    'salt, paprika',
+  ),
+  Recipe(
+    'Overnight Oats',
+    '🥣',
+    '5 min + night',
+    2,
+    [Ing('Rolled Oats', 100), Ing('Milk', 200), Ing('Yogurt', 100), Ing('Banana', 120), Ing('Honey', 20)],
+    ['Mix oats, milk, yogurt and honey in a jar.', 'Close and leave in the fridge overnight.', 'In the morning top with sliced banana.'],
+    'optional: cinnamon, nuts',
+  ),
+  Recipe(
+    'Fluffy Pancakes',
+    '🥞',
+    '20 min',
+    3,
+    [Ing('Flour', 200), Ing('Milk', 300), Ing('Eggs', 120), Ing('Sugar', 30), Ing('Butter', 30)],
+    ['Mix flour, sugar, a pinch of salt and baking powder.', 'Whisk in the milk, eggs and melted butter.', 'Cook small pancakes on a hot pan 2 minutes per side.'],
+    'salt, baking powder',
+  ),
+  Recipe(
+    'Russian Blini',
+    '🥞',
+    '30 min',
+    4,
+    [Ing('Flour', 250), Ing('Milk', 500), Ing('Eggs', 120), Ing('Sugar', 30), Ing('Vegetable Oil', 30)],
+    [
+      'Whisk the eggs with sugar and salt, add half the milk.',
+      'Add the flour, whisk until smooth, then the rest of the milk and the oil.',
+      'Pour a thin layer into a hot pan, cook 1 minute per side.',
+      'Serve with sour cream, jam or leftover fillings.',
+    ],
+    'salt',
+  ),
+  Recipe(
+    'Draniki (Potato Pancakes)',
+    '🥔',
+    '35 min',
+    3,
+    [Ing('Potato', 600), Ing('Onion', 80), Ing('Eggs', 60), Ing('Flour', 40), Ing('Vegetable Oil', 50), Ing('Sour Cream', 100)],
+    ['Grate the potatoes and onion, squeeze out the liquid.', 'Mix with egg, flour and salt.', 'Fry spoonfuls in hot oil 3–4 minutes per side until crispy.', 'Serve hot with sour cream.'],
+    'salt, pepper',
+  ),
+  Recipe(
+    'Okroshka',
+    '🥣',
+    '30 min',
+    4,
+    [Ing('Kefir', 1000), Ing('Potato', 300), Ing('Cucumber', 200), Ing('Radish', 150), Ing('Eggs', 180), Ing('Dill', 20), Ing('Boiled Sausage', 200)],
+    [
+      'Boil and cool the potatoes and eggs.',
+      'Dice potatoes, eggs, cucumber, radish and sausage.',
+      'Chop the dill, mix everything and pour over cold kefir.',
+      'Season and serve chilled — perfect for hot days.',
+    ],
+    'salt, mineral water',
+  ),
+  Recipe(
+    'Vinegret Salad',
+    '🥗',
+    '1 h',
+    4,
+    [Ing('Beetroot', 300), Ing('Potato', 300), Ing('Carrot', 200), Ing('Pickles', 150), Ing('Sauerkraut', 150), Ing('Vegetable Oil', 40)],
+    ['Boil the beetroot, potatoes and carrots until soft, then cool.', 'Dice everything into small cubes, together with the pickles.', 'Add sauerkraut and oil, mix and season.'],
+    'salt',
+  ),
+  Recipe(
+    'Shchi (Cabbage Soup)',
+    '🍲',
+    '1 h 30 min',
+    5,
+    [Ing('Beef', 300), Ing('Cabbage', 400), Ing('Potato', 300), Ing('Carrot', 100), Ing('Onion', 100), Ing('Tomato Paste', 30)],
+    [
+      'Simmer the beef in 2.5 liters of water for 1 hour.',
+      'Add shredded cabbage and diced potatoes, cook 15 minutes.',
+      'Fry onion and carrot with tomato paste, add to the soup.',
+      'Cook 10 more minutes, season and serve with sour cream.',
+    ],
+    'salt, bay leaf, dill',
+  ),
+  Recipe(
+    'Classic Guacamole',
+    '🥑',
+    '10 min',
+    4,
+    [Ing('Avocado', 300), Ing('Lime', 40), Ing('Tomato', 100), Ing('Red Onion', 40), Ing('Cilantro', 10)],
+    ['Mash the avocados with lime juice and salt.', 'Fold in the diced tomato, onion and chopped cilantro.', 'Serve right away with chips or on toast.'],
+    'salt, chili',
+  ),
+  Recipe(
+    'Homemade Hummus',
+    '🧆',
+    '10 min',
+    6,
+    [Ing('Canned Chickpeas', 400), Ing('Tahini', 60), Ing('Lemon', 40), Ing('Garlic', 10), Ing('Olive Oil', 30)],
+    ['Drain the chickpeas, keep a little of the liquid.', 'Blend chickpeas, tahini, lemon juice and garlic until smooth.', 'Add some liquid to loosen it, season, drizzle with oil.'],
+    'salt, cumin, paprika',
+  ),
+  Recipe(
+    'Berry Smoothie Bowl',
+    '🫐',
+    '10 min',
+    2,
+    [Ing('Frozen Berries', 200), Ing('Banana', 120), Ing('Greek Yogurt', 200), Ing('Granola', 60)],
+    ['Blend the berries, banana and yogurt into a thick smoothie.', 'Pour into bowls.', 'Top with granola and any fruit you have.'],
+    'optional: honey',
+  ),
+  Recipe(
+    'Roasted Chicken Thighs with Veggies',
+    '🍗',
+    '55 min',
+    4,
+    [Ing('Chicken Thighs', 600), Ing('Potato', 500), Ing('Carrot', 200), Ing('Onion', 150), Ing('Olive Oil', 30), Ing('Garlic', 10)],
+    ['Preheat the oven to 200 °C.', 'Cut the vegetables into chunks, toss with oil, garlic and spices.', 'Lay the chicken on top, season well.', 'Roast 45 minutes until golden and crispy.'],
+    'salt, paprika, thyme',
+  ),
+  Recipe(
+    'Tvorog Casserole (Zapekanka)',
+    '🍰',
+    '50 min',
+    4,
+    [Ing('Cottage Cheese', 500), Ing('Eggs', 120), Ing('Semolina', 60), Ing('Sugar', 60), Ing('Sour Cream', 100)],
+    ['Mix cottage cheese, eggs, sugar and semolina, rest 15 minutes.', 'Put into a greased dish and smooth the top with sour cream.', 'Bake at 180 °C for 35–40 minutes until golden.'],
+    'vanilla, raisins',
+  ),
+  Recipe(
+    'Creamy Mushroom Soup',
+    '🍄',
+    '40 min',
+    4,
+    [Ing('Mushrooms', 300), Ing('Potato', 300), Ing('Onion', 100), Ing('Carrot', 100), Ing('Sour Cream', 60)],
+    ['Fry the onion, carrot and sliced mushrooms 10 minutes.', 'Add diced potatoes and 1.5 liters of water, cook 20 minutes.', 'Blend half of the soup for creaminess, stir in sour cream.'],
+    'salt, pepper, dill',
+  ),
+  Recipe(
+    'Pumpkin Soup',
+    '🎃',
+    '40 min',
+    4,
+    [Ing('Pumpkin', 800), Ing('Onion', 100), Ing('Carrot', 100), Ing('Heavy Cream', 100), Ing('Ginger', 10)],
+    [
+      'Fry the onion, carrot and ginger 5 minutes.',
+      'Add cubed pumpkin and water to cover, simmer 20 minutes.',
+      'Blend until smooth and stir in the cream.',
+      'Top with roasted pumpkin seeds — don\'t throw them away!',
+    ],
+    'salt, nutmeg',
+  ),
+  Recipe(
+    'Teriyaki Tofu Bowl',
+    '🌱',
+    '25 min',
+    3,
+    [Ing('Tofu', 400), Ing('Teriyaki Sauce', 80), Ing('Rice', 250), Ing('Edamame', 150), Ing('Carrot', 100)],
+    ['Press the tofu with a towel and cut into cubes.', 'Fry until crispy on all sides, add teriyaki and glaze.', 'Serve on rice with edamame and grated carrot.'],
+    'sesame seeds, oil',
+  ),
+  Recipe(
+    'Lentil Bolognese',
+    '🍝',
+    '40 min',
+    4,
+    [Ing('Green Lentils', 200), Ing('Spaghetti', 300), Ing('Canned Tomatoes', 400), Ing('Onion', 100), Ing('Carrot', 100), Ing('Garlic', 10)],
+    ['Fry onion, carrot and garlic until soft.', 'Add lentils, tomatoes and 400 ml water, simmer 25 minutes.', 'Cook the spaghetti and serve with the sauce.'],
+    'salt, oregano, oil',
+  ),
+  Recipe(
+    'Beet Salad with Prunes',
+    '🟣',
+    '15 min',
+    4,
+    [Ing('Beetroot', 400), Ing('Walnuts', 50), Ing('Garlic', 10), Ing('Mayonnaise', 60), Ing('Prunes', 60)],
+    ['Boil or bake the beetroot, then grate it.', 'Chop the walnuts and prunes, crush the garlic.', 'Mix everything with mayonnaise and season.'],
+    'salt',
+  ),
+  Recipe(
+    'Grilled Cheese Sandwich',
+    '🥪',
+    '10 min',
+    2,
+    [Ing('Toast Bread', 120), Ing('Cheddar Cheese', 80), Ing('Butter', 20)],
+    ['Butter the outside of the bread slices.', 'Put cheese between two slices.', 'Fry on medium heat 3 minutes per side until golden and melty.'],
+    '',
+  ),
+  Recipe(
+    'Buckwheat with Mushrooms',
+    '🍄',
+    '30 min',
+    3,
+    [Ing('Buckwheat', 200), Ing('Mushrooms', 300), Ing('Onion', 100), Ing('Butter', 30)],
+    ['Cook the buckwheat in 400 ml salted water for 15 minutes.', 'Fry the onion and mushrooms in butter until golden.', 'Mix with the buckwheat and rest 5 minutes under a lid.'],
+    'salt, pepper',
+  ),
+  Recipe(
+    'Baked Potatoes with Cheese',
+    '🥔',
+    '1 h',
+    4,
+    [Ing('Potato', 800), Ing('Cheddar Cheese', 100), Ing('Sour Cream', 100), Ing('Butter', 30)],
+    ['Wash the potatoes, prick with a fork and bake at 200 °C for 50 minutes.', 'Cut a cross on top, squeeze open, add butter.', 'Top with grated cheese and sour cream.'],
+    'salt, chives',
+  ),
+  // ── Zero-waste: из остатков и «почти испорченного» ──
+  Recipe(
+    'Veggie Curry from Odds and Ends',
+    '🍛',
+    '35 min',
+    4,
+    [Ing('Cauliflower', 400), Ing('Potato', 300), Ing('Green Peas', 150), Ing('Onion', 100), Ing('Coconut Milk', 200), Ing('Curry Powder', 15)],
+    [
+      'Any tired vegetables work here — cut off bad spots and chop the rest.',
+      'Fry the onion with curry powder for 2 minutes.',
+      'Add potatoes, cauliflower and coconut milk with a cup of water. Simmer 20 minutes.',
+      'Stir in the peas, cook 3 minutes and serve with rice or bread.',
+    ],
+    'salt, oil',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Ratatouille',
+    '🍆',
+    '50 min',
+    4,
+    [Ing('Eggplant', 300), Ing('Zucchini', 300), Ing('Bell Pepper', 200), Ing('Tomato', 400), Ing('Onion', 100), Ing('Olive Oil', 40), Ing('Garlic', 10)],
+    [
+      'Soft vegetables are perfect here! Dice everything into similar cubes.',
+      'Fry the onion and garlic, add eggplant and pepper, cook 10 minutes.',
+      'Add zucchini and tomatoes, simmer 25 minutes.',
+      'Season with herbs. Even better the next day.',
+    ],
+    'salt, thyme, basil',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Clean-the-Fridge Quesadilla',
+    '🌮',
+    '15 min',
+    2,
+    [Ing('Tortilla', 240), Ing('Cheddar Cheese', 150), Ing('Bell Pepper', 100), Ing('Canned Corn', 100), Ing('Canned Beans', 100)],
+    ['Use any leftovers: half a pepper, some corn, beans or chicken.', 'Spread cheese and fillings on half of each tortilla, fold.', 'Fry on a dry pan 2–3 minutes per side until the cheese melts.'],
+    'salsa, sour cream',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Leftover Veggie Stir-Fry',
+    '🥦',
+    '20 min',
+    3,
+    [Ing('Broccoli', 200), Ing('Carrot', 150), Ing('Bell Pepper', 150), Ing('Mushrooms', 150), Ing('Soy Sauce', 30), Ing('Garlic', 10), Ing('Rice', 200)],
+    [
+      'Slice the broccoli stems too — they are sweet and crunchy!',
+      'Stir-fry all vegetables on high heat 5 minutes.',
+      'Add garlic and soy sauce, toss 1 minute.',
+      'Serve with rice (yesterday\'s rice is perfect).',
+    ],
+    'oil, chili',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Potato Peel Crisps',
+    '🥔',
+    '20 min',
+    2,
+    [Ing('Potato', 300), Ing('Olive Oil', 20), Ing('Paprika', 5)],
+    ['Peeled potatoes for mash? Keep the clean peels!', 'Toss the peels with oil, salt and paprika.', 'Bake at 200 °C for 12–15 minutes until crispy. A free snack!'],
+    'salt',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Broccoli Stem Soup',
+    '🥦',
+    '30 min',
+    3,
+    [Ing('Broccoli', 400), Ing('Potato', 200), Ing('Onion', 100), Ing('Milk', 200), Ing('Butter', 20)],
+    ['Use the whole broccoli — peel the stems and chop them.', 'Soften the onion in butter, add potato, broccoli and 800 ml water.', 'Simmer 15 minutes, add milk and blend until creamy.'],
+    'salt, pepper, nutmeg',
+    zeroWaste: true,
+  ),
+  Recipe(
+    '2-Ingredient Banana Pancakes',
+    '🍌',
+    '15 min',
+    2,
+    [Ing('Banana', 240), Ing('Eggs', 120), Ing('Oats', 60)],
+    ['Mash very ripe bananas — the spottier the better.', 'Mix with eggs and oats.', 'Fry small pancakes on low heat 2 minutes per side.'],
+    'cinnamon',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Panzanella (Stale Bread Salad)',
+    '🥖',
+    '15 min',
+    3,
+    [Ing('White Bread', 250), Ing('Tomato', 400), Ing('Cucumber', 200), Ing('Red Onion', 60), Ing('Olive Oil', 40), Ing('Basil', 10)],
+    ['Tear stale bread into chunks — it soaks up juice like a sponge.', 'Chop the tomatoes, cucumber and onion, mix with the bread.', 'Dress with oil, salt and vinegar. Rest 10 minutes, add basil.'],
+    'salt, vinegar',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Leftover Pasta Frittata',
+    '🍝',
+    '20 min',
+    3,
+    [Ing('Pasta', 150), Ing('Eggs', 240), Ing('Cheddar Cheese', 60), Ing('Milk', 50)],
+    ['Got cooked pasta left over? Perfect.', 'Whisk eggs, milk and grated cheese, mix in the pasta.', 'Cook in an oiled pan on low heat 8 minutes, flip or grill the top.'],
+    'salt, pepper',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Herb Stem Pesto',
+    '🌿',
+    '10 min',
+    6,
+    [Ing('Parsley', 60), Ing('Basil', 30), Ing('Garlic', 10), Ing('Walnuts', 50), Ing('Olive Oil', 80), Ing('Parmesan', 40)],
+    [
+      'Don\'t throw away herb stems or wilted leaves — they are full of flavor.',
+      'Blend herbs, garlic, nuts and cheese, slowly adding oil.',
+      'Keep in a jar under a layer of oil for a week, or freeze in portions.',
+    ],
+    'salt, lemon',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Soft Fruit Compote',
+    '🍐',
+    '25 min',
+    6,
+    [Ing('Apple', 300), Ing('Pear', 200), Ing('Plum', 200), Ing('Sugar', 60)],
+    ['Bruised or soft fruit? Cut off the bad bits and chop the rest.', 'Cover with 2 liters of water, add sugar and bring to a boil.', 'Simmer 10 minutes, cool and drink cold. Eat the fruit too!'],
+    'cinnamon, lemon',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Scrap Vegetable Broth',
+    '🥣',
+    '1 h',
+    6,
+    [Ing('Onion', 150), Ing('Carrot', 150), Ing('Celery', 100), Ing('Parsley', 20)],
+    [
+      'Collect peels, ends and stems in a bag in the freezer during the week.',
+      'Cover with 2.5 liters of water, add a bay leaf and peppercorns.',
+      'Simmer 45 minutes, strain. Use as a base for soups and risotto.',
+    ],
+    'bay leaf, pepper',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Arancini (Leftover Rice Balls)',
+    '🍙',
+    '30 min',
+    4,
+    [Ing('Rice', 250), Ing('Mozzarella', 100), Ing('Eggs', 60), Ing('Breadcrumbs', 80), Ing('Vegetable Oil', 60)],
+    ['Use cold cooked rice or leftover risotto.', 'Shape balls with a cube of mozzarella inside.', 'Dip in beaten egg, then breadcrumbs.', 'Fry until golden or bake at 200 °C for 20 minutes.'],
+    'salt',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Zucchini Fritters',
+    '🥒',
+    '25 min',
+    3,
+    [Ing('Zucchini', 400), Ing('Eggs', 60), Ing('Flour', 60), Ing('Dill', 15), Ing('Vegetable Oil', 30)],
+    ['A great way to use big or soft zucchini. Grate and squeeze it.', 'Mix with egg, flour, dill and salt.', 'Fry spoonfuls 3 minutes per side. Serve with sour cream.'],
+    'salt, garlic',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Soft Tomato Soup',
+    '🍅',
+    '30 min',
+    4,
+    [Ing('Tomato', 800), Ing('Onion', 100), Ing('Garlic', 10), Ing('Olive Oil', 30), Ing('Basil', 10), Ing('Heavy Cream', 100)],
+    ['Overripe, soft tomatoes give the best flavor!', 'Fry the onion and garlic, add chopped tomatoes and simmer 20 minutes.', 'Blend with basil, stir in the cream and season.'],
+    'salt, sugar, pepper',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Apple Charlotte',
+    '🍎',
+    '55 min',
+    6,
+    [Ing('Apple', 500), Ing('Eggs', 180), Ing('Flour', 150), Ing('Sugar', 150)],
+    ['Wrinkly apples are welcome. Slice them into a lined baking tin.', 'Whisk eggs and sugar until fluffy, fold in the flour.', 'Pour the batter over the apples.', 'Bake at 180 °C for 40 minutes.'],
+    'cinnamon, vanilla',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Avocado Toast with Egg',
+    '🥑',
+    '10 min',
+    2,
+    [Ing('Sourdough Bread', 120), Ing('Avocado', 150), Ing('Eggs', 120), Ing('Lemon', 20), Ing('Chili Flakes', 2)],
+    ['Very ripe avocado? Toast time! Toast the bread.', 'Mash the avocado with lemon juice and salt, spread on toast.', 'Top with a fried or poached egg and chili flakes.'],
+    'salt',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'French Toast',
+    '🍞',
+    '15 min',
+    2,
+    [Ing('White Bread', 240), Ing('Eggs', 120), Ing('Milk', 150), Ing('Sugar', 20), Ing('Butter', 20)],
+    ['Dry, day-old bread works best — it doesn\'t fall apart.', 'Whisk eggs, milk, sugar and a pinch of cinnamon.', 'Soak the slices for 20 seconds, fry in butter 2–3 minutes per side.'],
+    'cinnamon',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Bread Pudding',
+    '🍮',
+    '50 min',
+    6,
+    [Ing('White Bread', 300), Ing('Milk', 500), Ing('Eggs', 180), Ing('Sugar', 80), Ing('Raisins', 60)],
+    ['Collect stale bread and cut into cubes.', 'Whisk milk, eggs and sugar, pour over the bread with raisins.', 'Let it soak 15 minutes, then bake at 180 °C for 35 minutes.'],
+    'vanilla, cinnamon',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Fried Eggs with Soft Tomatoes',
+    '🍳',
+    '10 min',
+    2,
+    [Ing('Eggs', 180), Ing('Tomato', 200), Ing('Butter', 10)],
+    ['Slice soft tomatoes and fry them in butter 3 minutes.', 'Crack the eggs on top, cover and cook until set.', 'Season with salt, pepper and herbs.'],
+    'salt, pepper',
+    zeroWaste: true,
+  ),
 ];
 
 List<Recipe> rankRecipes(AppState s) {
   final names = s.pantryNames;
-  final exp = s.expiringSoon.map((e) => e.food.name).toSet();
+  final exp = s.toRescue.map((e) => e.food.name).toSet();
   int score(Recipe r) =>
-      (r.missing(names).isEmpty ? 1000 : 0) +
-      r.ingredients.where((i) => exp.contains(i.name)).length * 50 +
-      r.ingredients.where((i) => names.contains(i.name)).length * 10 -
-      r.missing(names).length;
+      (r.missing(names).isEmpty ? 1000 : 0) + r.ingredients.where((i) => exp.contains(i.name)).length * 50 + r.ingredients.where((i) => names.contains(i.name)).length * 10 - r.missing(names).length;
   final list = recipes.where((r) => !r.ingredients.any((i) => s.dislikes.any((d) => i.name.toLowerCase().contains(d)))).toList();
   list.sort((a, b) => score(b).compareTo(score(a)));
   return list;
@@ -202,9 +1184,7 @@ class AppState extends ChangeNotifier {
   final pantry = <PantryItem>[];
   final log = <LogEntry>[];
   final dislikes = <String>{};
-  final chat = <ChatMessage>[
-    ChatMessage('Hello! I am your AI Chef. Ask what to cook, what expires soon, or tell me what you do not like.', isUser: false)
-  ];
+  final chat = <ChatMessage>[ChatMessage('Hi! I\'m your AI Chef 👩‍🍳 Ask me what to cook, what expires soon, how to store food — or tell me what you don\'t like.', isUser: false)];
   bool showTutorial = false;
   int wasted = 0, suggestIndex = 0, _id = 0;
   String name = 'Guest', email = '';
@@ -216,6 +1196,7 @@ class AppState extends ChangeNotifier {
   int kcalOn(int day) => log.where((e) => e.day == day).fold<int>(0, (s, e) => s + e.kcal);
   int get eatenCalories => kcalOn(dayShift);
   List<PantryItem> get expiringSoon => (pantry.where((p) => p.daysLeft <= 2).toList()..sort((a, b) => a.daysLeft.compareTo(b.daysLeft)));
+  List<PantryItem> get toRescue => expiringSoon.where((p) => p.daysLeft >= 0).toList();
   Set<String> get pantryNames => pantry.map((p) => p.food.name).toSet();
 
   final shopping = <String>[];
@@ -223,11 +1204,43 @@ class AppState extends ChangeNotifier {
   final unlocked = <String>{};
   Medal? pendingBadge;
   bool celebrate = false;
-  int consumed = 0, rescued = 0, cooked = 0, bought = 0, tipIndex = 0;
+  int consumed = 0, rescued = 0, cooked = 0, bought = 0, tipIndex = 0, frozen = 0, shared = 0;
   double rescuedMoney = 0, wastedMoney = 0;
   DateTime streakStart = DateTime.now();
+  final wasteLog = <WasteEntry>[];
 
-  static const _price = {'Meat': 4.5, 'Seafood': 5.0, 'Dairy': 2.0, 'Vegetables': 1.2, 'Fruits': 1.5, 'Berries': 3.0, 'Bakery': 1.5, 'Grains': 1.2, 'Nuts & Legumes': 3.0, 'Pantry': 2.5, 'Sweets': 2.5, 'Drinks': 1.8, 'Frozen': 3.5, 'Spices': 2.0, 'Canned': 1.8, 'Ready Meals': 4.0, 'Snacks': 2.5};
+  double get moneyAtRisk => expiringSoon.where((p) => p.daysLeft >= 0).fold(0.0, (s, p) => s + price(p.food));
+  List<PantryItem> get expired => pantry.where((p) => p.daysLeft < 0).toList();
+  Map<WasteReason, int> get wasteByReason => {for (final r in WasteReason.values) r: wasteLog.where((w) => w.reason == r).length};
+  Map<String, int> get wasteByCategory {
+    final m = <String, int>{};
+    for (final w in wasteLog) {
+      m[w.food.category] = (m[w.food.category] ?? 0) + 1;
+    }
+    return Map.fromEntries(m.entries.toList()..sort((a, b) => b.value.compareTo(a.value)));
+  }
+
+  static const _price = {
+    'Meat': 4.5,
+    'Seafood': 5.0,
+    'Dairy': 2.0,
+    'Vegetables': 1.2,
+    'Fruits': 1.5,
+    'Berries': 3.0,
+    'Bakery': 1.5,
+    'Grains': 1.2,
+    'Nuts & Legumes': 3.0,
+    'Pantry': 2.5,
+    'Sweets': 2.5,
+    'Drinks': 1.8,
+    'Frozen': 3.5,
+    'Spices': 2.0,
+    'Canned': 1.8,
+    'Ready Meals': 4.0,
+    'Snacks': 2.5,
+    'Plant-Based': 3.0,
+    'World Foods': 3.0,
+  };
   double price(FoodItem f) => _price[f.category] ?? 2.0;
   double get co2 => rescued * 0.3 * 2.5;
   int get ecoScore => consumed + wasted == 0 ? 100 : (100 * consumed / (consumed + wasted)).round();
@@ -260,6 +1273,12 @@ class AppState extends ChangeNotifier {
         return bought >= 1;
       case 'weight':
         return weights.length >= 3;
+      case 'freezer':
+        return frozen >= 3;
+      case 'share':
+        return shared >= 1;
+      case 'cleanfridge':
+        return pantry.length >= 5 && expired.isEmpty;
       default:
         return co2 >= 2;
     }
@@ -271,12 +1290,18 @@ class AppState extends ChangeNotifier {
         unlocked.add(m.id);
         pendingBadge = m;
         celebrate = true;
+        nutrikEvent('medal');
       }
     }
   }
 
   void clearBadge() {
     pendingBadge = null;
+    notifyListeners();
+  }
+
+  void party() {
+    celebrate = true;
     notifyListeners();
   }
 
@@ -345,26 +1370,98 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void add(FoodItem f) {
+  void add(FoodItem f, {int? days, bool quiet = false}) {
     final n = now();
-    pantry.add(PantryItem(_id++, f, n, n.add(Duration(days: f.shelf))));
+    pantry.add(PantryItem(_id++, f, n, n.add(Duration(days: days ?? f.shelf)), defaultStorage(f)));
+    if (!quiet) nutrikEvent('add');
     _check();
     notifyListeners();
   }
 
-  void eat(PantryItem p, int grams) {
-    _use(p);
-    pantry.remove(p);
+  /// Набор продуктов для демонстрации: часть уже «горит», часть свежая.
+  void loadDemo() {
+    const demo = {
+      'Banana': 1,
+      'Milk': 0,
+      'Kefir': 2,
+      'Tomato': 1,
+      'Bell Pepper': 3,
+      'Eggs': 12,
+      'Chicken Breast': 1,
+      'White Bread': 0,
+      'Apple': 9,
+      'Potato': 20,
+      'Carrot': 14,
+      'Onion': 25,
+      'Cheddar Cheese': 10,
+      'Spinach': -1,
+      'Rice': 300,
+      'Flour': 200,
+      'Sugar': 300,
+      'Butter': 20,
+      'Vegetable Oil': 300,
+      'Strawberry': 2,
+    };
+    demo.forEach((name, d) => add(foodByName[name]!, days: d, quiet: true));
+    nutrikEvent('add');
+  }
+
+  void eat(PantryItem p, int grams, {bool finished = true}) {
+    if (finished) {
+      _use(p);
+      pantry.remove(p);
+    }
     log.add(LogEntry(_id++, p.food.emoji, '${p.food.name} · $grams g', (p.food.kcal * grams / 100).round()));
+    nutrikEvent('eat');
     _check();
     notifyListeners();
   }
 
-  void throwAway(PantryItem p) {
+  void throwAway(PantryItem p, [WasteReason reason = WasteReason.expired]) {
     pantry.remove(p);
     wasted++;
     wastedMoney += price(p.food);
+    wasteLog.add(WasteEntry(p.food, reason, price(p.food)));
     streakStart = now();
+    if (reason == WasteReason.disliked) dislikes.add(p.food.name.toLowerCase());
+    nutrikEvent('waste');
+    notifyListeners();
+  }
+
+  /// Заморозка продлевает жизнь продукта на 3 месяца — это тоже «спасение».
+  void freeze(PantryItem p) {
+    if (p.daysLeft >= 0 && p.daysLeft <= 2) {
+      rescued++;
+      rescuedMoney += price(p.food);
+    }
+    p.storage = Storage.freezer;
+    p.expiry = now().add(const Duration(days: 90));
+    frozen++;
+    nutrikEvent('rescue');
+    _check();
+    notifyListeners();
+  }
+
+  /// Отдать соседу / другу / на фудшеринг.
+  void share(PantryItem p) {
+    pantry.remove(p);
+    shared++;
+    nutrikEvent('rescue');
+    rescued++;
+    consumed++;
+    rescuedMoney += price(p.food);
+    celebrate = true;
+    _check();
+    notifyListeners();
+  }
+
+  void setExpiry(PantryItem p, DateTime d) {
+    p.expiry = d;
+    notifyListeners();
+  }
+
+  void moveTo(PantryItem p, Storage s) {
+    p.storage = s;
     notifyListeners();
   }
 
@@ -379,6 +1476,7 @@ class AppState extends ChangeNotifier {
     log.add(LogEntry(_id++, r.emoji, '${r.name} ×$portions', r.kcal * portions));
     cooked++;
     celebrate = true;
+    nutrikEvent('cook');
     _check();
     notifyListeners();
   }
@@ -435,10 +1533,10 @@ class MockAiService implements AiService {
         w = w.substring(0, w.length - 1);
       }
       s.dislikes.add(w);
-      return 'Got it, ${s.name}! I will avoid recipes with "$w" from now on. 👍';
+      return 'Got it, ${s.name}! I\'ll skip recipes with "$w" from now on. 👍';
     }
     if (RegExp(r'\b(hi|hello|hey)\b').hasMatch(t) || t.contains('привет')) {
-      return 'Hi ${s.name}! You have ${s.pantry.length} products in the fridge. Ask me what to cook!';
+      return 'Hi, ${s.name}! You have ${s.pantry.length} products in the fridge. Ask me what to cook!';
     }
     if (has(['thank', 'спасибо'])) return 'Anytime! Happy cooking 🍳';
     if (has(['calorie', 'kcal', 'калор'])) {
@@ -447,32 +1545,75 @@ class MockAiService implements AiService {
       return 'Today: ${s.eatenCalories} of ${s.targetCalories} kcal. ${left > 0 ? '$left kcal left.' : 'Goal reached!'}';
     }
     if (has(['do i have', 'have i', 'is there', 'есть ли']) && mentioned.isNotEmpty) {
-      return mentioned.map((f) {
-        final m = s.pantry.where((p) => p.food.name == f.name).toList();
-        return m.isEmpty ? '${f.emoji} No ${f.name} in the fridge.' : '${f.emoji} ${f.name}: ${m.length} pcs, soonest ${m.map((p) => p.status).first}.';
-      }).join('\n');
+      return mentioned
+          .map((f) {
+            final m = s.pantry.where((p) => p.food.name == f.name).toList();
+            return m.isEmpty ? '${f.emoji} No ${f.name} in the fridge.' : '${f.emoji} ${f.name}: ${m.length} pcs, soonest ${m.map((p) => p.status).first}.';
+          })
+          .join('\n');
+    }
+    if (has(['freeze', 'freezer', 'замороз']) && mentioned.isNotEmpty) {
+      final yes = mentioned.where((f) => canFreeze(f) || f.category == 'Frozen').map((f) => f.name).toList();
+      final no = mentioned.where((f) => !yes.contains(f.name)).map((f) => f.name).toList();
+      return [
+        if (yes.isNotEmpty) '❄️ ${yes.join(', ')}: yes! Frozen it keeps about 3 months. Tip: portion it first, so you thaw only what you need.',
+        if (no.isNotEmpty) '🚫 ${no.join(', ')}: better not — the texture gets watery after thawing. Use it fresh or cook it today.',
+      ].join('\n');
+    }
+    if (has(['store', 'keep', 'хран', 'last longer']) && mentioned.isNotEmpty) {
+      return mentioned.map((f) => '${f.emoji} ${f.name}: ${storageTips[f.name] ?? storageTips[f.category] ?? 'keep it cool and dry'}. Usually lasts about ${f.shelf} days.').join('\n');
+    }
+    if (has(['still good', 'still ok', 'safe to eat', 'can i eat', 'испорт'])) {
+      return 'Trust your senses for "best before" products: look, smell, taste a little. ⚠️ But never risk it with meat, fish or dairy past the "use by" date. When in doubt — throw it out.';
     }
     if (has(['expire', 'waste', 'spoil', 'soon', 'срок'])) {
       if (exp.isEmpty) return 'Nothing is expiring soon. Great job! 🎉';
       return 'Use these first: ${exp.map((e) => '${e.food.emoji} ${e.food.name} (${e.status})').join(', ')}.';
     }
     if (has(['cook', 'recipe', 'eat', 'dinner', 'lunch', 'breakfast', 'hungry', 'suggest', 'make', 'more', 'another', 'else', 'приготов'])) {
-      if (s.pantry.isEmpty) return 'Your fridge is empty. Find products in the Search tab first!';
+      if (s.pantry.isEmpty) return 'Your fridge is empty. Add some products in the Search tab first!';
       var list = rankRecipes(s);
       if (mentioned.isNotEmpty) {
         list = list.where((r) => r.ingredients.any((i) => mentioned.any((m) => m.name == i.name))).toList();
       }
-      if (list.isEmpty) return 'I found no recipes for that. Try other products!';
+      if (list.isEmpty) return 'I couldn\'t find a recipe with that. Try another product!';
       s.suggestIndex = has(['more', 'another', 'else']) ? s.suggestIndex + 1 : 0;
       final r = list[s.suggestIndex % list.length];
       final miss = r.missing(s.pantryNames);
-      return '${r.emoji} ${r.name} — ${r.kcal} kcal per serving, ${r.time}. ' +
-          (miss.isEmpty ? 'You have everything! Open Recipes for grams and steps.' : 'You still need: ${miss.join(', ')}.') +
-          ' Say "another" for more ideas.';
+      return '${r.emoji} ${r.name} — ${r.kcal} kcal per serving, ${r.time}. ${miss.isEmpty ? 'You have everything! Open Recipes for grams and steps.' : 'You still need: ${miss.join(', ')}.'} Say "another" for more ideas.';
     }
-    return 'I did not fully get "$message". Try: "what can I cook?", "what expires soon?", "calories in cheese", "do I have milk?" or "I don\'t like onion".';
+    return 'Sorry, I didn\'t quite get "$message". Try: "what can I cook?", "what expires soon?", "how to store tomatoes", "can I freeze bread?", "do I have milk?" or "I don\'t like onion".';
   }
 }
+
+const storageTips = {
+  'Tomato': 'keep at room temperature, stem down, away from sunlight — the fridge kills the flavor',
+  'Banana': 'keep apart from other fruit (bananas make them ripen faster); wrap the stems in foil',
+  'Potato': 'dark, cool and dry place, never next to onions',
+  'Onion': 'dry, airy and dark place, away from potatoes',
+  'Bread': 'in a bread box or paper bag; freeze the slices you won\'t eat within 2 days',
+  'White Bread': 'in a bread box or paper bag; freeze the slices you won\'t eat within 2 days',
+  'Milk': 'on a fridge shelf, not in the door — the door is the warmest spot',
+  'Eggs': 'in their box on a fridge shelf, not in the door',
+  'Apple': 'in the fridge crisper drawer, separately from vegetables',
+  'Avocado': 'ripen on the counter, then move to the fridge to slow it down',
+  'Spinach': 'in a box lined with a paper towel to soak up moisture',
+  'Lettuce': 'wrapped in a damp towel inside a bag in the crisper drawer',
+  'Cheddar Cheese': 'wrapped in wax or baking paper, not plastic — cheese needs to breathe',
+  'Strawberry': 'unwashed, in one layer on a paper towel; wash right before eating',
+  'Carrot': 'cut off the green tops, store in the crisper drawer',
+  'Herbs': 'like flowers: stems in a glass of water',
+  'Vegetables': 'in the crisper drawer of the fridge',
+  'Fruits': 'in the fridge or a cool place, away from bananas',
+  'Berries': 'unwashed in the fridge, wash just before eating',
+  'Dairy': 'on a middle fridge shelf, not in the door',
+  'Meat': 'on the bottom shelf of the fridge (coldest), or freeze within 2 days',
+  'Seafood': 'on ice on the bottom shelf, eat within 1–2 days or freeze',
+  'Bakery': 'in a bread box; freeze what you can\'t eat soon',
+  'Grains': 'airtight jar in a dry cupboard',
+  'Frozen': 'at −18 °C, never refreeze after thawing',
+  'Ready Meals': 'in a closed container in the fridge, eat within 2–3 days',
+};
 
 // ───────────────────────── АНИМАЦИИ ─────────────────────────
 
@@ -504,22 +1645,25 @@ class _AppearState extends State<Appear> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) => FadeTransition(
-        opacity: a,
-        child: SlideTransition(position: Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero).animate(a), child: widget.child),
-      );
+    opacity: a,
+    child: SlideTransition(
+      position: Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero).animate(a),
+      child: widget.child,
+    ),
+  );
 }
 
 Route<T> fadeSlide<T>(Widget page) => PageRouteBuilder<T>(
-      transitionDuration: const Duration(milliseconds: 450),
-      pageBuilder: (_, __, ___) => page,
-      transitionsBuilder: (_, a, __, child) => FadeTransition(
-        opacity: a,
-        child: SlideTransition(
-          position: Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
-          child: child,
-        ),
-      ),
-    );
+  transitionDuration: const Duration(milliseconds: 450),
+  pageBuilder: (_, _, _) => page,
+  transitionsBuilder: (_, a, _, child) => FadeTransition(
+    opacity: a,
+    child: SlideTransition(
+      position: Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
+      child: child,
+    ),
+  ),
+);
 
 const titleStyle = TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: burgundy);
 const headStyle = TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: burgundy);
@@ -539,7 +1683,10 @@ class CalorieApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'serif',
-        colorScheme: ColorScheme.fromSeed(seedColor: burgundy, primary: burgundy).copyWith(surface: cream, surfaceTint: Colors.transparent, secondaryContainer: const Color(0xFFE8DFC8), primaryContainer: const Color(0xFFE8DFC8)),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: burgundy,
+          primary: burgundy,
+        ).copyWith(surface: cream, surfaceTint: Colors.transparent, secondaryContainer: const Color(0xFFE8DFC8), primaryContainer: const Color(0xFFE8DFC8)),
         scaffoldBackgroundColor: cream,
       ),
       home: RegisterScreen(state: appState, ai: aiService),
@@ -548,8 +1695,10 @@ class CalorieApp extends StatelessWidget {
 }
 
 // ───────────────────────── НУТРИК (маскот) ─────────────────────────
+// Чиби-девочка-кошка: чёрное каре с ушками, бежевая рубашка-оверсайз с красным бантом,
+// хвост и листик-заколка (символ свежей еды). Рисуется целиком в CustomPainter.
 
-enum NutrikMode { idle, run, eat, fall }
+enum NutrikMode { idle, walk, run, eat, fall, sleep, wave, dance, dangle, stretch, love, sit, sad, jump, cheer }
 
 class NutrikPainter extends CustomPainter {
   final NutrikMode mode;
@@ -558,133 +1707,412 @@ class NutrikPainter extends CustomPainter {
   final String? snack;
   NutrikPainter(this.mode, this.t, this.blink, this.mouth, this.look, this.tilt, this.point, this.hasPoint, this.stars, this.snack);
 
-  static const ink = Color(0xFF5A0016);
-  static const bodyC = Color(0xFFFFC38A);
+  static const ink = Color(0xFF2A1F2D);
+  static const hairC = Color(0xFF1F1B24);
+  static const hairHi = Color(0xFF4A4357);
+  static const skin = Color(0xFFFFE8D8);
+  static const shirt = Color(0xFFE9C79A);
+  static const shirtDark = Color(0xFFD6B080);
+  static const shorts = Color(0xFF3B3F4C);
+  static const bowC = Color(0xFFC0392B);
+  static const pink = Color(0xFFF4A7B0);
+
+  Paint fill(Color c) => Paint()..color = c;
+  Paint line(double w, [Color c = ink]) => Paint()
+    ..color = c
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = w
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.save();
-    canvas.scale(size.width / 100, size.height / 100);
-    final run = mode == NutrikMode.run;
-    final line = Paint()..color = ink..style = PaintingStyle.stroke..strokeWidth = 2.4..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round;
-    Paint fill(Color c) => Paint()..color = c;
-    final bounce = run ? -3 * sin(t * 4 * pi).abs() : 0.0;
+    final c = canvas;
+    c.save();
+    c.scale(size.width / 100, size.height / 100);
+    final m = mode;
+    final cyc = t * 2 * pi;
+    final moving = m == NutrikMode.walk || m == NutrikMode.run;
+    final step = sin(cyc * (m == NutrikMode.run ? 4 : 2));
+    final seated = m == NutrikMode.sit || m == NutrikMode.sleep;
 
-    canvas.drawOval(Rect.fromCenter(center: const Offset(50, 93), width: 40 - bounce.abs() * 2, height: 6), fill(Colors.black12));
-    canvas.translate(50, 90);
-    canvas.rotate(tilt);
-    canvas.translate(0, bounce);
-    canvas.scale(1, 1 + 0.025 * sin(t * 2 * pi)); // дыхание
-    canvas.translate(-50, -90);
-
-    // ножки (маленькие!)
-    void leg(double x, double sw) {
-      final foot = Offset(x + (run ? sw * 5 : 0), 90 - (run ? max(0.0, sw) * 4 : 0));
-      canvas.drawLine(Offset(x, 80), foot, line..strokeWidth = 5);
-      canvas.drawOval(Rect.fromCenter(center: foot.translate(2, 0), width: 11, height: 6), fill(ink));
+    if (m != NutrikMode.dangle) {
+      c.drawOval(Rect.fromCenter(center: const Offset(50, 96), width: m == NutrikMode.jump ? 22 : 36, height: 5), fill(Colors.black.withValues(alpha: 0.12)));
     }
-    leg(41, sin(t * 4 * pi));
-    leg(59, -sin(t * 4 * pi));
-    line.strokeWidth = 2.4;
+    final bob = moving
+        ? -2.2 * step.abs()
+        : m == NutrikMode.dance
+        ? -2.5 * sin(cyc * 2).abs()
+        : 0.0;
+    final sway = m == NutrikMode.dance
+        ? 0.12 * sin(cyc * 2)
+        : m == NutrikMode.dangle
+        ? 0.1 * sin(cyc)
+        : 0.0;
+    c.translate(50, 94);
+    c.rotate(tilt + sway);
+    c.scale(1, 1 + (m == NutrikMode.sleep ? 0.03 : 0.015) * sin(cyc)); // дыхание
+    c.translate(-50, -94 + bob + (seated ? 7 : 0));
 
-    // растрёпанные волосы-росток
-    final w = sin(t * 2 * pi) * 1.2;
-    final hair = Paint()..color = const Color(0xFF4C9A2A)..style = PaintingStyle.stroke..strokeWidth = 2.6..strokeCap = StrokeCap.round;
-    canvas.drawPath(Path()..moveTo(46, 30)..quadraticBezierTo(38 + w, 17, 43, 9), hair);
-    canvas.drawPath(Path()..moveTo(50, 28)..quadraticBezierTo(53, 12 - w, 61, 13), hair);
-    canvas.drawPath(Path()..moveTo(56, 30)..quadraticBezierTo(67, 22 + w, 72, 27), hair);
-    canvas.save();
-    canvas.translate(62, 13);
-    canvas.rotate(-0.5);
-    canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: 10, height: 5), fill(const Color(0xFF6DBE45)));
-    canvas.restore();
+    _tail(c, cyc, m);
+    _legs(c, cyc, m, step, seated);
+    _body(c);
+    final armsUp = m == NutrikMode.stretch || m == NutrikMode.cheer || m == NutrikMode.jump;
+    if (armsUp) _arms(c, cyc, m, step);
+    _head(c, cyc, m);
+    if (!armsUp) _arms(c, cyc, m, step);
+    _extras(c, cyc, m);
+    c.restore();
+  }
 
-    // тело
-    final bodyRect = const Rect.fromLTRB(22, 28, 78, 88);
-    canvas.drawOval(bodyRect, fill(bodyC));
-    canvas.drawOval(const Rect.fromLTRB(36, 58, 64, 85), fill(Colors.white24));
-    canvas.drawOval(bodyRect, line);
-    // пятно кетчупа и крошки
-    canvas.drawOval(Rect.fromCenter(center: const Offset(60, 76), width: 9, height: 5), fill(const Color(0xFFC62828)));
-    canvas.drawCircle(const Offset(61, 80), 1.6, fill(const Color(0xFFC62828)));
-    for (final o in const [Offset(45, 71), Offset(55, 72), Offset(33, 66), Offset(68, 68)]) {
-      canvas.drawCircle(o, 1.1, fill(const Color(0xFF8D5524)));
-    }
-    canvas.drawCircle(const Offset(30, 58), 5, fill(const Color(0x88FF6F91)));
-    canvas.drawCircle(const Offset(70, 58), 5, fill(const Color(0x88FF6F91)));
-
-    // глаза
-    for (final cx in const [39.0, 61.0]) {
-      if (mode == NutrikMode.fall) {
-        canvas.drawLine(Offset(cx - 4, 45), Offset(cx + 4, 53), line);
-        canvas.drawLine(Offset(cx + 4, 45), Offset(cx - 4, 53), line);
-      } else if (blink > 0.85) {
-        canvas.drawLine(Offset(cx - 5, 49), Offset(cx + 5, 49), line);
-      } else {
-        canvas.drawOval(Rect.fromCenter(center: Offset(cx, 49), width: 14, height: 14 * (1 - blink)), fill(Colors.white));
-        canvas.drawOval(Rect.fromCenter(center: Offset(cx, 49), width: 14, height: 14 * (1 - blink)), line..strokeWidth = 1.4);
-        if (blink < 0.5) {
-          canvas.drawCircle(Offset(cx + look * 2.2, 49.5), 3.4, fill(Colors.black87));
-          canvas.drawCircle(Offset(cx + look * 2.2 + 1, 48.3), 1, fill(Colors.white));
-        }
-        line.strokeWidth = 2.4;
-      }
-    }
-
-    // рот
-    if (mouth > 0.05) {
-      canvas.drawOval(Rect.fromCenter(center: const Offset(50, 64), width: 9, height: 2 + 7 * mouth), fill(const Color(0xFF7A1020)));
-      if (mouth > 0.4) canvas.drawOval(Rect.fromCenter(center: const Offset(50, 66.5), width: 5, height: 2.5), fill(const Color(0xFFFF8A9A)));
+  void _tail(Canvas c, double cyc, NutrikMode m) {
+    final happy = m == NutrikMode.dance || m == NutrikMode.love || m == NutrikMode.cheer;
+    final wag = happy
+        ? sin(cyc * 3) * 8
+        : m == NutrikMode.sleep
+        ? 0.0
+        : sin(cyc) * 4;
+    final p = Path()..moveTo(59, 76);
+    if (m == NutrikMode.dangle || m == NutrikMode.sad) {
+      p.cubicTo(66, 82, 68, 90, 64 + wag * 0.3, 98);
+    } else if (m == NutrikMode.sleep || m == NutrikMode.sit) {
+      p.cubicTo(74, 82, 76, 94, 56, 95);
     } else {
-      canvas.drawPath(Path()..moveTo(44, 62)..quadraticBezierTo(50, 68, 56, 62), line..strokeWidth = 1.8);
-      line.strokeWidth = 2.4;
+      p.cubicTo(76, 80, 86 + wag * 0.4, 68, 80 + wag, 52);
+    }
+    c.drawPath(p, line(9.5));
+    c.drawPath(p, line(7, hairC));
+    c.drawPath(p, line(1.2, hairHi));
+  }
+
+  void _legs(Canvas c, double cyc, NutrikMode m, double step, bool seated) {
+    void leg(double hip, Offset foot) {
+      c.drawLine(Offset(hip, 80), foot, line(6.2));
+      c.drawLine(Offset(hip, 80), foot, line(4.4, skin));
+      final f = Rect.fromCenter(center: foot.translate(1.2, 0.6), width: 7.5, height: 4.4);
+      c.drawOval(f, fill(skin));
+      c.drawOval(f, line(1.1));
     }
 
-    // руки
-    void arm(Offset from, Offset to, {bool finger = false}) {
-      canvas.drawLine(from, to, line..strokeWidth = 6.4);
-      canvas.drawLine(from, to, fill(bodyC)..strokeWidth = 3.6..strokeCap = StrokeCap.round);
-      canvas.drawCircle(to, 3.8, fill(bodyC));
-      canvas.drawCircle(to, 3.8, line..strokeWidth = 1.8);
-      if (finger) {
-        final d = to - from;
-        final u = d / d.distance;
-        canvas.drawLine(to + u * 3, to + u * 8, line..strokeWidth = 2.6);
-      }
-      line.strokeWidth = 2.4;
+    if (seated) {
+      leg(45, const Offset(36, 87));
+      leg(55, const Offset(64, 87));
+    } else if (m == NutrikMode.dangle) {
+      final s = sin(cyc * 2) * 2.5;
+      leg(45, Offset(44 + s, 96));
+      leg(55, Offset(56 - s, 96));
+    } else if (m == NutrikMode.jump) {
+      leg(45, const Offset(41, 88));
+      leg(55, const Offset(59, 88));
+    } else if (m == NutrikMode.walk || m == NutrikMode.run) {
+      final k = m == NutrikMode.run ? 5.0 : 3.5;
+      leg(45, Offset(45 + step * k, 93 - max(0.0, step) * 3));
+      leg(55, Offset(55 - step * k, 93 - max(0.0, -step) * 3));
+    } else if (m == NutrikMode.dance) {
+      final s = sin(cyc * 2);
+      leg(45, Offset(43 + s * 2, 93 - max(0.0, s) * 4));
+      leg(55, Offset(57 + s * 2, 93 - max(0.0, -s) * 4));
+    } else {
+      leg(45, const Offset(44, 93));
+      leg(55, const Offset(56, 93));
     }
-    const ls = Offset(24, 62), rs = Offset(76, 62);
-    final sw = sin(t * 4 * pi);
+  }
+
+  void _body(Canvas c) {
+    final sh = RRect.fromRectAndRadius(const Rect.fromLTRB(39, 74, 61, 83), const Radius.circular(3));
+    c.drawRRect(sh, fill(shorts));
+    c.drawRRect(sh, line(1.3));
+    final p = Path()
+      ..moveTo(41, 56)
+      ..quadraticBezierTo(36, 66, 33, 79)
+      ..quadraticBezierTo(50, 83, 67, 79)
+      ..quadraticBezierTo(64, 66, 59, 56)
+      ..close();
+    c.drawPath(p, fill(shirt));
+    c.save();
+    c.clipPath(p);
+    c.drawRect(const Rect.fromLTRB(30, 76, 70, 86), fill(shirtDark));
+    c.restore();
+    c.drawPath(p, line(1.6));
+    c.drawPath(
+      Path()
+        ..moveTo(43, 56)
+        ..lineTo(50, 63)
+        ..lineTo(57, 56),
+      line(1.2),
+    );
+    c.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTRB(54, 69, 61, 75), const Radius.circular(1.5)), line(0.9, ink.withValues(alpha: 0.55)));
+    final b = fill(bowC);
+    c.drawPath(
+      Path()
+        ..moveTo(50, 61)
+        ..lineTo(43.5, 57.5)
+        ..lineTo(44, 64.5)
+        ..close(),
+      b,
+    );
+    c.drawPath(
+      Path()
+        ..moveTo(50, 61)
+        ..lineTo(56.5, 57.5)
+        ..lineTo(56, 64.5)
+        ..close(),
+      b,
+    );
+    c.drawPath(
+      Path()
+        ..moveTo(49, 62)
+        ..lineTo(46.5, 68)
+        ..lineTo(48.6, 67.4)
+        ..close(),
+      b,
+    );
+    c.drawPath(
+      Path()
+        ..moveTo(51, 62)
+        ..lineTo(53.5, 68)
+        ..lineTo(51.4, 67.4)
+        ..close(),
+      b,
+    );
+    c.drawCircle(const Offset(50, 61), 1.8, fill(const Color(0xFF962D22)));
+  }
+
+  void _arm(Canvas c, Offset from, Offset to) {
+    c.drawLine(from, to, line(7.6));
+    c.drawLine(from, to, line(5.8, shirt));
+    c.drawCircle(to, 2.7, fill(skin));
+    c.drawCircle(to, 2.7, line(1.1));
+  }
+
+  void _arms(Canvas c, double cyc, NutrikMode m, double step) {
+    const l = Offset(42, 59), r = Offset(58, 59);
     if (hasPoint) {
       final right = cos(point) >= 0;
-      final s = right ? rs : ls;
-      arm(s, s + Offset(cos(point), sin(point)) * 24, finger: true);
-      arm(right ? ls : rs, right ? const Offset(15, 71) : const Offset(85, 71));
-    } else if (mode == NutrikMode.eat) {
-      arm(ls, const Offset(38, 66));
-      arm(rs, const Offset(62, 66));
-    } else if (run) {
-      arm(ls, Offset(15, 66 + sw * 6));
-      arm(rs, Offset(85, 66 - sw * 6));
-    } else if (mode == NutrikMode.fall) {
-      arm(ls, const Offset(12, 50));
-      arm(rs, const Offset(88, 50));
-    } else {
-      arm(ls, Offset(14, 70 + sin(t * 2 * pi) * 1.5));
-      arm(rs, Offset(86, 70 - sin(t * 2 * pi) * 1.5));
+      final s = right ? r : l;
+      _arm(c, s, s + Offset(cos(point), sin(point)) * 18);
+      _arm(c, right ? l : r, right ? const Offset(36, 73) : const Offset(64, 73));
+      return;
+    }
+    switch (m) {
+      case NutrikMode.eat:
+        _arm(c, l, const Offset(46, 52));
+        _arm(c, r, const Offset(54, 52));
+      case NutrikMode.wave:
+        _arm(c, l, const Offset(36, 74));
+        _arm(c, r, Offset(72 + sin(cyc * 4) * 3, 42));
+      case NutrikMode.dance:
+        final up = sin(cyc * 2) > 0;
+        _arm(c, l, up ? const Offset(31, 46) : const Offset(34, 72));
+        _arm(c, r, up ? const Offset(66, 72) : const Offset(69, 46));
+      case NutrikMode.stretch:
+        _arm(c, l, Offset(34, 30 + sin(cyc) * 2));
+        _arm(c, r, Offset(66, 30 + sin(cyc) * 2));
+      case NutrikMode.cheer || NutrikMode.jump:
+        _arm(c, l, const Offset(29, 44));
+        _arm(c, r, const Offset(71, 44));
+      case NutrikMode.dangle || NutrikMode.sad:
+        _arm(c, l, const Offset(40, 76));
+        _arm(c, r, const Offset(60, 76));
+      case NutrikMode.walk || NutrikMode.run:
+        _arm(c, l, Offset(35, 72 + step * 4));
+        _arm(c, r, Offset(65, 72 - step * 4));
+      case NutrikMode.sleep || NutrikMode.sit:
+        _arm(c, l, const Offset(44, 77));
+        _arm(c, r, const Offset(56, 77));
+      case NutrikMode.fall:
+        _arm(c, l, const Offset(30, 52));
+        _arm(c, r, const Offset(70, 52));
+      case NutrikMode.love:
+        _arm(c, l, const Offset(47, 67));
+        _arm(c, r, const Offset(53, 67));
+      case NutrikMode.idle:
+        _arm(c, l, Offset(36, 73 + sin(cyc)));
+        _arm(c, r, Offset(64, 73 - sin(cyc)));
+    }
+  }
+
+  void _head(Canvas c, double cyc, NutrikMode m) {
+    final droop = m == NutrikMode.sad || m == NutrikMode.dangle || m == NutrikMode.sleep ? 1.0 : 0.0;
+    final twitch = sin(cyc * 3) > 0.93 ? 0.18 : 0.0;
+    // волосы сзади
+    c.drawOval(Rect.fromCenter(center: const Offset(50, 35), width: 52, height: 46), fill(hairC));
+    c.drawPath(
+      Path()
+        ..moveTo(26, 32)
+        ..quadraticBezierTo(21, 48, 27, 57)
+        ..lineTo(35, 50)
+        ..close(),
+      fill(hairC),
+    );
+    c.drawPath(
+      Path()
+        ..moveTo(74, 32)
+        ..quadraticBezierTo(79, 48, 73, 57)
+        ..lineTo(65, 50)
+        ..close(),
+      fill(hairC),
+    );
+    // ушки
+    void ear(Offset base, double side, double rot) {
+      c.save();
+      c.translate(base.dx, base.dy);
+      c.rotate(rot);
+      c.scale(side, 1); // правое ушко — зеркальная копия левого
+      final o = Path()
+        ..moveTo(-8, 4)
+        ..quadraticBezierTo(-6, -7, -3, -17)
+        ..quadraticBezierTo(4, -9, 8, 3)
+        ..close();
+      c.drawPath(o, fill(hairC));
+      c.drawPath(o, line(1.1));
+      c.save();
+      c.translate(-1.5, -5);
+      c.scale(0.5);
+      c.translate(1.5, 5);
+      c.drawPath(o, fill(pink));
+      c.restore();
+      c.restore();
     }
 
-    if (snack != null) {
-      final tp = TextPainter(text: TextSpan(text: snack, style: const TextStyle(fontSize: 18)), textDirection: TextDirection.ltr)..layout();
-      tp.paint(canvas, Offset(50 - tp.width / 2, 62 - tp.height / 2 + sin(t * 4 * pi) * 1.5));
-    }
-    if (stars) {
-      for (var k = 0; k < 3; k++) {
-        final a = t * 4 * pi + k * 2 * pi / 3;
-        canvas.drawCircle(Offset(50 + 18 * cos(a), 14 + 5 * sin(a)), 2.6, fill(Colors.amber));
+    ear(const Offset(35, 16), 1, -0.22 - 0.45 * droop - twitch);
+    ear(const Offset(65, 16), -1, 0.22 + 0.45 * droop);
+    // лицо
+    c.drawOval(Rect.fromCenter(center: const Offset(50, 39), width: 41, height: 34), fill(skin));
+    // чёлка
+    final bangs = Path()
+      ..moveTo(25, 36)
+      ..quadraticBezierTo(25, 10, 50, 11)
+      ..quadraticBezierTo(75, 10, 75, 36)
+      ..lineTo(71, 30)
+      ..lineTo(68, 35)
+      ..lineTo(63, 27)
+      ..lineTo(59, 33)
+      ..lineTo(54, 26)
+      ..lineTo(50, 32)
+      ..lineTo(45, 26)
+      ..lineTo(41, 33)
+      ..lineTo(36, 27)
+      ..lineTo(32, 35)
+      ..lineTo(29, 30)
+      ..close();
+    c.drawPath(bangs, fill(hairC));
+    c.drawArc(Rect.fromCenter(center: const Offset(50, 22), width: 34, height: 15), pi * 1.1, pi * 0.5, false, line(1.6, hairHi));
+    // пряди по бокам лица
+    c.drawPath(
+      Path()
+        ..moveTo(27, 30)
+        ..quadraticBezierTo(24, 45, 29, 53)
+        ..lineTo(32, 44)
+        ..quadraticBezierTo(30, 37, 31, 32)
+        ..close(),
+      fill(hairC),
+    );
+    c.drawPath(
+      Path()
+        ..moveTo(73, 30)
+        ..quadraticBezierTo(76, 45, 71, 53)
+        ..lineTo(68, 44)
+        ..quadraticBezierTo(70, 37, 69, 32)
+        ..close(),
+      fill(hairC),
+    );
+    // листик-заколка
+    c.save();
+    c.translate(67, 20);
+    c.rotate(0.6);
+    c.drawOval(Rect.fromCenter(center: Offset.zero, width: 10, height: 5), fill(const Color(0xFF6DBE45)));
+    c.drawLine(const Offset(-4, 0), const Offset(4, 0), line(0.8, const Color(0xFF3E7D22)));
+    c.restore();
+    _face(c, cyc, m);
+  }
+
+  void _face(Canvas c, double cyc, NutrikMode m) {
+    c.drawOval(Rect.fromCenter(center: const Offset(36.5, 48), width: 6.5, height: 3.2), fill(pink.withValues(alpha: 0.75)));
+    c.drawOval(Rect.fromCenter(center: const Offset(63.5, 48), width: 6.5, height: 3.2), fill(pink.withValues(alpha: 0.75)));
+    final happy = m == NutrikMode.love || m == NutrikMode.dance || m == NutrikMode.cheer || m == NutrikMode.jump;
+    final closed = m == NutrikMode.sleep || m == NutrikMode.stretch;
+    for (final (i, cx) in const [(0, 42.0), (1, 58.0)]) {
+      if (m == NutrikMode.fall) {
+        c.drawCircle(Offset(cx, 42), 3.2, line(1));
+        c.drawCircle(Offset(cx, 42), 1.3, line(1));
+      } else if (happy) {
+        c.drawArc(Rect.fromCenter(center: Offset(cx, 43.5), width: 7, height: 6), pi, pi, false, line(1.7));
+      } else if (closed || blink > 0.85) {
+        c.drawArc(Rect.fromCenter(center: Offset(cx, 41), width: 7, height: 5), 0.2, pi - 0.4, false, line(1.5));
+      } else if (m == NutrikMode.dangle && i == 1) {
+        // недовольный прищур, как на референсе
+        c.drawLine(Offset(cx - 3.6, 43), Offset(cx + 3.4, 41.6), line(1.6));
+      } else {
+        final h = 9.0 * (1 - blink);
+        final ex = cx + look * 0.8;
+        final eye = Rect.fromCenter(center: Offset(ex, 42.5), width: 6.6, height: h);
+        c.drawOval(eye, fill(const Color(0xFF2B2235)));
+        c.drawOval(Rect.fromCenter(center: Offset(ex, 44.6), width: 4.4, height: h * 0.38), fill(const Color(0xFF8A5A9E)));
+        if (blink < 0.5) {
+          c.drawCircle(Offset(ex - 1.3, 40.4), 1.4, fill(Colors.white));
+          c.drawCircle(Offset(ex + 1.2, 44.8), 0.6, fill(Colors.white));
+        }
+        c.drawArc(Rect.fromCenter(center: Offset(ex, 42.5), width: 7.8, height: h + 1), pi * 1.08, pi * 0.84, false, line(1.5));
       }
     }
-    canvas.restore();
+    if (m == NutrikMode.sad) {
+      final ty = 46 + (t * 9) % 9;
+      c.drawOval(Rect.fromCenter(center: Offset(38.5, ty), width: 2.2, height: 3.2), fill(const Color(0xBB6EC6FF)));
+      c.drawOval(Rect.fromCenter(center: Offset(61.5, ty), width: 2.2, height: 3.2), fill(const Color(0xBB6EC6FF)));
+    }
+    // рот
+    final open = m == NutrikMode.stretch ? 0.6 + 0.4 * sin(cyc).abs() : mouth;
+    if (snack != null) return; // рот закрыт едой
+    if (open > 0.05) {
+      c.drawOval(Rect.fromCenter(center: const Offset(50, 50.8), width: 3.4 + open * 1.6, height: 1.2 + open * 3.8), fill(const Color(0xFF8E2B3A)));
+      if (open > 0.45) c.drawOval(Rect.fromCenter(center: const Offset(50, 52), width: 2.4, height: 1.2), fill(const Color(0xFFFF8A9A)));
+    } else if (m == NutrikMode.dangle || m == NutrikMode.sad) {
+      c.drawArc(Rect.fromCenter(center: const Offset(50, 52.2), width: 4, height: 3), pi * 1.1, pi * 0.8, false, line(1.1));
+    } else {
+      // кошачий ротик «ω»
+      c.drawArc(Rect.fromCenter(center: const Offset(48.6, 49.8), width: 2.8, height: 2.4), 0, pi, false, line(1.0));
+      c.drawArc(Rect.fromCenter(center: const Offset(51.4, 49.8), width: 2.8, height: 2.4), 0, pi, false, line(1.0));
+    }
+  }
+
+  Path _heart(Offset o, double s) => Path()
+    ..moveTo(o.dx, o.dy + s * 0.9)
+    ..cubicTo(o.dx - s * 1.6, o.dy - s * 0.2, o.dx - s * 0.6, o.dy - s * 1.3, o.dx, o.dy - s * 0.4)
+    ..cubicTo(o.dx + s * 0.6, o.dy - s * 1.3, o.dx + s * 1.6, o.dy - s * 0.2, o.dx, o.dy + s * 0.9);
+
+  void _text(Canvas c, String s, Offset o, double size, Color color) {
+    final tp = TextPainter(
+      text: TextSpan(
+        text: s,
+        style: TextStyle(fontSize: size, color: color, fontWeight: FontWeight.bold),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(c, o - Offset(tp.width / 2, tp.height / 2));
+  }
+
+  void _extras(Canvas c, double cyc, NutrikMode m) {
+    for (var k = 0; k < 3; k++) {
+      final p = (t + k / 3) % 1;
+      if (m == NutrikMode.sleep) _text(c, 'z', Offset(68 + p * 12, 22 - p * 18), 5 + p * 5, ink.withValues(alpha: 1 - p));
+      if (m == NutrikMode.love) c.drawPath(_heart(Offset(38 + k * 12 + sin(p * 6) * 2, 18 - p * 16), 2.2 + p * 1.5), fill(const Color(0xFFE84A6F).withValues(alpha: 1 - p)));
+      if (m == NutrikMode.dance) _text(c, k.isEven ? '♪' : '♫', Offset(k == 1 ? 80 : 20 + k * 30, 30 - p * 20), 8, ink.withValues(alpha: 1 - p));
+    }
+    if (stars || m == NutrikMode.fall) {
+      for (var k = 0; k < 3; k++) {
+        final a = cyc * 2 + k * 2 * pi / 3;
+        c.drawCircle(Offset(50 + 18 * cos(a), 9 + 4 * sin(a)), 2.4, fill(Colors.amber));
+      }
+    }
+    if (m == NutrikMode.run) c.drawOval(Rect.fromCenter(center: const Offset(74, 26), width: 3, height: 4.5), fill(const Color(0xAA6EC6FF)));
+    if (m == NutrikMode.cheer) {
+      for (var k = 0; k < 4; k++) {
+        final a = cyc + k * pi / 2;
+        c.drawCircle(Offset(50 + 30 * cos(a), 34 + 22 * sin(a)), 1.4, fill(const Color(0xFFFFC94D)));
+      }
+    }
+    if (snack != null) _text(c, snack!, Offset(50, 52 + sin(cyc * 4)), 10, Colors.black);
   }
 
   @override
@@ -703,7 +2131,7 @@ class Nutrik extends StatefulWidget {
 }
 
 class _NutrikState extends State<Nutrik> with TickerProviderStateMixin {
-  late final AnimationController cycle = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat();
+  late final AnimationController cycle = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat();
   late final AnimationController blink = AnimationController(vsync: this, duration: const Duration(milliseconds: 110));
   final _r = Random();
 
@@ -734,15 +2162,15 @@ class _NutrikState extends State<Nutrik> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: Listenable.merge([cycle, blink]),
-      builder: (_, __) {
+      builder: (_, _) {
         final t = cycle.value;
         var m = 0.0;
-        if (widget.mode == NutrikMode.eat) {
-          m = sin(t * 2 * pi * 2).abs() * 0.7;
-        } else if (widget.mode == NutrikMode.fall) {
+        if (widget.mode == NutrikMode.fall) {
           m = 0.6;
+        } else if (widget.mode == NutrikMode.cheer || widget.mode == NutrikMode.jump) {
+          m = 0.7;
         } else if (widget.talking) {
-          m = sin(t * 2 * pi * 3).abs();
+          m = sin(t * 2 * pi * 4).abs();
         }
         final look = widget.talking ? 0.0 : sin(DateTime.now().millisecondsSinceEpoch / 1000 * 0.8);
         return Transform(
@@ -763,13 +2191,17 @@ class NutrikSays extends StatefulWidget {
   final String text;
   final double? point;
   final double size;
-  const NutrikSays({super.key, required this.text, this.point, this.size = 96});
+  final NutrikMode mode;
+  const NutrikSays({super.key, required this.text, this.point, this.size = 96, this.mode = NutrikMode.idle});
   @override
   State<NutrikSays> createState() => _NutrikSaysState();
 }
 
 class _NutrikSaysState extends State<NutrikSays> with SingleTickerProviderStateMixin {
-  late final AnimationController c = AnimationController(vsync: this, duration: Duration(milliseconds: 26 * widget.text.length))..forward();
+  late final AnimationController c = AnimationController(
+    vsync: this,
+    duration: Duration(milliseconds: 22 * widget.text.length),
+  )..forward();
 
   @override
   void dispose() {
@@ -781,27 +2213,35 @@ class _NutrikSaysState extends State<NutrikSays> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: c,
-      builder: (_, __) {
+      builder: (_, _) {
         final n = (c.value * widget.text.length).round();
-        return Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-          Nutrik(size: widget.size, talking: c.value < 1, point: widget.point),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: burgundy, width: 1.5),
-                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3))],
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Nutrik(size: widget.size, talking: c.value < 1, point: widget.point, mode: widget.mode),
+            const SizedBox(width: 4),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => c.value = 1, // тап — показать весь текст сразу
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: burgundy, width: 1.5),
+                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3))],
+                  ),
+                  child: Stack(
+                    children: [
+                      Opacity(opacity: 0, child: Text(widget.text, style: const TextStyle(fontSize: 15))),
+                      Text(widget.text.substring(0, n), style: const TextStyle(fontSize: 15, color: Colors.black87)),
+                    ],
+                  ),
+                ),
               ),
-              child: Stack(children: [
-                Opacity(opacity: 0, child: Text(widget.text, style: const TextStyle(fontSize: 15))),
-                Text(widget.text.substring(0, n), style: const TextStyle(fontSize: 15, color: Colors.black87)),
-              ]),
             ),
-          ),
-        ]);
+          ],
+        );
       },
     );
   }
@@ -826,18 +2266,28 @@ class _FloatingFoodState extends State<FloatingFood> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-        animation: c,
-        builder: (_, __) => Stack(children: [
-          for (var k = 0; k < items.length; k++)
-            Align(
-              alignment: Alignment((k / (items.length - 1)) * 2 - 1, 1 - ((c.value + k * 0.37) % 1) * 2.4),
-              child: Transform.rotate(angle: sin((c.value + k) * 2 * pi) * 0.4, child: Opacity(opacity: 0.22, child: Text(items[k], style: const TextStyle(fontSize: 30)))),
+    animation: c,
+    builder: (_, _) => Stack(
+      children: [
+        for (var k = 0; k < items.length; k++)
+          Align(
+            alignment: Alignment((k / (items.length - 1)) * 2 - 1, 1 - ((c.value + k * 0.37) % 1) * 2.4),
+            child: Transform.rotate(
+              angle: sin((c.value + k) * 2 * pi) * 0.4,
+              child: Opacity(opacity: 0.22, child: Text(items[k], style: const TextStyle(fontSize: 30))),
             ),
-        ]),
-      );
+          ),
+      ],
+    ),
+  );
 }
 
-/// Нутрик бегает по низу экрана: ест, спотыкается, падает.
+// События приложения, на которые Нутрик реагирует (выбросили еду, приготовили, спасли...).
+final nutrikEvents = ValueNotifier<(String, int)>(('', 0));
+void nutrikEvent(String e) => nutrikEvents.value = (e, nutrikEvents.value.$2 + 1);
+
+/// Нутрик живёт внизу экрана. Сама гуляет, бегает, спит, танцует, ест, ловит бабочек...
+/// Тап — погладить, двойной тап — подпрыгнуть, можно схватить, таскать и даже бросить.
 class NutrikRoamer extends StatefulWidget {
   final bool paused;
   final double bottom;
@@ -847,281 +2297,821 @@ class NutrikRoamer extends StatefulWidget {
   State<NutrikRoamer> createState() => _RoamerState();
 }
 
-class _RoamerState extends State<NutrikRoamer> with TickerProviderStateMixin {
+class _RoamerState extends State<NutrikRoamer> with SingleTickerProviderStateMixin {
+  static const size = 72.0;
+  static const gravity = 2200.0;
   final _r = Random();
-  late final AnimationController move = AnimationController(vsync: this);
-  late final AnimationController fall = AnimationController(vsync: this, duration: const Duration(milliseconds: 1700));
-  late final AnimationController hop = AnimationController(vsync: this, duration: const Duration(milliseconds: 450));
-  double _from = 0.1, _to = 0.1;
-  bool right = true;
+  late final Ticker _ticker;
+  Duration _last = Duration.zero;
+  double x = 30, y = 0, vx = 0, vy = 0, tilt = 0; // y — высота над «полом»
+  double w = 360, h = 600;
+  double? targetX;
+  double speed = 70;
+  bool held = false, right = true, _busy = false;
   NutrikMode mode = NutrikMode.idle;
   String? snack, say;
-
-  double get x => _from + (_to - _from) * move.value;
+  Offset? fly; // бабочка
+  double _flyT = 0;
+  int _gen = 0, _pokes = 0, _sayId = 0;
+  DateTime _lastPoke = DateTime(2000);
 
   @override
   void initState() {
     super.initState();
+    _ticker = createTicker(_tick)..start();
+    nutrikEvents.addListener(_onEvent);
     _life();
   }
 
   @override
   void dispose() {
-    move.dispose();
-    fall.dispose();
-    hop.dispose();
+    nutrikEvents.removeListener(_onEvent);
+    _ticker.dispose();
     super.dispose();
   }
 
-  Future<void> _leg(double to) async {
-    _from = x;
-    _to = to;
-    right = to >= _from;
-    move.duration = Duration(milliseconds: (700 + (to - _from).abs() * 4200).round());
-    setState(() => mode = NutrikMode.run);
-    await move.forward(from: 0);
-  }
-
-  Future<void> _quip(String s, [int ms = 1800]) async {
-    if (!mounted) return;
-    setState(() => say = s);
-    await Future.delayed(Duration(milliseconds: ms));
-    if (mounted) setState(() => say = null);
-  }
-
-  Future<void> _life() async {
-    while (mounted) {
-      await Future.delayed(Duration(milliseconds: 1500 + _r.nextInt(3500)));
-      if (!mounted) return;
-      if (widget.paused) continue;
-      final r = _r.nextInt(10);
-      if (r < 3) {
-        await _leg(_r.nextDouble());
-      } else if (r < 5) {
-        final target = _r.nextDouble();
-        await _leg((x + target) / 2);
-        if (!mounted) return;
-        setState(() => mode = NutrikMode.fall);
-        _quip('Ouch! Tiny legs... 😵');
-        await fall.forward(from: 0);
-        await _leg(target);
-      } else if (r < 8) {
-        setState(() {
-          mode = NutrikMode.eat;
-          snack = ['🍎', '🧀', '🍞', '🥕', '🍪', '🍌'][_r.nextInt(6)];
-        });
-        await Future.delayed(const Duration(seconds: 3));
-        if (!mounted) return;
-        setState(() => snack = null);
-        _quip('Yum! 😋', 1200);
-      } else {
-        _quip(_idleLine());
-      }
-      if (mounted) setState(() => mode = NutrikMode.idle);
+  // ── физика и ходьба ──
+  void _tick(Duration el) {
+    final dt = ((el - _last).inMicroseconds / 1e6).clamp(0.0, 0.05);
+    _last = el;
+    var changed = false;
+    if (fly != null) {
+      _flyT += dt;
+      fly = Offset((w * (0.5 + 0.42 * sin(_flyT * 0.9))).clamp(0, w - 24), 60 + 40 * sin(_flyT * 2.3).abs());
+      changed = true;
     }
+    if (held) {
+      if (changed) setState(() {});
+      return;
+    }
+    if (y > 0 || vy > 0) {
+      vy -= gravity * dt;
+      x += vx * dt;
+      y += vy * dt;
+      if (x < 0 || x > w - size) {
+        x = x.clamp(0.0, max(0.0, w - size));
+        vx = -vx * 0.5;
+      }
+      if (y > h - size) {
+        y = h - size;
+        vy = -vy.abs() * 0.3;
+      }
+      if (y <= 0) {
+        y = 0;
+        final impact = -vy;
+        vy = 0;
+        if (impact > 1150) {
+          vx = 0;
+          _land(hard: true);
+        } else if (impact > 380) {
+          vy = impact * 0.32; // отскок
+          vx *= 0.6;
+        } else {
+          vx = 0;
+          _land(hard: false);
+        }
+      }
+      changed = true;
+    } else if (targetX != null) {
+      final d = targetX! - x;
+      final s = speed * dt;
+      if (d.abs() <= s) {
+        x = targetX!;
+        targetX = null;
+      } else {
+        x += s * d.sign;
+        right = d > 0;
+      }
+      changed = true;
+    }
+    if (changed && mounted) setState(() {});
+  }
+
+  void _land({required bool hard}) {
+    final g = ++_gen;
+    if (hard) {
+      _busy = true;
+      setState(() {
+        mode = NutrikMode.fall;
+        tilt = right ? 1.35 : -1.35;
+      });
+      _quip(['Ouch! My tail! 😵', 'Owie... gentle please!', 'I can\'t fly! 🙀', 'The floor is hard...'][_r.nextInt(4)]);
+      Future.delayed(const Duration(milliseconds: 1700), () {
+        if (!mounted || g != _gen) return;
+        setState(() {
+          tilt = 0;
+          mode = NutrikMode.sad;
+        });
+        Future.delayed(const Duration(milliseconds: 900), () {
+          if (mounted && g == _gen) setState(() => mode = NutrikMode.idle);
+          _busy = false;
+        });
+      });
+    } else {
+      setState(() {
+        tilt = 0;
+        mode = NutrikMode.idle;
+      });
+      _busy = false;
+    }
+  }
+
+  // ── хелперы поведения ──
+  Future<void> _wait(int ms) => Future.delayed(Duration(milliseconds: ms));
+  bool _alive(int g) => mounted && g == _gen && !held && y == 0;
+
+  void _quip(String s, [int ms = 2200]) {
+    if (!mounted) return;
+    final id = ++_sayId;
+    setState(() => say = s);
+    Future.delayed(Duration(milliseconds: ms), () {
+      if (mounted && id == _sayId) setState(() => say = null);
+    });
+  }
+
+  Future<bool> _walkTo(double tx, int g, {bool run = false}) async {
+    targetX = tx.clamp(0.0, max(0.0, w - size));
+    speed = run ? 190 : 75;
+    setState(() => mode = run ? NutrikMode.run : NutrikMode.walk);
+    while (targetX != null) {
+      await _wait(40);
+      if (!_alive(g)) {
+        targetX = null;
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Future<bool> _do(NutrikMode m, int ms, int g, {String? line, String? food}) async {
+    if (!_alive(g)) return false;
+    setState(() {
+      mode = m;
+      snack = food;
+    });
+    if (line != null) _quip(line, min(ms + 400, 2600));
+    await _wait(ms);
+    if (mounted) setState(() => snack = null);
+    return _alive(g);
+  }
+
+  void _hop([double power = 560]) {
+    vy = power;
+    y = 0.1;
+    setState(() => mode = NutrikMode.jump);
   }
 
   String _idleLine() {
-    final exp = widget.state?.expiringSoon ?? [];
+    final s = widget.state;
+    final exp = s?.toRescue ?? [];
+    final dead = s?.expired ?? [];
+    if (dead.isNotEmpty && _r.nextBool()) return '${dead.first.food.emoji} ${dead.first.food.name} smells funny... 👃';
     if (exp.isNotEmpty && _r.nextBool()) {
       final p = exp.first;
-      return p.daysLeft <= 0 ? '${p.food.name} is expired! 😱' : '${p.food.name} expires in ${p.daysLeft} d! Eat me... I mean it!';
+      return p.daysLeft == 0 ? 'Eat the ${p.food.name} today, please! 🥺' : '${p.food.name} spoils in ${p.daysLeft} d!';
     }
-    return ['Crumbs everywhere!', 'Is it snack time?', 'Do not waste food!', 'Did you check the fridge?'][_r.nextInt(4)];
+    return ['Is it snack time yet?', 'Don\'t waste food, nya!', 'Did you check the fridge?', 'Old food goes to the front!', 'Leftovers = free lunch 😋', 'I love a clean fridge ✨'][_r.nextInt(6)];
   }
 
+  // ── жизнь: случайные занятия ──
+  Future<void> _life() async {
+    await _wait(1200);
+    while (mounted) {
+      await _wait(1600 + _r.nextInt(2800));
+      if (!mounted) return;
+      if (widget.paused || held || _busy || y > 0) continue;
+      final g = ++_gen;
+      await _randomAction(g);
+      if (mounted && g == _gen && !held && y == 0) {
+        setState(() {
+          mode = NutrikMode.idle;
+          snack = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _randomAction(int g) async {
+    final roll = _r.nextInt(100);
+    final far = _r.nextDouble() * max(0.0, w - size);
+    if (roll < 18) {
+      await _walkTo(far, g);
+    } else if (roll < 24) {
+      _quip('Zoomies! 💨', 1400);
+      if (await _walkTo(x < w / 2 ? w - size : 0, g, run: true)) await _walkTo(far, g, run: true);
+    } else if (roll < 31) {
+      // спотыкается
+      if (!await _walkTo((x + far) / 2, g)) return;
+      setState(() {
+        mode = NutrikMode.fall;
+        tilt = right ? 1.35 : -1.35;
+      });
+      _quip(['Oops! Tiny legs... 😵', 'Who put that there?!', '*trips gracefully*'][_r.nextInt(3)]);
+      await _wait(1600);
+      if (!mounted || g != _gen) return;
+      setState(() => tilt = 0);
+    } else if (roll < 41) {
+      await _do(NutrikMode.eat, 3000, g, line: ['Nom nom nom...', 'Yum! 😋', 'Crunchy!'][_r.nextInt(3)], food: ['🍎', '🧀', '🍙', '🥕', '🍪', '🍌', '🍓', '🥐'][_r.nextInt(8)]);
+    } else if (roll < 50) {
+      setState(() => mode = NutrikMode.stretch);
+      _quip('*yaaawn*', 1500);
+      await _wait(1600);
+      if (!_alive(g)) return;
+      setState(() => mode = NutrikMode.sleep);
+      _busy = true;
+      await _wait(6000 + _r.nextInt(5000));
+      _busy = false;
+      if (_alive(g)) await _do(NutrikMode.stretch, 1200, g, line: 'Good nap!');
+    } else if (roll < 58) {
+      await _do(NutrikMode.dance, 3600, g, line: ['La-la-la~ ♪', 'Dance break!', 'Nya-nya-nya ♫'][_r.nextInt(3)]);
+    } else if (roll < 64) {
+      right = x < w / 2;
+      await _do(NutrikMode.wave, 2200, g, line: ['Hi there! 👋', 'Hello, human!', 'Psst! Over here!'][_r.nextInt(3)]);
+    } else if (roll < 71) {
+      await _do(NutrikMode.sit, 3500 + _r.nextInt(2000), g, line: _r.nextBool() ? null : 'Just sitting... 🍃');
+    } else if (roll < 79) {
+      // ловит бабочку
+      setState(() {
+        fly = Offset(w * 0.5, 80);
+        _flyT = _r.nextDouble() * 6;
+      });
+      _quip('A butterfly!! 🦋', 1500);
+      for (var k = 0; k < 3 && mounted && g == _gen; k++) {
+        if (!await _walkTo((fly?.dx ?? x) - size / 3, g, run: true)) break;
+        _hop(640);
+        await _wait(700);
+      }
+      if (mounted) setState(() => fly = null);
+      if (mounted && g == _gen && !held) await _do(NutrikMode.sad, 1300, g, line: 'It got away... 😿');
+    } else if (roll < 85) {
+      _hop(520);
+      _quip('Boing!', 900);
+    } else if (roll < 93) {
+      final line = _idleLine();
+      await _do(line.contains('smells') || line.contains('spoils') ? NutrikMode.sad : NutrikMode.idle, 2400, g, line: line);
+    } else {
+      await _do(NutrikMode.cheer, 1800, g, line: ['You\'re doing great! ✨', 'Go, food saver! 💪'][_r.nextInt(2)]);
+    }
+  }
+
+  // ── реакции на действия в приложении ──
+  void _onEvent() {
+    final e = nutrikEvents.value.$1;
+    if (held || widget.paused || !mounted) return;
+    final g = ++_gen;
+    targetX = null;
+    _busy = false;
+    switch (e) {
+      case 'waste':
+        _do(NutrikMode.sad, 2600, g, line: ['Noo... that food deserved better 😿', 'Into the bin? Sniff...', 'Next time we save it!'][_r.nextInt(3)]);
+      case 'cook':
+        _do(NutrikMode.dance, 3200, g, line: ['Chef mode! 👩‍🍳', 'Smells amazing!', 'Food rescued deliciously!'][_r.nextInt(3)]);
+      case 'rescue':
+        _hop(600);
+        _quip(['Food saved! 🦸', 'Hero move! ❄️', 'Zero waste, nya! ✨'][_r.nextInt(3)]);
+      case 'eat':
+        _do(NutrikMode.eat, 1800, g, line: 'Can I have a bite? 🥺', food: '🍴');
+      case 'add':
+        _do(NutrikMode.cheer, 1400, g, line: ['New groceries! 🛒', 'Into the fridge!'][_r.nextInt(2)]);
+      case 'medal':
+        _do(NutrikMode.cheer, 2200, g, line: 'A new badge! ✨');
+    }
+  }
+
+  // ── взаимодействие с пользователем ──
   void _tap() {
-    if (mode == NutrikMode.fall) return;
-    hop.forward(from: 0);
-    _quip(_r.nextBool() ? _idleLine() : ['Hehe! 😄', 'Hi there!', 'Tickles!'][_r.nextInt(3)], 2200);
+    if (held || y > 0) return;
+    final g = ++_gen;
+    targetX = null;
+    tilt = 0;
+    final wasAsleep = mode == NutrikMode.sleep;
+    _busy = false;
+    if (wasAsleep) {
+      _do(NutrikMode.sad, 1600, g, line: ['Hey! I was sleeping 😾', 'Five more minutes...', 'Mrrr... who woke me?'][_r.nextInt(3)]);
+      return;
+    }
+    final now = DateTime.now();
+    _pokes = now.difference(_lastPoke).inMilliseconds < 1300 ? _pokes + 1 : 1;
+    _lastPoke = now;
+    if (_pokes >= 5) {
+      _pokes = 0;
+      setState(() => right = !right);
+      _do(NutrikMode.sad, 1800, g, line: 'Stop poking me! 😾');
+      _walkTo(x < w / 2 ? x + 120 : x - 120, g, run: true);
+      return;
+    }
+    _do(NutrikMode.love, 1500, g, line: _r.nextInt(3) == 0 ? _idleLine() : ['Purr~ 💕', 'Hehe, that tickles!', '*happy nya*', 'Pet me more!'][_r.nextInt(4)]);
+  }
+
+  void _doubleTap() {
+    if (held) return;
+    ++_gen;
+    targetX = null;
+    _busy = false;
+    tilt = 0;
+    _hop(820);
+    _quip('Wheee! 🎉', 1200);
+  }
+
+  void _grab(DragStartDetails d) {
+    ++_gen;
+    targetX = null;
+    _busy = false;
+    setState(() {
+      held = true;
+      vx = vy = 0;
+      tilt = 0;
+      snack = null;
+      mode = NutrikMode.dangle;
+    });
+    _quip(['Hey! Put me down! 🙀', 'Where are we going?', 'Wheee... I mean, NO!', 'I\'m not a toy! 😾'][_r.nextInt(4)], 1800);
+  }
+
+  void _drag(DragUpdateDetails d) {
+    setState(() {
+      x = (x + d.delta.dx).clamp(0.0, max(0.0, w - size));
+      y = (y - d.delta.dy).clamp(0.0, max(0.0, h - size));
+      if (d.delta.dx.abs() > 1) right = d.delta.dx > 0;
+    });
+  }
+
+  void _drop(DragEndDetails d) {
+    final v = d.velocity.pixelsPerSecond;
+    setState(() {
+      held = false;
+      vx = v.dx.clamp(-1600.0, 1600.0);
+      vy = (-v.dy).clamp(-1600.0, 1800.0);
+      if (y > 1 || vy > 0) {
+        mode = NutrikMode.jump;
+        if (y < 1) y = 0.1;
+      } else {
+        mode = NutrikMode.idle;
+      }
+    });
+    if (v.distance > 900) _quip('AAAAA! 🙀', 1200);
   }
 
   @override
   Widget build(BuildContext context) {
+    // Positioned, а не SizedBox: иначе Stack сжимается до 0×0 и страницы не рисуются.
+    if (widget.paused) return const Positioned(left: 0, top: 0, child: SizedBox.shrink());
     return Positioned.fill(
-      child: LayoutBuilder(builder: (context, c) {
-        const size = 64.0;
-        return AnimatedBuilder(
-          animation: Listenable.merge([move, fall, hop]),
-          builder: (_, __) {
-            final p = fall.value;
-            final tilt = p == 0 ? 0.0 : p < .2 ? 1.4 * (p / .2) : p < .8 ? 1.4 : 1.4 * (1 - (p - .8) / .2);
-            final left = x * (c.maxWidth - size);
-            return Stack(clipBehavior: Clip.none, children: [
+      child: LayoutBuilder(
+        builder: (context, c) {
+          w = c.maxWidth;
+          h = c.maxHeight - widget.bottom;
+          final left = x.clamp(0.0, max(0.0, w - size)).toDouble();
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Ключи нужны, чтобы появление облачка не пересоздавало Нутрик посреди перетаскивания.
+              if (fly != null)
+                Positioned(
+                  key: const ValueKey('fly'),
+                  left: fly!.dx,
+                  bottom: widget.bottom + fly!.dy,
+                  child: IgnorePointer(
+                    child: Transform.rotate(
+                      angle: sin(_flyT * 12) * 0.3,
+                      child: const Text('🦋', style: TextStyle(fontSize: 22)),
+                    ),
+                  ),
+                ),
               if (say != null)
                 Positioned(
-                  left: (left - 30).clamp(0.0, max(0.0, c.maxWidth - 124)).toDouble(),
-                  width: 124,
-                  bottom: widget.bottom + size + 2,
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: burgundy)),
-                      child: Text(say!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Colors.black87)),
+                  key: const ValueKey('say'),
+                  left: (left - 44).clamp(0.0, max(0.0, w - 160)).toDouble(),
+                  width: 160,
+                  bottom: widget.bottom + y + size + 2,
+                  child: IgnorePointer(
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: burgundy),
+                          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
+                        ),
+                        child: Text(
+                          say!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 11, color: Colors.black87),
+                        ),
+                      ),
                     ),
                   ),
                 ),
               Positioned(
+                key: const ValueKey('nutrik'),
                 left: left,
-                bottom: widget.bottom,
+                bottom: widget.bottom + y,
                 child: GestureDetector(
                   onTap: _tap,
-                  child: Transform.translate(
-                    offset: Offset(0, -22 * sin(hop.value * pi)),
-                    child: Nutrik(size: size, mode: mode, faceRight: right, tilt: tilt, stars: p > .2 && p < .8, snack: snack),
-                  ),
+                  onDoubleTap: _doubleTap,
+                  onPanStart: _grab,
+                  onPanUpdate: _drag,
+                  onPanEnd: _drop,
+                  child: Nutrik(size: size, mode: mode, faceRight: right, tilt: tilt, snack: snack),
                 ),
               ),
-            ]);
-          },
-        );
-      }),
+            ],
+          );
+        },
+      ),
     );
   }
 }
 
-// ───────────────────────── ТУТОРИАЛ ─────────────────────────
+// ───────────────────────── ТУТОРИАЛ (интерактивный тур) ─────────────────────────
+// Подсвечивает настоящие элементы экрана (через GlobalKey), просит нажать нужные кнопки
+// и даёт потаскать Нутрик. Шаг пропускается сам, если его элемента сейчас нет на экране.
 
-class _Step {
-  final int? tab;
-  final String text;
-  const _Step(this.tab, this.text);
+class Tour {
+  static final hero = GlobalKey(debugLabel: 'tour-hero');
+  static final useFirst = GlobalKey(debugLabel: 'tour-use-first');
+  static final tiles = GlobalKey(debugLabel: 'tour-tiles');
+  static final fridgeTop = GlobalKey(debugLabel: 'tour-fridge');
+  static final recipeFilters = GlobalKey(debugLabel: 'tour-recipes');
+  static final chatInput = GlobalKey(debugLabel: 'tour-chat');
+  static final nav = List.generate(5, (i) => GlobalKey(debugLabel: 'tour-nav$i'));
 }
 
-const _steps = [
-  _Step(null, 'Hi! I am Nutrik, your messy little kitchen buddy. Let me show you around — it takes 20 seconds!'),
-  _Step(0, 'HOME: your daily calories and the products that will expire soon. Use those first!'),
-  _Step(1, 'SEARCH: hundreds of products. Find one, tap + and it jumps into your fridge.'),
-  _Step(2, 'FRIDGE: everything you own with freshness bars. Eat it or throw it away here.'),
-  _Step(3, 'RECIPES: dishes made from YOUR fridge, with grams and steps. Tap one to cook!'),
-  _Step(4, 'AI CHEF: ask what to cook. Tell me what you hate and I will remember it!'),
-  _Step(null, 'That is all! On Home, tap the glass tiles: Impact, Shopping, Weight and Achievements. Now go save food! 🏃'),
-];
+enum TourKind { info, demo, tap, drag, finish }
+
+class TourStep {
+  final String text;
+  final GlobalKey? target;
+  final int? tab; // какую вкладку показать перед шагом
+  final TourKind kind;
+  final int? opens; // для TourKind.tap: какую вкладку открывает нажатие
+  const TourStep(this.text, {this.target, this.tab, this.kind = TourKind.info, this.opens});
+}
 
 class SpotPainter extends CustomPainter {
   final Rect hole;
+  final bool hasHole;
   final double pulse;
-  SpotPainter(this.hole, this.pulse);
+  SpotPainter(this.hole, this.hasHole, this.pulse);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final r = hole.width / 2;
-    final path = Path.combine(PathOperation.difference, Path()..addRect(Offset.zero & size), Path()..addOval(hole));
-    canvas.drawPath(path, Paint()..color = Colors.black.withValues(alpha: 0.72));
-    if (r < 6) return;
-    for (var k = 0; k < 3; k++) {
-      final p = (pulse + k / 3) % 1;
-      canvas.drawCircle(hole.center, r + p * 34, Paint()..style = PaintingStyle.stroke..strokeWidth = 2.5..color = Colors.white.withValues(alpha: (1 - p) * 0.7));
+    final rr = RRect.fromRectAndRadius(hole, const Radius.circular(22));
+    final dim = Paint()..color = const Color(0xFF14060A).withValues(alpha: 0.82);
+    if (!hasHole) {
+      canvas.drawRect(Offset.zero & size, dim);
+      return;
     }
-    canvas.drawCircle(hole.center, r, Paint()..style = PaintingStyle.stroke..strokeWidth = 3..color = Colors.white);
+    canvas.drawPath(Path.combine(PathOperation.difference, Path()..addRect(Offset.zero & size), Path()..addRRect(rr)), dim);
+    for (var k = 0; k < 2; k++) {
+      final p = (pulse + k / 2) % 1;
+      canvas.drawRRect(
+        rr.inflate(p * 18),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5
+          ..color = const Color(0xFFF2C879).withValues(alpha: (1 - p) * 0.8),
+      );
+    }
+    canvas.drawRRect(
+      rr,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..color = Colors.white,
+    );
   }
 
   @override
   bool shouldRepaint(covariant SpotPainter o) => true;
 }
 
+/// Ставит облачко под подсвеченным элементом, а если места нет — над ним.
+class _BubbleLayout extends SingleChildLayoutDelegate {
+  final Rect hole;
+  final bool hasHole;
+  final EdgeInsets safe;
+  final bool top; // облачко наверху (когда в центре экрана стоит большая Нутрик)
+  _BubbleLayout(this.hole, this.hasHole, this.safe, {this.top = false});
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints c) => BoxConstraints(minWidth: min(c.maxWidth - 32, 460), maxWidth: min(c.maxWidth - 32, 460), maxHeight: c.maxHeight);
+
+  @override
+  Offset getPositionForChild(Size size, Size child) {
+    final x = (size.width - child.width) / 2;
+    if (top) return Offset(x, safe.top + 64);
+    if (!hasHole) return Offset(x, (size.height - child.height) * 0.4);
+    final below = hole.bottom + 18, above = hole.top - 18 - child.height;
+    final fitsBelow = below + child.height < size.height - safe.bottom - 8;
+    var yy = hole.center.dy < size.height * 0.5 && fitsBelow ? below : above;
+    if (yy < safe.top + 8) yy = fitsBelow ? below : safe.top + 8;
+    return Offset(x, yy.clamp(safe.top + 8, max(safe.top + 8, size.height - child.height - 8)));
+  }
+
+  @override
+  bool shouldRelayout(_BubbleLayout o) => o.hole != hole || o.hasHole != hasHole || o.top != top;
+}
+
 class TutorialOverlay extends StatefulWidget {
+  final AppState state;
   final ValueChanged<int> onTab;
   final VoidCallback onDone;
-  const TutorialOverlay({super.key, required this.onTab, required this.onDone});
+  const TutorialOverlay({super.key, required this.state, required this.onTab, required this.onDone});
   @override
   State<TutorialOverlay> createState() => _TutorialState();
 }
 
-class _TutorialState extends State<TutorialOverlay> with SingleTickerProviderStateMixin {
-  int step = 0;
+class _TutorialState extends State<TutorialOverlay> with TickerProviderStateMixin {
+  late final List<TourStep> steps = [
+    const TourStep('Hi! I\'m Nutrik 🐾 your zero-waste kitchen buddy. About a third of the world\'s food ends up in the bin. Let\'s make sure yours doesn\'t! Want a quick tour?'),
+    if (widget.state.pantry.isEmpty)
+      const TourStep('Your fridge is empty. Shall I fill it with demo groceries? Some of them are about to spoil, so you can see how rescuing food works.', kind: TourKind.demo),
+    TourStep('This is your Rescue Mission: products that spoil within 2 days and the money at risk. The eco score shows how much of your food you actually use.', target: Tour.hero, tab: 0),
+    TourStep('These need you first! Tap a card to eat it, freeze it, share it or fix the date.', target: Tour.useFirst, tab: 0),
+    TourStep('Shortcuts: your eco impact, shopping list, weight and achievements.', target: Tour.tiles, tab: 0),
+    TourStep('Now open your fridge: tap the glowing Fridge button 👇', target: Tour.nav[2], tab: 0, kind: TourKind.tap, opens: 2),
+    TourStep('Everything you own, sorted by urgency. Swipe right to eat, left to throw away. Filter by fridge, freezer or pantry.', target: Tour.fridgeTop, tab: 2),
+    TourStep('Hungry? Tap Recipes 👇', target: Tour.nav[3], tab: 2, kind: TourKind.tap, opens: 3),
+    TourStep('Recipes that use up your spoiling food come first. Try the ♻️ Rescue food and 🌱 Zero-waste filters!', target: Tour.recipeFilters, tab: 3),
+    TourStep('Last tab: tap AI Chef 👇', target: Tour.nav[4], tab: 3, kind: TourKind.tap, opens: 4),
+    TourStep('Ask me anything: what to cook, how to store tomatoes, whether you can freeze bread...', target: Tour.chatInput, tab: 4),
+    const TourStep('One more secret: I live at the bottom of your screen! Grab me and drag me around. Go on, try it now! 👆', kind: TourKind.drag, tab: 0),
+    const TourStep('Purr-fect! 🎉 Tap me to pet me, double-tap to make me jump, or throw me if you dare 😼 Now let\'s go save some food!', kind: TourKind.finish, tab: 0),
+  ];
+
+  int step = 0, _dir = 1;
+  Rect? hole;
+  bool _ready = false;
   late final AnimationController pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat();
+  late final AnimationController back = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+  Offset drag = Offset.zero, _dragFrom = Offset.zero;
+  bool dragging = false, dragDone = false;
+
+  @override
+  void initState() {
+    super.initState();
+    back.addListener(() => setState(() => drag = Offset.lerp(_dragFrom, Offset.zero, Curves.elasticOut.transform(back.value))!));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _show());
+  }
 
   @override
   void dispose() {
     pulse.dispose();
+    back.dispose();
     super.dispose();
   }
 
-  void _next() {
-    if (step == _steps.length - 1) {
-      widget.onDone();
+  TourStep get st => steps[step];
+
+  Future<void> _show() async {
+    final s = st;
+    setState(() => _ready = false);
+    if (s.tab != null) widget.onTab(s.tab!);
+    await Future.delayed(const Duration(milliseconds: 320)); // ждём смену вкладки
+    if (!mounted) return;
+    final ctx = s.target?.currentContext;
+    if (s.target != null && ctx == null) {
+      _go(step + _dir); // элемента нет (например, нечего «спасать») — пропускаем шаг
       return;
     }
-    setState(() => step++);
-    widget.onTab(_steps[step].tab ?? (step == _steps.length - 1 ? 0 : 0));
+    if (ctx != null && ctx.mounted) {
+      await Scrollable.ensureVisible(ctx, alignment: 0.25, duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    if (!mounted) return;
+    setState(() {
+      hole = ctx != null && ctx.mounted ? _rectOf(ctx) : null;
+      _ready = true;
+    });
+  }
+
+  Rect? _rectOf(BuildContext ctx) {
+    final box = ctx.findRenderObject() as RenderBox?;
+    final me = context.findRenderObject() as RenderBox?;
+    if (box == null || me == null || !box.attached || !box.hasSize) return null;
+    return (box.localToGlobal(Offset.zero, ancestor: me) & box.size).inflate(6);
+  }
+
+  void _go(int i) {
+    if (i < 0) return;
+    if (i >= steps.length) {
+      _finish();
+      return;
+    }
+    setState(() {
+      _dir = i >= step ? 1 : -1;
+      step = i;
+      drag = Offset.zero;
+      dragDone = false;
+    });
+    _show();
+  }
+
+  void _finish() {
+    widget.onTab(0);
+    widget.state.party();
+    widget.onDone();
+  }
+
+  Widget _btn(String t, VoidCallback f, {bool filled = true}) => filled
+      ? FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: burgundy, padding: const EdgeInsets.symmetric(horizontal: 18)),
+          onPressed: f,
+          child: Text(t, style: const TextStyle(fontWeight: FontWeight.bold)),
+        )
+      : TextButton(
+          style: TextButton.styleFrom(foregroundColor: Colors.white),
+          onPressed: f,
+          child: Text(t),
+        );
+
+  Widget _controls() {
+    final s = st;
+    final progress = Row(
+      children: [
+        Text('${step + 1}/${steps.length}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 70,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(end: (step + 1) / steps.length),
+              duration: const Duration(milliseconds: 400),
+              builder: (_, v, _) => LinearProgressIndicator(value: v, minHeight: 5, color: const Color(0xFFF2C879), backgroundColor: Colors.white24),
+            ),
+          ),
+        ),
+      ],
+    );
+    final List<Widget> right = switch (s.kind) {
+      TourKind.demo => [
+        _btn('Keep it empty', () => _go(step + 1), filled: false),
+        _btn('Fill my fridge! 🧺', () {
+          widget.state.loadDemo();
+          _go(step + 1);
+        }),
+      ],
+      TourKind.tap => [
+        AnimatedBuilder(
+          animation: pulse,
+          builder: (_, _) => Opacity(
+            opacity: 0.55 + 0.45 * sin(pulse.value * 2 * pi).abs(),
+            child: const Text(
+              '👆 Tap the glowing button',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      ],
+      TourKind.drag => [if (dragDone) _btn('Next', () => _go(step + 1)) else const Text('Drag her! 👆', style: TextStyle(color: Colors.white70))],
+      TourKind.finish => [_btn('Let\'s go! 🚀', _finish)],
+      TourKind.info => [if (step > 0) _btn('Back', () => _go(step - 1), filled: false), _btn(step == 0 ? 'Show me around' : 'Next', () => _go(step + 1))],
+    };
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: const Color(0xE62A0A12),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Row(children: [progress, const Spacer(), ...right]),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final st = _steps[step];
-    final pad = MediaQuery.of(context).padding;
-    return LayoutBuilder(builder: (context, c) {
-      final w = c.maxWidth, h = c.maxHeight;
-      final navH = 76 + pad.bottom;
-      final spot = st.tab == null ? null : Offset(16 + (w - 32) / 5 * (st.tab! + 0.5), h - pad.bottom - 44);
-      final hole = spot == null ? Rect.fromCircle(center: Offset(w / 2, h / 2), radius: 0.1) : Rect.fromCircle(center: spot, radius: 40);
-      final last = step == _steps.length - 1;
-      double? ang;
-      if (spot != null) {
-        final from = Offset(16 + 48, h - navH - 176);
-        ang = atan2(spot.dy - from.dy, spot.dx - from.dx);
-      }
-      return Stack(children: [
-        Positioned.fill(child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () {}, child: const SizedBox.expand())),
-        Positioned.fill(
-          child: IgnorePointer(
-            child: TweenAnimationBuilder<Rect?>(
-              tween: RectTween(end: hole),
-              duration: const Duration(milliseconds: 550),
-              curve: Curves.easeInOutCubic,
-              builder: (_, r, __) => AnimatedBuilder(animation: pulse, builder: (_, __) => CustomPaint(painter: SpotPainter(r ?? hole, pulse.value))),
+    final mq = MediaQuery.of(context);
+    final s = st;
+    final dragStep = s.kind == TourKind.drag || s.kind == TourKind.finish;
+    return LayoutBuilder(
+      builder: (context, c) {
+        final size = c.biggest;
+        final has = hole != null && _ready;
+        final target = has ? hole! : Rect.fromCenter(center: size.center(Offset.zero), width: 0, height: 0);
+        final pointUp = has && target.center.dy < size.height * 0.5;
+        final ang = has ? atan2(pointUp ? -1.0 : 1.0, ((target.center.dx - 70) / 160).clamp(-1.5, 1.5)) : null;
+        return Stack(
+          children: [
+            // блокируем всё под оверлеем
+            Positioned.fill(
+              child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () {}),
             ),
-          ),
-        ),
-        if (spot != null) ...[
-          Positioned.fromRect(rect: hole, child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: _next)),
-          Positioned(
-            left: spot.dx - 22,
-            top: hole.top - 54,
-            child: AnimatedBuilder(
-              animation: pulse,
-              builder: (_, __) => Transform.translate(
-                offset: Offset(0, 8 * sin(pulse.value * 2 * pi)),
-                child: const Icon(Icons.arrow_downward_rounded, size: 44, color: Colors.white, shadows: [Shadow(color: Colors.white54, blurRadius: 14)]),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: TweenAnimationBuilder<Rect?>(
+                  tween: RectTween(end: target),
+                  duration: const Duration(milliseconds: 450),
+                  curve: Curves.easeInOutCubic,
+                  builder: (_, r, _) => AnimatedBuilder(
+                    animation: pulse,
+                    builder: (_, _) => CustomPaint(painter: SpotPainter(r ?? target, has, pulse.value)),
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
-        Positioned(
-          top: pad.top + 8,
-          right: 12,
-          child: TextButton.icon(
-            style: TextButton.styleFrom(backgroundColor: Colors.white24, foregroundColor: Colors.white),
-            onPressed: widget.onDone,
-            icon: const Icon(Icons.close, size: 18),
-            label: const Text('Skip tutorial'),
-          ),
-        ),
-        Positioned(
-          left: 16,
-          right: 16,
-          bottom: spot == null ? null : navH + 70,
-          top: spot == null ? h * 0.3 : null,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            NutrikSays(key: ValueKey(step), text: st.text, point: ang, size: 96),
-            const SizedBox(height: 10),
-            Row(children: [
-              for (var k = 0; k < _steps.length; k++)
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  margin: const EdgeInsets.only(right: 5),
-                  width: k == step ? 18 : 7,
-                  height: 7,
-                  decoration: BoxDecoration(color: k == step ? Colors.white : Colors.white38, borderRadius: BorderRadius.circular(4)),
+            // «дырка» в шаге tap пропускает нажатие на настоящую кнопку
+            if (has && s.kind == TourKind.tap)
+              Positioned.fromRect(
+                rect: target,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    widget.onTab(s.opens!);
+                    _go(step + 1);
+                  },
                 ),
-              const Spacer(),
-              FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: burgundy), onPressed: _next, child: Text(last ? 'Let\'s go!' : 'Next →')),
-            ]),
-          ]),
-        ),
-      ]);
-    });
+              ),
+            // большая Нутрик, которую можно таскать
+            if (dragStep)
+              Positioned(
+                key: const ValueKey('guide'),
+                left: size.width / 2 - 70 + drag.dx,
+                top: size.height * 0.52 + drag.dy,
+                child: GestureDetector(
+                  onPanStart: s.kind == TourKind.drag
+                      ? (_) {
+                          back.stop();
+                          setState(() => dragging = true);
+                        }
+                      : null,
+                  onPanUpdate: s.kind == TourKind.drag ? (d) => setState(() => drag += d.delta) : null,
+                  onPanEnd: s.kind == TourKind.drag
+                      ? (_) {
+                          _dragFrom = drag;
+                          back.forward(from: 0);
+                          setState(() {
+                            dragging = false;
+                            dragDone = true;
+                          });
+                        }
+                      : null,
+                  child: Nutrik(
+                    size: 140,
+                    mode: s.kind == TourKind.finish
+                        ? NutrikMode.cheer
+                        : dragging
+                        ? NutrikMode.dangle
+                        : dragDone
+                        ? NutrikMode.love
+                        : NutrikMode.wave,
+                  ),
+                ),
+              ),
+            if (_ready)
+              Positioned.fill(
+                child: TweenAnimationBuilder<Rect?>(
+                  tween: RectTween(end: target),
+                  duration: const Duration(milliseconds: 450),
+                  curve: Curves.easeInOutCubic,
+                  builder: (_, r, child) => CustomSingleChildLayout(
+                    delegate: _BubbleLayout(r ?? target, has, mq.padding, top: dragStep),
+                    child: child,
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: Column(
+                      key: ValueKey('$step$dragDone'),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (dragStep)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: burgundy, width: 1.5),
+                            ),
+                            child: Text(
+                              dragDone && s.kind == TourKind.drag ? 'Wheee! You got it! 😸 I don\'t always enjoy it though...' : s.text,
+                              style: const TextStyle(fontSize: 15, color: Colors.black87),
+                            ),
+                          )
+                        else
+                          NutrikSays(text: s.text, point: ang, size: 92, mode: s.kind == TourKind.tap ? NutrikMode.cheer : NutrikMode.idle),
+                        const SizedBox(height: 10),
+                        _controls(),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            Positioned(
+              top: mq.padding.top + 8,
+              right: 12,
+              child: TextButton.icon(
+                style: TextButton.styleFrom(backgroundColor: Colors.white24, foregroundColor: Colors.white),
+                onPressed: widget.onDone,
+                icon: const Icon(Icons.close, size: 18),
+                label: const Text('Skip'),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
 
@@ -1141,7 +3131,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _age = TextEditingController(text: '22'), _weight = TextEditingController(text: '70'), _height = TextEditingController(text: '175');
   bool isMan = true, hide = true, busy = false, arrived = false;
   int step = 0; // 0 знакомство, 1 аккаунт, 2 параметры
-  String say = 'Hi! I am Nutrik! I help people stop wasting food. Nice to meet you!';
+  String say = 'Hi! I\'m Nutrik 🐾 I help people stop wasting food. Nice to meet you!';
 
   @override
   void dispose() {
@@ -1152,13 +3142,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   InputDecoration _dec(String label, IconData icon, {Widget? suffix}) => InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: burgundy),
-        suffixIcon: suffix,
-        filled: true,
-        fillColor: sand,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-      );
+    labelText: label,
+    prefixIcon: Icon(icon, color: burgundy),
+    suffixIcon: suffix,
+    filled: true,
+    fillColor: sand,
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+  );
 
   String? _num(String? v, int lo, int hi) {
     final n = double.tryParse((v ?? '').replaceAll(',', '.'));
@@ -1166,22 +3156,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   void _go(int s, String text) => setState(() {
-        step = s;
-        say = text;
-      });
+    step = s;
+    say = text;
+  });
 
   void _next() {
     if (step == 1) {
       if (_k1.currentState!.validate()) {
-        _go(2, 'Now your body stats! I will use them to count your daily calorie goal. 🔢');
+        _go(2, 'Now your body stats! I\'ll use them to work out your daily calorie goal. 🔢');
       } else {
-        setState(() => say = 'Hmm, check the red fields for me please!');
+        setState(() => say = 'Hmm, please check the fields in red!');
       }
     } else if (step == 2) {
       if (_k2.currentState!.validate()) {
         _submit();
       } else {
-        setState(() => say = 'Those numbers look odd... try again?');
+        setState(() => say = 'Those numbers look a bit odd... try again?');
       }
     }
   }
@@ -1227,134 +3217,229 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _intro() {
-    return Column(key: const ValueKey('intro'), children: [
-      const Spacer(),
-      const Appear(child: Text('NutriMate Pro', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: burgundy))),
-      const SizedBox(height: 6),
-      Text('Track calories. Cook from your fridge. Waste less.', style: TextStyle(color: Colors.grey.shade700)),
-      const SizedBox(height: 24),
-      SizedBox(
-        height: 130,
-        child: arrived
-            ? NutrikSays(key: ValueKey(say), text: say, size: 110)
-            : TweenAnimationBuilder<double>(
-                tween: Tween(begin: -140, end: 0),
-                duration: const Duration(milliseconds: 2400),
-                curve: Curves.easeOut,
-                onEnd: () => setState(() => arrived = true),
-                builder: (_, v, __) => Stack(clipBehavior: Clip.none, children: [
-                  Positioned(left: v, bottom: 0, child: const Nutrik(size: 110, mode: NutrikMode.run)),
-                ]),
-              ),
-      ),
-      const SizedBox(height: 20),
-      AnimatedOpacity(
-        duration: const Duration(milliseconds: 500),
-        opacity: arrived ? 1 : 0,
-        child: Column(children: [
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: burgundy),
-              onPressed: arrived ? () => _go(1, 'Let us make your account! Who are you? (It is a test account, I will not tell anyone 🤫)') : null,
-              child: const Text('Create account', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
+    return Column(
+      key: const ValueKey('intro'),
+      children: [
+        const Spacer(),
+        const Appear(
+          child: Text(
+            'NutriMate',
+            style: TextStyle(fontSize: 38, fontWeight: FontWeight.bold, color: burgundy),
           ),
-          TextButton(onPressed: arrived ? () => _submit(guest: true) : null, child: const Text('Continue as guest', style: TextStyle(color: burgundy))),
-        ]),
-      ),
-      const Spacer(),
-    ]);
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'ZERO-WASTE KITCHEN',
+          style: TextStyle(color: burgundy, fontSize: 12, letterSpacing: 3, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Save food. Save money. Save the planet.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.grey.shade700),
+        ),
+        const SizedBox(height: 14),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final f in const ['🗑️ 1/3 of food is wasted', '💰 ≈\$1,500 per family / year', '🌍 8–10% of CO₂'])
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(color: sand, borderRadius: BorderRadius.circular(20)),
+                child: Text(f, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          height: 130,
+          child: arrived
+              ? NutrikSays(key: ValueKey(say), text: say, size: 110)
+              : TweenAnimationBuilder<double>(
+                  tween: Tween(begin: -140, end: 0),
+                  duration: const Duration(milliseconds: 2400),
+                  curve: Curves.easeOut,
+                  onEnd: () => setState(() => arrived = true),
+                  builder: (_, v, _) => Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned(
+                        left: v,
+                        bottom: 0,
+                        child: const Nutrik(size: 110, mode: NutrikMode.run),
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+        const SizedBox(height: 20),
+        AnimatedOpacity(
+          duration: const Duration(milliseconds: 500),
+          opacity: arrived ? 1 : 0,
+          child: Column(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: burgundy),
+                  onPressed: arrived ? () => _go(1, 'Let\'s create your account! What\'s your name? (It\'s just a test account — I won\'t tell anyone 🤫)') : null,
+                  child: const Text('Create account', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+              TextButton(
+                onPressed: arrived ? () => _submit(guest: true) : null,
+                child: const Text('Continue as guest', style: TextStyle(color: burgundy)),
+              ),
+            ],
+          ),
+        ),
+        const Spacer(),
+      ],
+    );
   }
 
   Widget _form() {
     return SingleChildScrollView(
       key: ValueKey('form$step'),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        NutrikSays(key: ValueKey(say), text: say, point: pi / 2, size: 96),
-        const SizedBox(height: 16),
-        if (step == 1)
-          Form(
-            key: _k1,
-            child: Column(children: [
-              Appear(index: 0, child: TextFormField(controller: _name, decoration: _dec('Name', Icons.person_outline), validator: (v) => (v ?? '').trim().isEmpty ? 'Enter your name' : null)),
-              const SizedBox(height: 12),
-              Appear(index: 1, child: TextFormField(controller: _email, keyboardType: TextInputType.emailAddress, decoration: _dec('Email', Icons.mail_outline), validator: (v) => (v ?? '').contains('@') ? null : 'Enter a valid email')),
-              const SizedBox(height: 12),
-              Appear(
-                index: 2,
-                child: TextFormField(
-                  controller: _pass,
-                  obscureText: hide,
-                  decoration: _dec('Password', Icons.lock_outline, suffix: IconButton(icon: Icon(hide ? Icons.visibility_off : Icons.visibility), onPressed: () => setState(() => hide = !hide))),
-                  validator: (v) => (v ?? '').length < 4 ? 'At least 4 characters' : null,
-                ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          NutrikSays(key: ValueKey(say), text: say, point: pi / 2, size: 96),
+          const SizedBox(height: 16),
+          if (step == 1)
+            Form(
+              key: _k1,
+              child: Column(
+                children: [
+                  Appear(
+                    index: 0,
+                    child: TextFormField(controller: _name, decoration: _dec('Name', Icons.person_outline), validator: (v) => (v ?? '').trim().isEmpty ? 'Enter your name' : null),
+                  ),
+                  const SizedBox(height: 12),
+                  Appear(
+                    index: 1,
+                    child: TextFormField(
+                      controller: _email,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: _dec('Email', Icons.mail_outline),
+                      validator: (v) => (v ?? '').contains('@') ? null : 'Enter a valid email',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Appear(
+                    index: 2,
+                    child: TextFormField(
+                      controller: _pass,
+                      obscureText: hide,
+                      decoration: _dec(
+                        'Password',
+                        Icons.lock_outline,
+                        suffix: IconButton(icon: Icon(hide ? Icons.visibility_off : Icons.visibility), onPressed: () => setState(() => hide = !hide)),
+                      ),
+                      validator: (v) => (v ?? '').length < 4 ? 'At least 4 characters' : null,
+                    ),
+                  ),
+                ],
               ),
-            ]),
-          )
-        else
-          Form(
-            key: _k2,
-            child: Column(children: [
-              Appear(index: 0, child: Row(children: [_gender('Man', true), const SizedBox(width: 12), _gender('Woman', false)])),
-              const SizedBox(height: 12),
-              Appear(
-                index: 1,
-                child: Row(children: [
-                  Expanded(child: TextFormField(controller: _age, keyboardType: TextInputType.number, decoration: _dec('Age', Icons.cake_outlined), validator: (v) => _num(v, 14, 90))),
-                  const SizedBox(width: 8),
-                  Expanded(child: TextFormField(controller: _weight, keyboardType: TextInputType.number, decoration: _dec('kg', Icons.monitor_weight_outlined), validator: (v) => _num(v, 40, 150))),
-                  const SizedBox(width: 8),
-                  Expanded(child: TextFormField(controller: _height, keyboardType: TextInputType.number, decoration: _dec('cm', Icons.height), validator: (v) => _num(v, 120, 220))),
-                ]),
-              ),
-            ]),
-          ),
-        const SizedBox(height: 24),
-        Row(children: [
-          if (!busy)
-            TextButton(onPressed: () => _go(step - 1, step == 1 ? 'Back so soon? OK!' : 'Let us fix your account info!'), child: const Text('Back', style: TextStyle(color: burgundy))),
-          const Spacer(),
-          SizedBox(
-            height: 52,
-            child: FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: burgundy, padding: const EdgeInsets.symmetric(horizontal: 28)),
-              onPressed: busy ? null : _next,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                child: busy
-                    ? const SizedBox(key: ValueKey('b'), width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Text(step == 1 ? 'Next →' : 'Finish', key: ValueKey('t$step'), style: const TextStyle(fontWeight: FontWeight.bold)),
+            )
+          else
+            Form(
+              key: _k2,
+              child: Column(
+                children: [
+                  Appear(index: 0, child: Row(children: [_gender('Man', true), const SizedBox(width: 12), _gender('Woman', false)])),
+                  const SizedBox(height: 12),
+                  Appear(
+                    index: 1,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(controller: _age, keyboardType: TextInputType.number, decoration: _dec('Age', Icons.cake_outlined), validator: (v) => _num(v, 14, 90)),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(controller: _weight, keyboardType: TextInputType.number, decoration: _dec('kg', Icons.monitor_weight_outlined), validator: (v) => _num(v, 40, 150)),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(controller: _height, keyboardType: TextInputType.number, decoration: _dec('cm', Icons.height), validator: (v) => _num(v, 120, 220)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              if (!busy)
+                TextButton(
+                  onPressed: () => _go(step - 1, step == 1 ? 'Back so soon? OK!' : 'Let\'s fix your account info!'),
+                  child: const Text('Back', style: TextStyle(color: burgundy)),
+                ),
+              const Spacer(),
+              SizedBox(
+                height: 52,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: burgundy, padding: const EdgeInsets.symmetric(horizontal: 28)),
+                  onPressed: busy ? null : _next,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: busy
+                        ? const SizedBox(
+                            key: ValueKey('b'),
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : Text(
+                            step == 1 ? 'Next' : 'Finish',
+                            key: ValueKey('t$step'),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ]),
-      ]),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(children: [
-        const Positioned.fill(child: IgnorePointer(child: FloatingFood())),
-        SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 400),
-                  transitionBuilder: (child, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween<Offset>(begin: const Offset(0.06, 0), end: Offset.zero).animate(a), child: child)),
-                  child: step == 0 ? _intro() : _form(),
+      body: Stack(
+        children: [
+          const Positioned.fill(child: IgnorePointer(child: FloatingFood())),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 400),
+                    transitionBuilder: (child, a) => FadeTransition(
+                      opacity: a,
+                      child: SlideTransition(
+                        position: Tween<Offset>(begin: const Offset(0.06, 0), end: Offset.zero).animate(a),
+                        child: child,
+                      ),
+                    ),
+                    child: step == 0 ? _intro() : _form(),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 }
@@ -1374,13 +3459,37 @@ class RimPainter extends CustomPainter {
     if (shadow) {
       canvas.save();
       canvas.clipPath(Path.combine(PathOperation.difference, Path()..addRect(Rect.fromLTWH(-60, -60, size.width + 120, size.height + 120)), Path()..addRRect(rr)));
-      canvas.drawRRect(rr.shift(const Offset(0, 8)), Paint()..color = Colors.black.withValues(alpha: 0.16)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12));
+      canvas.drawRRect(
+        rr.shift(const Offset(0, 8)),
+        Paint()
+          ..color = Colors.black.withValues(alpha: 0.16)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+      );
       canvas.restore();
     }
     final sh = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: colors).createShader(Offset.zero & size);
-    canvas.drawRRect(rr, Paint()..style = PaintingStyle.stroke..strokeWidth = 3.5..shader = sh..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5));
-    canvas.drawRRect(rr, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.4..shader = sh);
-    canvas.drawRRect(rr.deflate(3), Paint()..style = PaintingStyle.stroke..strokeWidth = 1..color = Colors.white.withValues(alpha: 0.22));
+    canvas.drawRRect(
+      rr,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.5
+        ..shader = sh
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+    );
+    canvas.drawRRect(
+      rr,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..shader = sh,
+    );
+    canvas.drawRRect(
+      rr.deflate(3),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = Colors.white.withValues(alpha: 0.22),
+    );
   }
 
   @override
@@ -1423,16 +3532,26 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
   Widget _item(int i) {
     final on = widget.index == i;
     final col = on ? burgundy : Colors.black87;
-    return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      TweenAnimationBuilder<double>(
-        tween: Tween(end: on ? 1.0 : 0.0),
-        duration: const Duration(milliseconds: 700),
-        curve: Curves.elasticOut,
-        builder: (_, v, child) => Transform.scale(scale: 1 + 0.2 * v, child: child),
-        child: Badge(isLabelVisible: i == 2 && widget.fridge > 0, label: Text('${widget.fridge}'), child: Icon(icons[i], color: col, size: 25)),
-      ),
-      Text(labels[i], style: TextStyle(fontSize: 10, color: col, fontWeight: on ? FontWeight.bold : FontWeight.w500)),
-    ]);
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        TweenAnimationBuilder<double>(
+          tween: Tween(end: on ? 1.0 : 0.0),
+          duration: const Duration(milliseconds: 700),
+          curve: Curves.elasticOut,
+          builder: (_, v, child) => Transform.scale(scale: 1 + 0.2 * v, child: child),
+          child: Badge(
+            isLabelVisible: i == 2 && widget.fridge > 0,
+            label: Text('${widget.fridge}'),
+            child: Icon(icons[i], color: col, size: 25),
+          ),
+        ),
+        Text(
+          labels[i],
+          style: TextStyle(fontSize: 10, color: col, fontWeight: on ? FontWeight.bold : FontWeight.w500),
+        ),
+      ],
+    );
   }
 
   @override
@@ -1444,59 +3563,78 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
         padding: EdgeInsets.fromLTRB(16, 0, 16, inset + 12),
         child: SizedBox(
           height: 64,
-          child: LayoutBuilder(builder: (context, cs) {
-            final seg = cs.maxWidth / 5;
-            return CustomPaint(
-              foregroundPainter: RimPainter(32, [Colors.white.withValues(alpha: 0.95), Colors.white.withValues(alpha: 0.05), Colors.white.withValues(alpha: 0.6)]),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(32),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 2.5, sigmaY: 2.5),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Colors.white.withValues(alpha: 0.2), Colors.white.withValues(alpha: 0.03)])),
-                    child: AnimatedBuilder(
-                      animation: c,
-                      builder: (_, __) {
-                        final sq = sin(c.value * pi).abs();
-                        final dist = min((to - from).abs(), 3.0);
-                        final w = (seg - 8) * (1 + 0.2 * sq * dist);
-                        final h = 54 * (1 - 0.12 * sq);
-                        final left = _pos * seg + (seg - w) / 2;
-                        return Stack(children: [
-                          Positioned(
-                            left: left,
-                            top: (64 - h) / 2,
-                            width: w,
-                            height: h,
-                            child: RawMagnifier(
-                              size: Size(w, h),
-                              magnificationScale: 1.35,
-                              decoration: MagnifierDecoration(
-                                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(27))),
-                                shadows: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 3))],
-                              ),
-                              child: CustomPaint(
-                                foregroundPainter: RimPainter(27, [Colors.white, const Color(0xAAF2C879), const Color(0x889B1B33), const Color(0xCCFFFFFF)], shadow: false),
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(27),
-                                    gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, stops: const [0, 0.5], colors: [Colors.white.withValues(alpha: 0.4), Colors.white.withValues(alpha: 0)]),
+          child: LayoutBuilder(
+            builder: (context, cs) {
+              final seg = cs.maxWidth / 5;
+              return CustomPaint(
+                foregroundPainter: RimPainter(32, [Colors.white.withValues(alpha: 0.95), Colors.white.withValues(alpha: 0.05), Colors.white.withValues(alpha: 0.6)]),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(32),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 2.5, sigmaY: 2.5),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Colors.white.withValues(alpha: 0.2), Colors.white.withValues(alpha: 0.03)]),
+                      ),
+                      child: AnimatedBuilder(
+                        animation: c,
+                        builder: (_, _) {
+                          final sq = sin(c.value * pi).abs();
+                          final dist = min((to - from).abs(), 3.0);
+                          final w = (seg - 8) * (1 + 0.2 * sq * dist);
+                          final h = 54 * (1 - 0.12 * sq);
+                          final left = _pos * seg + (seg - w) / 2;
+                          return Stack(
+                            children: [
+                              Positioned(
+                                left: left,
+                                top: (64 - h) / 2,
+                                width: w,
+                                height: h,
+                                child: RawMagnifier(
+                                  size: Size(w, h),
+                                  magnificationScale: 1.35,
+                                  decoration: MagnifierDecoration(
+                                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(27))),
+                                    shadows: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 3))],
+                                  ),
+                                  child: CustomPaint(
+                                    foregroundPainter: RimPainter(27, [Colors.white, const Color(0xAAF2C879), const Color(0x889B1B33), const Color(0xCCFFFFFF)], shadow: false),
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(27),
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          stops: const [0, 0.5],
+                                          colors: [Colors.white.withValues(alpha: 0.4), Colors.white.withValues(alpha: 0)],
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ),
-                          Row(children: [
-                            for (var i = 0; i < 5; i++) Expanded(child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => widget.onTap(i), child: _item(i))),
-                          ]),
-                        ]);
-                      },
+                              Row(
+                                children: [
+                                  for (var i = 0; i < 5; i++)
+                                    Expanded(
+                                      child: KeyedSubtree(
+                                        key: Tour.nav[i],
+                                        child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => widget.onTap(i), child: _item(i)),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          }),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -1513,18 +3651,31 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
   int i = 0;
+  late final AnimationController fade = AnimationController(vsync: this, duration: const Duration(milliseconds: 260), value: 1);
+
+  @override
+  void dispose() {
+    fade.dispose();
+    super.dispose();
+  }
+
+  void _tab(int v) {
+    if (v == i) return;
+    setState(() => i = v);
+    fade.forward(from: 0);
+  }
 
   Widget _page(int i) {
     final s = widget.state;
     switch (i) {
       case 0:
-        return HomePage(state: s, ai: widget.ai);
+        return HomePage(state: s, ai: widget.ai, onTab: _tab);
       case 1:
         return SearchPage(state: s);
       case 2:
-        return PantryPage(state: s, onSearch: () => setState(() => this.i = 1));
+        return PantryPage(state: s, onSearch: () => _tab(1));
       case 3:
         return RecipesPage(state: s);
       default:
@@ -1535,37 +3686,58 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final s = widget.state;
+    final pad = MediaQuery.of(context).padding.bottom;
     return ListenableBuilder(
       listenable: s,
-      builder: (context, _) => Stack(children: [
-        Scaffold(
-          extendBody: true,
-          body: Stack(children: [
-            Positioned.fill(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 320),
-                transitionBuilder: (child, a) => FadeTransition(
-                  opacity: a,
-                  child: SlideTransition(position: Tween<Offset>(begin: const Offset(0.04, 0), end: Offset.zero).animate(a), child: child),
+      builder: (context, _) => Stack(
+        children: [
+          Scaffold(
+            extendBody: true,
+            body: Stack(
+              fit: StackFit.expand,
+              children: [
+                // IndexedStack хранит состояние вкладок (поиск, чат, фильтры не сбрасываются).
+                Positioned.fill(
+                  child: FadeTransition(
+                    opacity: CurvedAnimation(parent: fade, curve: Curves.easeOut),
+                    child: IndexedStack(
+                      index: i,
+                      children: [for (var k = 0; k < 5; k++) TickerMode(enabled: k == i, child: _page(k))],
+                    ),
+                  ),
                 ),
-                child: KeyedSubtree(key: ValueKey(i), child: _page(i)),
+                // В чате пол Нутрик поднят над полем ввода.
+                NutrikRoamer(paused: s.showTutorial, bottom: 76 + pad + (i == 4 ? 128 : 6), state: s),
+              ],
+            ),
+            bottomNavigationBar: GlassNav(index: i, fridge: s.pantry.length, onTap: _tab),
+          ),
+          // Ключи обязательны: без них появление конфетти пересоздавало бы туториал с нуля.
+          if (s.celebrate)
+            Positioned.fill(
+              key: const ValueKey('confetti'),
+              child: IgnorePointer(child: Confetti(onDone: s.endCelebrate)),
+            ),
+          if (s.pendingBadge != null)
+            Positioned.fill(
+              key: const ValueKey('badge'),
+              child: IgnorePointer(
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: BadgePopup(key: ValueKey(s.pendingBadge!.id), m: s.pendingBadge!, onDone: s.clearBadge),
+                ),
               ),
             ),
-            NutrikRoamer(paused: s.showTutorial, bottom: 76 + MediaQuery.of(context).padding.bottom + (i == 4 ? 130 : 6), state: s),
-          ]),
-          bottomNavigationBar: GlassNav(index: i, fridge: s.pantry.length, onTap: (v) => setState(() => i = v)),
-        ),
-        if (s.celebrate) Positioned.fill(child: IgnorePointer(child: Confetti(onDone: s.endCelebrate))),
-        if (s.pendingBadge != null)
-          Positioned.fill(child: IgnorePointer(child: Material(type: MaterialType.transparency, child: BadgePopup(key: ValueKey(s.pendingBadge!.id), m: s.pendingBadge!, onDone: s.clearBadge)))),
-        if (s.showTutorial)
-          Positioned.fill(
-            child: Material(
-              type: MaterialType.transparency,
-              child: TutorialOverlay(onTab: (v) => setState(() => i = v), onDone: s.endTutorial),
+          if (s.showTutorial)
+            Positioned.fill(
+              key: const ValueKey('tour'),
+              child: Material(
+                type: MaterialType.transparency,
+                child: TutorialOverlay(state: s, onTab: _tab, onDone: s.endTutorial),
+              ),
             ),
-          ),
-      ]),
+        ],
+      ),
     );
   }
 }
@@ -1586,11 +3758,7 @@ class Glass extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         borderRadius: r,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [(tint ?? Colors.white).withValues(alpha: 0.7), (tint ?? Colors.white).withValues(alpha: 0.28)],
-        ),
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [(tint ?? Colors.white).withValues(alpha: 0.7), (tint ?? Colors.white).withValues(alpha: 0.28)]),
         border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 1.2),
         boxShadow: [BoxShadow(color: burgundy.withValues(alpha: 0.07), blurRadius: 14, offset: const Offset(0, 6))],
       ),
@@ -1635,11 +3803,11 @@ class _LiquidBgState extends State<LiquidBg> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) => RepaintBoundary(
-        child: AnimatedBuilder(
-          animation: c,
-          builder: (_, __) => CustomPaint(painter: BlobPainter(c.value * 2 * pi), size: Size.infinite),
-        ),
-      );
+    child: AnimatedBuilder(
+      animation: c,
+      builder: (_, _) => CustomPaint(painter: BlobPainter(c.value * 2 * pi), size: Size.infinite),
+    ),
+  );
 }
 
 class _CircleClip extends CustomClipper<Path> {
@@ -1659,11 +3827,11 @@ class _CircleClip extends CustomClipper<Path> {
 
 /// Страница «раскрывается» кругом из точки нажатия.
 Route<T> circleReveal<T>(Widget page, Offset origin) => PageRouteBuilder<T>(
-      transitionDuration: const Duration(milliseconds: 700),
-      reverseTransitionDuration: const Duration(milliseconds: 450),
-      pageBuilder: (_, __, ___) => page,
-      transitionsBuilder: (_, a, __, child) => ClipPath(clipper: _CircleClip(Curves.easeInOutCubic.transform(a.value), origin), child: child),
-    );
+  transitionDuration: const Duration(milliseconds: 700),
+  reverseTransitionDuration: const Duration(milliseconds: 450),
+  pageBuilder: (_, _, _) => page,
+  transitionsBuilder: (_, a, _, child) => ClipPath(clipper: _CircleClip(Curves.easeInOutCubic.transform(a.value), origin), child: child),
+);
 
 Offset centerOf(BuildContext c) {
   final b = c.findRenderObject() as RenderBox;
@@ -1677,10 +3845,20 @@ class GlassPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        backgroundColor: cream,
-        appBar: AppBar(title: Text(title, style: headStyle), backgroundColor: Colors.transparent, elevation: 0, scrolledUnderElevation: 0),
-        body: Stack(children: [const Positioned.fill(child: LiquidBg()), SafeArea(child: child)]),
-      );
+    backgroundColor: cream,
+    appBar: AppBar(
+      title: Text(title, style: headStyle),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+    ),
+    body: Stack(
+      children: [
+        const Positioned.fill(child: LiquidBg()),
+        SafeArea(child: child),
+      ],
+    ),
+  );
 }
 
 // ───────────────────────── КОНФЕТТИ И НАГРАДЫ ─────────────────────────
@@ -1688,13 +3866,7 @@ class GlassPage extends StatelessWidget {
 class _Piece {
   final double x, delay, sway, rot, size;
   final int color;
-  _Piece(Random r)
-      : x = r.nextDouble(),
-        delay = r.nextDouble() * 0.4,
-        sway = r.nextDouble() * 2 - 1,
-        rot = r.nextDouble() * 6,
-        size = 6 + r.nextDouble() * 6,
-        color = r.nextInt(6);
+  _Piece(Random r) : x = r.nextDouble(), delay = r.nextDouble() * 0.4, sway = r.nextDouble() * 2 - 1, rot = r.nextDouble() * 6, size = 6 + r.nextDouble() * 6, color = r.nextInt(6);
 }
 
 class ConfettiPainter extends CustomPainter {
@@ -1744,7 +3916,10 @@ class _ConfettiState extends State<Confetti> with SingleTickerProviderStateMixin
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(animation: c, builder: (_, __) => CustomPaint(painter: ConfettiPainter(ps, c.value), size: Size.infinite));
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: c,
+    builder: (_, _) => CustomPaint(painter: ConfettiPainter(ps, c.value), size: Size.infinite),
+  );
 }
 
 class Medal {
@@ -1761,6 +3936,9 @@ const medals = [
   Medal('shop', '🛒', 'Smart Shopper', 'Buy a product from your shopping list'),
   Medal('weight', '⚖️', 'Weigh-in', 'Log your weight 3 times'),
   Medal('planet', '🌍', 'Planet Hero', 'Avoid 2 kg of CO₂ by rescuing food'),
+  Medal('freezer', '❄️', 'Ice Saver', 'Freeze 3 products before they spoil'),
+  Medal('share', '🤝', 'Good Neighbor', 'Share food with someone instead of binning it'),
+  Medal('cleanfridge', '✨', 'Clean Fridge', '5+ products and nothing expired'),
 ];
 
 class WeightEntry {
@@ -1778,6 +3956,12 @@ const tips = [
   '"Best before" is about quality, "use by" is about safety.',
   'Plan 3 meals before shopping — it cuts waste a lot.',
   'Keep fresh herbs in a glass of water, like flowers.',
+  'Shop with a list and never shop hungry — you buy 20–30% less.',
+  'Stale bread → croutons, toast or bread pudding. Never the bin!',
+  'Freeze leftovers in single portions — instant lunch later.',
+  'The fridge door is the warmest spot: keep sauces there, not milk.',
+  'Vegetable peels and stems make a great free broth.',
+  'Too much food? Share it with neighbors or a community fridge.',
 ];
 
 class BadgePopup extends StatefulWidget {
@@ -1808,17 +3992,30 @@ class _BadgePopupState extends State<BadgePopup> {
             tween: Tween(begin: 0, end: 1),
             duration: const Duration(milliseconds: 700),
             curve: Curves.easeOutBack,
-            builder: (_, v, child) => Transform.translate(offset: Offset(0, -130 * (1 - v)), child: Opacity(opacity: v.clamp(0.0, 1.0).toDouble(), child: child)),
+            builder: (_, v, child) => Transform.translate(
+              offset: Offset(0, -130 * (1 - v)),
+              child: Opacity(opacity: v.clamp(0.0, 1.0).toDouble(), child: child),
+            ),
             child: Glass(
               tint: const Color(0xFFFFF3C4),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text(widget.m.emoji, style: const TextStyle(fontSize: 38)),
-                const SizedBox(width: 12),
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Achievement unlocked!', style: TextStyle(fontSize: 12, color: burgundy)),
-                  Text(widget.m.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
-                ]),
-              ]),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(widget.m.emoji, style: const TextStyle(fontSize: 38)),
+                  const SizedBox(width: 12),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Achievement unlocked!', style: TextStyle(fontSize: 12, color: burgundy)),
+                      Text(
+                        widget.m.title,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1837,8 +4034,27 @@ class RingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final r = Rect.fromLTWH(w / 2 + 2, w / 2 + 2, size.width - w - 4, size.height - w - 4);
-    canvas.drawArc(r, 0, 2 * pi, false, Paint()..style = PaintingStyle.stroke..strokeWidth = w..color = Colors.black12);
-    canvas.drawArc(r, -pi / 2, 2 * pi * p, false, Paint()..style = PaintingStyle.stroke..strokeWidth = w..strokeCap = StrokeCap.round..color = color);
+    canvas.drawArc(
+      r,
+      0,
+      2 * pi,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = w
+        ..color = Colors.black12,
+    );
+    canvas.drawArc(
+      r,
+      -pi / 2,
+      2 * pi * p,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = w
+        ..strokeCap = StrokeCap.round
+        ..color = color,
+    );
   }
 
   @override
@@ -1850,21 +4066,72 @@ class ImpactPage extends StatelessWidget {
   const ImpactPage({super.key, required this.state});
 
   Widget _tile(String emoji, String label, double v, int dec, {String prefix = '', String suffix = ''}) => Expanded(
-        child: Glass(
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(emoji, style: const TextStyle(fontSize: 26)),
-            const SizedBox(height: 6),
-            TweenAnimationBuilder<double>(
-              tween: Tween(end: v),
-              duration: const Duration(milliseconds: 900),
-              curve: Curves.easeOutCubic,
-              builder: (_, x, __) => Text('$prefix${x.toStringAsFixed(dec)}$suffix', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: burgundy)),
+    child: Glass(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 26)),
+          const SizedBox(height: 6),
+          TweenAnimationBuilder<double>(
+            tween: Tween(end: v),
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.easeOutCubic,
+            builder: (_, x, _) => Text(
+              '$prefix${x.toStringAsFixed(dec)}$suffix',
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: burgundy),
             ),
-            Text(label, style: const TextStyle(color: Colors.black54, fontSize: 12)),
-          ]),
-        ),
-      );
+          ),
+          Text(label, style: const TextStyle(color: Colors.black54, fontSize: 12)),
+        ],
+      ),
+    ),
+  );
+
+  /// Аналитика выброшенного: по причинам (бары) и самая «проблемная» категория + персональный совет.
+  Widget _whyWaste(AppState s) {
+    final by = s.wasteByReason;
+    final total = s.wasteLog.length;
+    final top = by.entries.reduce((a, b) => b.value > a.value ? b : a).key;
+    final cat = s.wasteByCategory.entries.first;
+    return Glass(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final e in by.entries.where((e) => e.value > 0))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text('${reasonInfo[e.key]!.$1}  ${reasonInfo[e.key]!.$2}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const Spacer(),
+                      Text('${e.value}', style: const TextStyle(color: Colors.black54)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(5),
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: e.value / total),
+                      duration: const Duration(milliseconds: 900),
+                      curve: Curves.easeOutCubic,
+                      builder: (_, v, _) => LinearProgressIndicator(value: v, minHeight: 8, color: e.key == top ? burgundy : burgundy.withValues(alpha: 0.4), backgroundColor: Colors.black12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const Divider(),
+          Text('${catEmoji[cat.key] ?? '🍽️'} You waste ${cat.key} most often (${cat.value}×).', style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text('💡 ${reasonInfo[top]!.$3}', style: const TextStyle(color: Colors.black87)),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1875,70 +4142,162 @@ class ImpactPage extends StatelessWidget {
         builder: (context, _) {
           final s = state;
           final score = s.ecoScore;
-          final col = score >= 70 ? Colors.green.shade700 : score >= 40 ? Colors.orange.shade800 : Colors.red.shade700;
+          final col = score >= 70
+              ? Colors.green.shade700
+              : score >= 40
+              ? Colors.orange.shade800
+              : Colors.red.shade700;
           final mood = score >= 80
-              ? 'You are a food-saving superstar! Keep it up! ⭐'
+              ? 'You\'re a food-saving superstar! Keep it up! ⭐'
               : score >= 50
-                  ? 'Not bad! Use the expiring products first.'
-                  : 'Oh no... let us waste less. Check Recipes for ideas!';
-          return ListView(padding: const EdgeInsets.all(16), children: [
-            Appear(
-              child: Glass(
-                padding: const EdgeInsets.all(20),
-                child: Row(children: [
-                  SizedBox(
-                    width: 112,
-                    height: 112,
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(end: score / 100),
-                      duration: const Duration(milliseconds: 1200),
-                      curve: Curves.easeOutCubic,
-                      builder: (_, v, __) => CustomPaint(painter: RingPainter(v, col), child: Center(child: Text('${(v * 100).round()}%', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87)))),
+              ? 'Not bad! Use the expiring products first.'
+              : 'Oh no... let\'s waste less. Check Recipes for ideas!';
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Appear(
+                child: Glass(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 112,
+                        height: 112,
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(end: score / 100),
+                          duration: const Duration(milliseconds: 1200),
+                          curve: Curves.easeOutCubic,
+                          builder: (_, v, _) => CustomPaint(
+                            painter: RingPainter(v, col),
+                            child: Center(
+                              child: Text(
+                                '${(v * 100).round()}%',
+                                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 18),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Eco score', style: titleStyle),
+                            const SizedBox(height: 4),
+                            Text(
+                              s.consumed + s.wasted == 0 ? 'Eat and cook your food to build your score!' : '${s.consumed} products used, ${s.wasted} thrown away.',
+                              style: const TextStyle(color: Colors.black54),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Appear(
+                index: 1,
+                child: NutrikSays(key: ValueKey(mood), text: mood, size: 84),
+              ),
+              const SizedBox(height: 12),
+              Appear(
+                index: 2,
+                child: Row(
+                  children: [
+                    _tile('🦸', 'Rescued items', s.rescued.toDouble(), 0),
+                    const SizedBox(width: 12),
+                    _tile('⚖️', 'Food saved', s.rescued * 0.3, 1, suffix: ' kg'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Appear(
+                index: 3,
+                child: Row(
+                  children: [
+                    _tile('💰', 'Money saved', s.rescuedMoney, 2, prefix: '\$'),
+                    const SizedBox(width: 12),
+                    _tile('🌍', 'CO₂ avoided', s.co2, 1, suffix: ' kg'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Appear(
+                index: 4,
+                child: Glass(
+                  child: Row(
+                    children: [
+                      const Text('🔥', style: TextStyle(fontSize: 34)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          '${s.streakDays} days without waste',
+                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black87),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Appear(
+                index: 5,
+                child: Glass(
+                  tint: const Color(0xFFFFD6D6),
+                  child: Row(
+                    children: [
+                      const Text('🗑️', style: TextStyle(fontSize: 28)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Wasted: ${s.wasted} ${s.wasted == 1 ? 'item' : 'items'} · about \$${s.wastedMoney.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Appear(index: 6, child: Row(children: [_tile('❄️', 'Frozen in time', s.frozen.toDouble(), 0), const SizedBox(width: 12), _tile('🤝', 'Shared', s.shared.toDouble(), 0)])),
+              if (s.wasteLog.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                const Text('Why food ends up in your bin', style: headStyle),
+                const SizedBox(height: 8),
+                Appear(index: 7, child: _whyWaste(s)),
+              ],
+              const SizedBox(height: 18),
+              const Text('Did you know?', style: headStyle),
+              const SizedBox(height: 8),
+              for (final f in const [
+                ('🗑️', 'About 1/3 of all food produced in the world is lost or wasted.'),
+                ('🏠', 'Most of the waste happens at home — not in shops or restaurants.'),
+                ('🌍', 'Food waste causes 8–10% of global greenhouse gas emissions.'),
+                ('💧', 'One wasted apple = ~125 liters of water used for nothing.'),
+              ])
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Glass(
+                    child: Row(
+                      children: [
+                        Text(f.$1, style: const TextStyle(fontSize: 24)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(f.$2, style: const TextStyle(color: Colors.black87)),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 18),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Text('Eco score', style: titleStyle),
-                      const SizedBox(height: 4),
-                      Text(s.consumed + s.wasted == 0 ? 'Eat and cook your food to build your score!' : '${s.consumed} products used, ${s.wasted} thrown away.', style: const TextStyle(color: Colors.black54)),
-                    ]),
-                  ),
-                ]),
+                ),
+              const SizedBox(height: 4),
+              const Text(
+                'Estimates: about 300 g per product, average prices, about 2.5 kg of CO₂ per kg of food. Sources: UNEP Food Waste Index, FAO.',
+                style: TextStyle(color: Colors.black45, fontSize: 11),
               ),
-            ),
-            const SizedBox(height: 12),
-            Appear(index: 1, child: NutrikSays(key: ValueKey(mood), text: mood, size: 84)),
-            const SizedBox(height: 12),
-            Appear(index: 2, child: Row(children: [_tile('🦸', 'Rescued items', s.rescued.toDouble(), 0), const SizedBox(width: 12), _tile('⚖️', 'Food saved', s.rescued * 0.3, 1, suffix: ' kg')])),
-            const SizedBox(height: 12),
-            Appear(index: 3, child: Row(children: [_tile('💰', 'Money saved', s.rescuedMoney, 2, prefix: '\$'), const SizedBox(width: 12), _tile('🌍', 'CO₂ avoided', s.co2, 1, suffix: ' kg')])),
-            const SizedBox(height: 12),
-            Appear(
-              index: 4,
-              child: Glass(
-                child: Row(children: [
-                  const Text('🔥', style: TextStyle(fontSize: 34)),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text('${s.streakDays} days without waste', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black87))),
-                ]),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Appear(
-              index: 5,
-              child: Glass(
-                tint: const Color(0xFFFFD6D6),
-                child: Row(children: [
-                  const Text('🗑️', style: TextStyle(fontSize: 28)),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text('Wasted: ${s.wasted} items · about \$${s.wastedMoney.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87))),
-                ]),
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text('Estimates: ~300 g per product, average prices, ~2.5 kg CO₂ per kg of food.', style: TextStyle(color: Colors.black45, fontSize: 11)),
-          ]);
+            ],
+          );
         },
       ),
     );
@@ -1969,19 +4328,43 @@ class WeightPainter extends CustomPainter {
       final m = path.computeMetrics().first;
       final part = m.extractPath(0, m.length * p);
       final end = m.getTangentForOffset(m.length * p)?.position ?? pt(0);
-      final fill = Path.from(part)..lineTo(end.dx, 20 + h)..lineTo(pt(0).dx, 20 + h)..close();
+      final fill = Path.from(part)
+        ..lineTo(end.dx, 20 + h)
+        ..lineTo(pt(0).dx, 20 + h)
+        ..close();
       canvas.drawPath(
         fill,
-        Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [burgundy.withValues(alpha: 0.3), burgundy.withValues(alpha: 0)]).createShader(Offset.zero & size),
+        Paint()
+          ..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [burgundy.withValues(alpha: 0.3), burgundy.withValues(alpha: 0)]).createShader(Offset.zero & size),
       );
-      canvas.drawPath(part, Paint()..style = PaintingStyle.stroke..strokeWidth = 3..strokeCap = StrokeCap.round..color = burgundy);
+      canvas.drawPath(
+        part,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3
+          ..strokeCap = StrokeCap.round
+          ..color = burgundy,
+      );
     }
     for (var i = 0; i < e.length; i++) {
       if (e.length > 1 && p < i / (e.length - 1)) continue;
       canvas.drawCircle(pt(i), 6, Paint()..color = Colors.white);
-      canvas.drawCircle(pt(i), 6, Paint()..style = PaintingStyle.stroke..strokeWidth = 2.5..color = burgundy);
+      canvas.drawCircle(
+        pt(i),
+        6,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5
+          ..color = burgundy,
+      );
       if (i == 0 || i == e.length - 1) {
-        final tp = TextPainter(text: TextSpan(text: e[i].kg.toStringAsFixed(1), style: const TextStyle(fontSize: 11, color: Colors.black87, fontWeight: FontWeight.bold)), textDirection: TextDirection.ltr)..layout();
+        final tp = TextPainter(
+          text: TextSpan(
+            text: e[i].kg.toStringAsFixed(1),
+            style: const TextStyle(fontSize: 11, color: Colors.black87, fontWeight: FontWeight.bold),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
         tp.paint(canvas, pt(i) - Offset(tp.width / 2, 22));
       }
     }
@@ -2000,23 +4383,29 @@ void weightSheet(BuildContext ctx, AppState s) {
     builder: (_) => StatefulBuilder(
       builder: (c, set) => Padding(
         padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('Log your weight', style: titleStyle),
-          Slider(value: v, min: 30, max: 200, divisions: 1700, label: '${v.toStringAsFixed(1)} kg', onChanged: (x) => set(() => v = x)),
-          Text('${v.toStringAsFixed(1)} kg', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: burgundy)),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: burgundy),
-              onPressed: () {
-                s.addWeight(double.parse(v.toStringAsFixed(1)));
-                Navigator.pop(c);
-              },
-              child: const Text('Save'),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Log your weight', style: titleStyle),
+            Slider(value: v, min: 30, max: 200, divisions: 1700, label: '${v.toStringAsFixed(1)} kg', onChanged: (x) => set(() => v = x)),
+            Text(
+              '${v.toStringAsFixed(1)} kg',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: burgundy),
             ),
-          ),
-        ]),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: burgundy),
+                onPressed: () {
+                  s.addWeight(double.parse(v.toStringAsFixed(1)));
+                  Navigator.pop(c);
+                },
+                child: const Text('Save'),
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -2037,68 +4426,122 @@ class WeightPage extends StatelessWidget {
         builder: (context, _) {
           final s = state;
           final bmi = s.weight / pow(s.height / 100, 2);
-          final cat = bmi < 18.5 ? 'Underweight' : bmi < 25 ? 'Normal' : bmi < 30 ? 'Overweight' : 'Obese';
+          final cat = bmi < 18.5
+              ? 'Underweight'
+              : bmi < 25
+              ? 'Normal'
+              : bmi < 30
+              ? 'Overweight'
+              : 'Obese';
           final list = s.weights.reversed.toList();
-          return ListView(padding: const EdgeInsets.all(16), children: [
-            Appear(
-              child: Glass(
-                padding: const EdgeInsets.fromLTRB(0, 8, 0, 0),
-                child: SizedBox(
-                  height: 210,
-                  child: TweenAnimationBuilder<double>(
-                    key: ValueKey(s.weights.length),
-                    tween: Tween(begin: 0, end: 1),
-                    duration: const Duration(milliseconds: 1300),
-                    curve: Curves.easeInOutCubic,
-                    builder: (_, v, __) => CustomPaint(painter: WeightPainter(s.weights, v), size: Size.infinite),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Appear(
-              index: 1,
-              child: Row(children: [
-                Expanded(child: Glass(child: Column(children: [Text('${s.weight.toStringAsFixed(1)} kg', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: burgundy)), const Text('Current', style: TextStyle(color: Colors.black54, fontSize: 12))]))),
-                const SizedBox(width: 10),
-                Expanded(child: Glass(child: Column(children: [Text(bmi.toStringAsFixed(1), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: burgundy)), Text('BMI · $cat', style: const TextStyle(color: Colors.black54, fontSize: 12))]))),
-                const SizedBox(width: 10),
-                Expanded(child: Glass(child: Column(children: [Text('${s.targetCalories}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: burgundy)), const Text('kcal goal', style: TextStyle(color: Colors.black54, fontSize: 12))]))),
-              ]),
-            ),
-            const SizedBox(height: 12),
-            Appear(
-              index: 2,
-              child: SizedBox(
-                height: 52,
-                child: FilledButton.icon(style: FilledButton.styleFrom(backgroundColor: burgundy), onPressed: () => weightSheet(context, s), icon: const Icon(Icons.add), label: const Text('Log weight')),
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text('BMI is only a rough guide.', style: TextStyle(color: Colors.black45, fontSize: 11)),
-            const SizedBox(height: 8),
-            for (var i = 0; i < list.length; i++)
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
               Appear(
-                key: ValueKey('w${list[i].date.microsecondsSinceEpoch}$i'),
-                index: i + 3,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Glass(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    child: Row(children: [
-                      Text(_d(list[i].date), style: const TextStyle(color: Colors.black54)),
-                      const Spacer(),
-                      if (i < list.length - 1)
-                        Text(
-                          '${list[i].kg - list[i + 1].kg >= 0 ? '+' : ''}${(list[i].kg - list[i + 1].kg).toStringAsFixed(1)}  ',
-                          style: TextStyle(color: list[i].kg - list[i + 1].kg > 0 ? Colors.orange.shade800 : Colors.green.shade800, fontSize: 12),
-                        ),
-                      Text('${list[i].kg.toStringAsFixed(1)} kg', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ]),
+                child: Glass(
+                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 0),
+                  child: SizedBox(
+                    height: 210,
+                    child: TweenAnimationBuilder<double>(
+                      key: ValueKey(s.weights.length),
+                      tween: Tween(begin: 0, end: 1),
+                      duration: const Duration(milliseconds: 1300),
+                      curve: Curves.easeInOutCubic,
+                      builder: (_, v, _) => CustomPaint(painter: WeightPainter(s.weights, v), size: Size.infinite),
+                    ),
                   ),
                 ),
               ),
-          ]);
+              const SizedBox(height: 12),
+              Appear(
+                index: 1,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Glass(
+                        child: Column(
+                          children: [
+                            Text(
+                              '${s.weight.toStringAsFixed(1)} kg',
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: burgundy),
+                            ),
+                            const Text('Current', style: TextStyle(color: Colors.black54, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Glass(
+                        child: Column(
+                          children: [
+                            Text(
+                              bmi.toStringAsFixed(1),
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: burgundy),
+                            ),
+                            Text('BMI · $cat', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Glass(
+                        child: Column(
+                          children: [
+                            Text(
+                              '${s.targetCalories}',
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: burgundy),
+                            ),
+                            const Text('kcal goal', style: TextStyle(color: Colors.black54, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Appear(
+                index: 2,
+                child: SizedBox(
+                  height: 52,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(backgroundColor: burgundy),
+                    onPressed: () => weightSheet(context, s),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Log weight'),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text('BMI is only a rough guide, not a diagnosis.', style: TextStyle(color: Colors.black45, fontSize: 11)),
+              const SizedBox(height: 8),
+              for (var i = 0; i < list.length; i++)
+                Appear(
+                  key: ValueKey('w${list[i].date.microsecondsSinceEpoch}$i'),
+                  index: i + 3,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Glass(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      child: Row(
+                        children: [
+                          Text(_d(list[i].date), style: const TextStyle(color: Colors.black54)),
+                          const Spacer(),
+                          if (i < list.length - 1)
+                            Text(
+                              '${list[i].kg - list[i + 1].kg >= 0 ? '+' : ''}${(list[i].kg - list[i + 1].kg).toStringAsFixed(1)}  ',
+                              style: TextStyle(color: list[i].kg - list[i + 1].kg > 0 ? Colors.orange.shade800 : Colors.green.shade800, fontSize: 12),
+                            ),
+                          Text('${list[i].kg.toStringAsFixed(1)} kg', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          );
         },
       ),
     );
@@ -2124,68 +4567,81 @@ class _ShoppingPageState extends State<ShoppingPage> {
       title: 'Shopping list',
       child: ListenableBuilder(
         listenable: s,
-        builder: (context, _) => ListView(padding: const EdgeInsets.all(16), children: [
-          Autocomplete<FoodItem>(
-            displayStringForOption: (f) => f.name,
-            optionsBuilder: (v) {
-              final q = v.text.trim().toLowerCase();
-              if (q.isEmpty) return const Iterable<FoodItem>.empty();
-              return foodDatabase.where((f) => f.name.toLowerCase().contains(q)).take(8);
-            },
-            onSelected: (f) {
-              s.addShopping([f.name]);
-              Future.microtask(() => _fc?.clear());
-            },
-            fieldViewBuilder: (ctx, ctrl, node, onSub) {
-              _fc = ctrl;
-              return TextField(
-                controller: ctrl,
-                focusNode: node,
-                decoration: InputDecoration(
-                  hintText: 'Add to shopping list...',
-                  prefixIcon: const Icon(Icons.add_shopping_cart, color: burgundy),
-                  filled: true,
-                  fillColor: Colors.white70,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          if (s.shopping.isEmpty)
-            const Padding(padding: EdgeInsets.only(top: 12), child: NutrikSays(text: 'Your list is empty! Add things here, or open a recipe and tap "Add missing to shopping list".', size: 90)),
-          for (var i = 0; i < s.shopping.length; i++)
-            Appear(
-              key: ValueKey('sh${s.shopping[i]}'),
-              index: i,
-              child: Dismissible(
-                key: ValueKey('shd${s.shopping[i]}'),
-                direction: DismissDirection.endToStart,
-                onDismissed: (_) => s.removeShopping(s.shopping[i]),
-                background: Container(color: Colors.red.shade900, alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete, color: Colors.white)),
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Glass(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Text(foodByName[s.shopping[i]]?.emoji ?? '🛒', style: const TextStyle(fontSize: 26)),
-                      title: Text(s.shopping[i], style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: const Text('Tap ✓ when bought — it goes to your fridge'),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.check_circle_outline, color: burgundy, size: 30),
-                        onPressed: () {
-                          final n = s.shopping[i];
-                          s.buy(n);
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: burgundy, duration: const Duration(milliseconds: 1400), content: Text('$n is in your fridge 🧊')));
-                        },
+        builder: (context, _) => ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Autocomplete<FoodItem>(
+              displayStringForOption: (f) => f.name,
+              optionsBuilder: (v) {
+                final q = v.text.trim().toLowerCase();
+                if (q.isEmpty) return const Iterable<FoodItem>.empty();
+                return foodDatabase.where((f) => f.name.toLowerCase().contains(q)).take(8);
+              },
+              onSelected: (f) {
+                s.addShopping([f.name]);
+                Future.microtask(() => _fc?.clear());
+              },
+              fieldViewBuilder: (ctx, ctrl, node, onSub) {
+                _fc = ctrl;
+                return TextField(
+                  controller: ctrl,
+                  focusNode: node,
+                  decoration: InputDecoration(
+                    hintText: 'Add to shopping list...',
+                    prefixIcon: const Icon(Icons.add_shopping_cart, color: burgundy),
+                    filled: true,
+                    fillColor: Colors.white70,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            if (s.shopping.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: NutrikSays(text: 'Your list is empty! Add items here, or open a recipe and tap "Add missing to shopping list".', size: 90),
+              ),
+            for (var i = 0; i < s.shopping.length; i++)
+              Appear(
+                key: ValueKey('sh${s.shopping[i]}'),
+                index: i,
+                child: Dismissible(
+                  key: ValueKey('shd${s.shopping[i]}'),
+                  direction: DismissDirection.endToStart,
+                  onDismissed: (_) => s.removeShopping(s.shopping[i]),
+                  background: Container(
+                    color: Colors.red.shade900,
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    child: const Icon(Icons.delete, color: Colors.white),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Glass(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Text(foodByName[s.shopping[i]]?.emoji ?? '🛒', style: const TextStyle(fontSize: 26)),
+                        title: Text(s.shopping[i], style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: const Text('Tap ✓ when you buy it — it goes straight to your fridge'),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.check_circle_outline, color: burgundy, size: 30),
+                          onPressed: () {
+                            final n = s.shopping[i];
+                            s.buy(n);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: burgundy, duration: const Duration(milliseconds: 1400), content: Text('$n is in your fridge 🧊')),
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-        ]),
+          ],
+        ),
       ),
     );
   }
@@ -2205,62 +4661,90 @@ class MedalsPage extends StatelessWidget {
         listenable: state,
         builder: (context, _) {
           final n = state.unlocked.length;
-          return ListView(padding: const EdgeInsets.all(16), children: [
-            Appear(
-              child: Glass(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('$n / ${medals.length} unlocked', style: titleStyle),
-                  const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(end: n / medals.length),
-                      duration: const Duration(milliseconds: 900),
-                      curve: Curves.easeOutCubic,
-                      builder: (_, v, __) => LinearProgressIndicator(value: v, minHeight: 10, color: burgundy, backgroundColor: Colors.black12),
-                    ),
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Appear(
+                child: Glass(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('$n / ${medals.length} unlocked', style: titleStyle),
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(end: n / medals.length),
+                          duration: const Duration(milliseconds: 900),
+                          curve: Curves.easeOutCubic,
+                          builder: (_, v, _) => LinearProgressIndicator(value: v, minHeight: 10, color: burgundy, backgroundColor: Colors.black12),
+                        ),
+                      ),
+                    ],
                   ),
-                ]),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 0.95,
-              children: [
-                for (var i = 0; i < medals.length; i++)
-                  Appear(
-                    index: i + 1,
-                    child: Builder(builder: (context) {
-                      final m = medals[i];
-                      final on = state.unlocked.contains(m.id);
-                      return Glass(
-                        tint: on ? const Color(0xFFFFF3C4) : null,
-                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                          on
-                              ? TweenAnimationBuilder<double>(tween: Tween(begin: 0.4, end: 1), duration: const Duration(milliseconds: 800), curve: Curves.elasticOut, builder: (_, v, child) => Transform.scale(scale: v, child: child), child: Text(m.emoji, style: const TextStyle(fontSize: 40)))
-                              : Stack(alignment: Alignment.center, children: [
-                                  ColorFiltered(
-                                    colorFilter: const ColorFilter.matrix(<double>[0.21, 0.72, 0.07, 0, 0, 0.21, 0.72, 0.07, 0, 0, 0.21, 0.72, 0.07, 0, 0, 0, 0, 0, 1, 0]),
-                                    child: Opacity(opacity: 0.35, child: Text(m.emoji, style: const TextStyle(fontSize: 40))),
-                                  ),
-                                  const Icon(Icons.lock, size: 18, color: Colors.black45),
-                                ]),
-                          const SizedBox(height: 8),
-                          Text(m.title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
-                          const SizedBox(height: 4),
-                          Text(m.desc, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Colors.black54)),
-                        ]),
-                      );
-                    }),
-                  ),
-              ],
-            ),
-          ]);
+              const SizedBox(height: 12),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 0.95,
+                children: [
+                  for (var i = 0; i < medals.length; i++)
+                    Appear(
+                      index: i + 1,
+                      child: Builder(
+                        builder: (context) {
+                          final m = medals[i];
+                          final on = state.unlocked.contains(m.id);
+                          return Glass(
+                            tint: on ? const Color(0xFFFFF3C4) : null,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                on
+                                    ? TweenAnimationBuilder<double>(
+                                        tween: Tween(begin: 0.4, end: 1),
+                                        duration: const Duration(milliseconds: 800),
+                                        curve: Curves.elasticOut,
+                                        builder: (_, v, child) => Transform.scale(scale: v, child: child),
+                                        child: Text(m.emoji, style: const TextStyle(fontSize: 40)),
+                                      )
+                                    : Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          ColorFiltered(
+                                            colorFilter: const ColorFilter.matrix(<double>[0.21, 0.72, 0.07, 0, 0, 0.21, 0.72, 0.07, 0, 0, 0.21, 0.72, 0.07, 0, 0, 0, 0, 0, 1, 0]),
+                                            child: Opacity(opacity: 0.35, child: Text(m.emoji, style: const TextStyle(fontSize: 40))),
+                                          ),
+                                          const Icon(Icons.lock, size: 18, color: Colors.black45),
+                                        ],
+                                      ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  m.title,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  m.desc,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 11, color: Colors.black54),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          );
         },
       ),
     );
@@ -2299,11 +4783,17 @@ class _QuickTileState extends State<QuickTile> {
             child: Glass(
               radius: 18,
               padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Column(children: [
-                Badge(isLabelVisible: widget.badge > 0, label: Text('${widget.badge}'), child: Text(widget.emoji, style: const TextStyle(fontSize: 24))),
-                const SizedBox(height: 4),
-                Text(widget.label, style: const TextStyle(fontSize: 11, color: Colors.black87)),
-              ]),
+              child: Column(
+                children: [
+                  Badge(
+                    isLabelVisible: widget.badge > 0,
+                    label: Text('${widget.badge}'),
+                    child: Text(widget.emoji, style: const TextStyle(fontSize: 24)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(widget.label, style: const TextStyle(fontSize: 11, color: Colors.black87)),
+                ],
+              ),
             ),
           ),
         ),
@@ -2354,19 +4844,37 @@ class WavePainter extends CustomPainter {
       canvas.drawCircle(Offset(r + sin(k * 2.1 + bt * 6) * r * 0.5, by), 2 + (k % 3), Paint()..color = Colors.white.withValues(alpha: 0.5 * (1 - bt)));
     }
     canvas.restore();
-    canvas.drawCircle(c, r - 3, Paint()..style = PaintingStyle.stroke..strokeWidth = 3..color = Colors.white.withValues(alpha: 0.55));
-    canvas.drawArc(Rect.fromCircle(center: c, radius: r - 12), pi * 1.05, pi * 0.45, false, Paint()..style = PaintingStyle.stroke..strokeWidth = 4..strokeCap = StrokeCap.round..color = Colors.white.withValues(alpha: 0.5));
+    canvas.drawCircle(
+      c,
+      r - 3,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..color = Colors.white.withValues(alpha: 0.55),
+    );
+    canvas.drawArc(
+      Rect.fromCircle(center: c, radius: r - 12),
+      pi * 1.05,
+      pi * 0.45,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round
+        ..color = Colors.white.withValues(alpha: 0.5),
+    );
   }
 
   @override
   bool shouldRepaint(covariant WavePainter o) => true;
 }
 
-/// Круглый «жидкий» индикатор калорий: уровень жидкости = съеденное от цели.
+/// Круглый «жидкий» индикатор: уровень жидкости = доля (эко-рейтинг, калории и т.п.).
 class LiquidGauge extends StatefulWidget {
   final double level, size;
-  final int kcal;
-  const LiquidGauge({super.key, required this.level, required this.kcal, this.size = 150});
+  final int value;
+  final String suffix, label;
+  const LiquidGauge({super.key, required this.level, required this.value, this.suffix = '', this.label = 'kcal eaten', this.size = 150});
   @override
   State<LiquidGauge> createState() => _LiquidGaugeState();
 }
@@ -2385,22 +4893,39 @@ class _LiquidGaugeState extends State<LiquidGauge> with SingleTickerProviderStat
     return SizedBox(
       width: widget.size,
       height: widget.size,
-      child: Stack(alignment: Alignment.center, children: [
-        TweenAnimationBuilder<double>(
-          tween: Tween(end: widget.level),
-          duration: const Duration(milliseconds: 1500),
-          curve: Curves.easeOutCubic,
-          builder: (_, v, __) => AnimatedBuilder(animation: c, builder: (_, __) => CustomPaint(size: Size.square(widget.size), painter: WavePainter(v, c.value))),
-        ),
-        Column(mainAxisSize: MainAxisSize.min, children: [
-          TweenAnimationBuilder<int>(
-            tween: IntTween(end: widget.kcal),
-            duration: const Duration(milliseconds: 1200),
-            builder: (_, v, __) => Text('$v', style: const TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: Colors.white, shadows: [Shadow(color: Colors.black45, blurRadius: 8)])),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          TweenAnimationBuilder<double>(
+            tween: Tween(end: widget.level),
+            duration: const Duration(milliseconds: 1500),
+            curve: Curves.easeOutCubic,
+            builder: (_, v, _) => AnimatedBuilder(
+              animation: c,
+              builder: (_, _) => CustomPaint(size: Size.square(widget.size), painter: WavePainter(v, c.value)),
+            ),
           ),
-          const Text('kcal eaten', style: TextStyle(color: Colors.white70, fontSize: 11)),
-        ]),
-      ]),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TweenAnimationBuilder<int>(
+                tween: IntTween(end: widget.value),
+                duration: const Duration(milliseconds: 1200),
+                builder: (_, v, _) => Text(
+                  '$v${widget.suffix}',
+                  style: TextStyle(
+                    fontSize: widget.size * 0.21,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    shadows: const [Shadow(color: Colors.black45, blurRadius: 8)],
+                  ),
+                ),
+              ),
+              Text(widget.label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2422,13 +4947,17 @@ class _PulseState extends State<Pulse> with SingleTickerProviderStateMixin {
   }
 
   @override
-  Widget build(BuildContext context) => ScaleTransition(scale: Tween<double>(begin: 0.9, end: 1.2).animate(CurvedAnimation(parent: c, curve: Curves.easeInOut)), child: widget.child);
+  Widget build(BuildContext context) => ScaleTransition(
+    scale: Tween<double>(begin: 0.9, end: 1.2).animate(CurvedAnimation(parent: c, curve: Curves.easeInOut)),
+    child: widget.child,
+  );
 }
 
 class HomePage extends StatefulWidget {
   final AppState state;
   final AiService ai;
-  const HomePage({super.key, required this.state, required this.ai});
+  final ValueChanged<int> onTab;
+  const HomePage({super.key, required this.state, required this.ai, required this.onTab});
   @override
   State<HomePage> createState() => _HomePageState();
 }
@@ -2445,267 +4974,595 @@ class _HomePageState extends State<HomePage> {
   AppState get state => widget.state;
 
   Widget _pill(String t) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white24)),
-        child: Text(t, style: const TextStyle(color: Colors.white, fontSize: 12)),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Colors.white24),
+    ),
+    child: Text(t, style: const TextStyle(color: Colors.white, fontSize: 12)),
+  );
 
+  /// Главная карточка: «спасательная миссия» — что вот-вот испортится и сколько это стоит.
   Widget _hero() {
-    final total = state.eatenCalories, goal = state.targetCalories, left = goal - total;
-    final level = (total / goal).clamp(0.0, 1.0).toDouble();
-    final line = total == 0
-        ? '"Feed me data! Log what you eat."'
-        : total < goal * 0.5
-            ? '"Nice start! Keep going."'
-            : total <= goal
-                ? '"Almost there! Do not forget water."'
-                : '"Mmm... that is over the goal 😅"';
-    return Stack(clipBehavior: Clip.none, children: [
-      Container(
-        margin: const EdgeInsets.only(top: 60),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(34),
-          gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF6A041C), Color(0xFF9B1B33)]),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 1.2),
-          boxShadow: [BoxShadow(color: burgundy.withValues(alpha: 0.35), blurRadius: 30, offset: const Offset(0, 14))],
-        ),
-        child: Row(children: [
-          LiquidGauge(level: level, kcal: total),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('TODAY', style: TextStyle(color: Colors.white60, fontSize: 11, letterSpacing: 2)),
-              const SizedBox(height: 4),
-              Text(left >= 0 ? '$left kcal left' : '${-left} kcal over', style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.bold)),
-              Text('goal $goal kcal', style: const TextStyle(color: Colors.white60, fontSize: 12)),
-              const SizedBox(height: 10),
-              Wrap(spacing: 6, runSpacing: 6, children: [_pill('🥗 ${state.log.where((e) => e.day == dayShift).length} meals'), _pill('🦸 ${state.rescued} rescued')]),
-              const SizedBox(height: 10),
-              Text(line, style: const TextStyle(color: Colors.white70, fontSize: 12, fontStyle: FontStyle.italic)),
-            ]),
+    final save = state.expiringSoon.where((p) => p.daysLeft >= 0).toList();
+    final dead = state.expired.length;
+    final empty = state.pantry.isEmpty;
+    final score = state.ecoScore;
+    final line = empty
+        ? '"Empty fridge = zero waste... but I\'m hungry!"'
+        : save.isNotEmpty
+        ? '"Eat these first! I found recipes for them."'
+        : dead > 0
+        ? '"Something smells funny in there... 👃"'
+        : '"Everything is fresh. You\'re a legend!"';
+    final cta = empty
+        ? 'Stock your fridge'
+        : save.isNotEmpty
+        ? 'Cook with them'
+        : 'Open fridge';
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          margin: const EdgeInsets.only(top: 60),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(34),
+            gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF6A041C), Color(0xFF9B1B33)]),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 1.2),
+            boxShadow: [BoxShadow(color: burgundy.withValues(alpha: 0.35), blurRadius: 30, offset: const Offset(0, 14))],
           ),
-        ]),
-      ),
-      Positioned(top: -17, right: 14, child: Nutrik(size: 92, mode: total > goal ? NutrikMode.eat : NutrikMode.idle, snack: total > goal ? '🍰' : null)),
-    ]);
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  LiquidGauge(level: score / 100, value: score, suffix: '%', label: 'eco score', size: 124),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('RESCUE MISSION', style: TextStyle(color: Colors.white60, fontSize: 11, letterSpacing: 2)),
+                        const SizedBox(height: 4),
+                        Text(
+                          empty
+                              ? 'Fridge is empty'
+                              : save.isEmpty
+                              ? 'Nothing to rescue'
+                              : '${save.length} ${save.length == 1 ? 'item' : 'items'} to save',
+                          style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          save.isNotEmpty
+                              ? '≈ \$${state.moneyAtRisk.toStringAsFixed(2)} at risk'
+                              : dead > 0
+                              ? '$dead expired in the fridge'
+                              : 'all products are fresh',
+                          style: TextStyle(color: dead > 0 && save.isEmpty ? const Color(0xFFFFB4B4) : Colors.white60, fontSize: 12),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(spacing: 6, runSpacing: 6, children: [_pill('🦸 ${state.rescued} rescued'), _pill('💰 \$${state.rescuedMoney.toStringAsFixed(0)} saved')]),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                line,
+                style: const TextStyle(color: Colors.white70, fontSize: 12, fontStyle: FontStyle.italic),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: burgundy),
+                  onPressed: () => widget.onTab(
+                    empty
+                        ? 1
+                        : save.isNotEmpty
+                        ? 3
+                        : 2,
+                  ),
+                  icon: Icon(
+                    empty
+                        ? Icons.add_shopping_cart
+                        : save.isNotEmpty
+                        ? Icons.restaurant_menu
+                        : Icons.kitchen,
+                  ),
+                  label: Text(cta, style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Positioned(
+          top: -17,
+          right: 14,
+          child: Nutrik(size: 92, mode: dead > 0 && save.isEmpty ? NutrikMode.fall : NutrikMode.idle, stars: !empty && save.isEmpty && dead == 0),
+        ),
+      ],
+    );
   }
 
-  Widget _week() {
-    final goal = state.targetCalories;
+  Widget _calories() {
+    final total = state.eatenCalories, goal = state.targetCalories, left = goal - total;
     final vals = [for (var k = 0; k < 7; k++) state.kcalOn(dayShift - 6 + k)];
     final mx = max(goal * 1.15, vals.reduce(max).toDouble());
-    final nz = vals.where((v) => v > 0).toList();
-    final avg = nz.isEmpty ? 0 : (nz.reduce((a, b) => a + b) / nz.length).round();
     return Glass(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [const Text('This week', style: headStyle), const Spacer(), Text('avg $avg kcal', style: const TextStyle(color: Colors.black54, fontSize: 12))]),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 124,
-          child: Stack(children: [
-            Positioned(left: 0, right: 0, bottom: 22 + 94 * (goal / mx), child: Container(height: 1, color: burgundy.withValues(alpha: 0.3))),
-            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              for (var k = 0; k < 7; k++)
-                Expanded(
-                  child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-                    TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0, end: vals[k] / mx),
-                      duration: Duration(milliseconds: 700 + k * 90),
-                      curve: Curves.easeOutBack,
-                      builder: (_, v, __) => Container(
-                        width: 18,
-                        height: max(5.0, 94 * v),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(9),
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: k == 6 ? const [Color(0xFFD9A441), burgundy] : [burgundy.withValues(alpha: 0.55), burgundy.withValues(alpha: 0.2)],
-                          ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 60,
+                height: 60,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(end: (total / goal).clamp(0.0, 1.0).toDouble()),
+                  duration: const Duration(milliseconds: 1200),
+                  curve: Curves.easeOutCubic,
+                  builder: (_, v, _) => CustomPaint(
+                    painter: RingPainter(v, total > goal ? Colors.orange.shade800 : burgundy, 7),
+                    child: Center(
+                      child: Text('${(total / goal * 100).round()}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Calories today', style: headStyle),
+                    Text('$total of $goal kcal · ${left >= 0 ? '$left left' : '${-left} over'}', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 88,
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 18 + 64 * (goal / mx),
+                  child: Container(height: 1, color: burgundy.withValues(alpha: 0.3)),
+                ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    for (var k = 0; k < 7; k++)
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TweenAnimationBuilder<double>(
+                              tween: Tween(begin: 0, end: vals[k] / mx),
+                              duration: Duration(milliseconds: 700 + k * 90),
+                              curve: Curves.easeOutBack,
+                              builder: (_, v, _) => Container(
+                                width: 16,
+                                height: max(5.0, 64 * v),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: k == 6 ? const [Color(0xFFD9A441), burgundy] : [burgundy.withValues(alpha: 0.55), burgundy.withValues(alpha: 0.2)],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'MTWTFSS'[now().subtract(Duration(days: 6 - k)).weekday - 1],
+                              style: TextStyle(fontSize: 10, fontWeight: k == 6 ? FontWeight.bold : FontWeight.normal, color: k == 6 ? burgundy : Colors.black54),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text('MTWTFSS'[now().subtract(Duration(days: 6 - k)).weekday - 1], style: TextStyle(fontSize: 11, fontWeight: k == 6 ? FontWeight.bold : FontWeight.normal, color: k == 6 ? burgundy : Colors.black54)),
-                  ]),
+                  ],
                 ),
-            ]),
-          ]),
-        ),
-      ]),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _health() {
     final p = state.pantry;
-    final bad = p.where((e) => e.daysLeft <= 0).length, soon = p.where((e) => e.daysLeft > 0 && e.daysLeft <= 2).length, ok = p.length - bad - soon;
-    if (p.isEmpty) return const Text('Your fridge is empty. Stock it in Search!', style: TextStyle(color: Colors.black54));
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0, end: 1),
-          duration: const Duration(milliseconds: 900),
-          curve: Curves.easeOutCubic,
-          builder: (_, v, __) => Align(
-            alignment: Alignment.centerLeft,
-            widthFactor: 1,
-            heightFactor: 1,
-            child: FractionallySizedBox(
-              widthFactor: v,
-              child: SizedBox(
-                height: 10,
-                child: Row(children: [
-                  if (ok > 0) Expanded(flex: ok, child: Container(color: Colors.green.shade600)),
-                  if (soon > 0) Expanded(flex: soon, child: Container(color: Colors.orange.shade700)),
-                  if (bad > 0) Expanded(flex: bad, child: Container(color: Colors.red.shade700)),
-                ]),
-              ),
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 6),
-      Text('$ok fresh · $soon use soon · $bad expired', style: const TextStyle(color: Colors.black54, fontSize: 12)),
-    ]);
-  }
-
-  Widget _expiryCard(PantryItem it, int i) => Appear(
-        index: i,
-        child: SizedBox(
-          width: 138,
-          child: Glass(
-            padding: const EdgeInsets.all(12),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Stack(alignment: Alignment.center, children: [
-                SizedBox(width: 56, height: 56, child: TweenAnimationBuilder<double>(tween: Tween(end: it.fresh), duration: const Duration(milliseconds: 900), builder: (_, v, __) => CustomPaint(painter: RingPainter(v, it.color, 5)))),
-                Text(it.food.emoji, style: const TextStyle(fontSize: 26)),
-              ]),
-              const SizedBox(height: 8),
-              Text(it.food.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text(it.status, style: TextStyle(color: it.color, fontWeight: FontWeight.bold, fontSize: 12)),
-              const Spacer(),
-              Row(children: [
-                IconButton(visualDensity: VisualDensity.compact, padding: EdgeInsets.zero, constraints: const BoxConstraints(minWidth: 40, minHeight: 32), icon: const Icon(Icons.restaurant, color: burgundy, size: 20), onPressed: () => eatSheet(context, state, it)),
-                IconButton(visualDensity: VisualDensity.compact, padding: EdgeInsets.zero, constraints: const BoxConstraints(minWidth: 40, minHeight: 32), icon: const Icon(Icons.delete_outline, size: 20), onPressed: () => state.throwAway(it)),
-              ]),
-            ]),
-          ),
-        ),
-      );
-
-  @override
-  Widget build(BuildContext context) {
-    final hr = now().hour;
-    final greet = hr < 5 ? 'Good night' : hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
-    final exp = state.expiringSoon;
-    final today = state.log.where((e) => e.day == dayShift).toList();
-    return Stack(children: [
-      const Positioned.fill(child: LiquidBg()),
-      SafeArea(
-        child: ListView(
-          controller: sc,
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+    final bad = p.where((e) => e.daysLeft < 0).length, soon = p.where((e) => e.daysLeft >= 0 && e.daysLeft <= 2).length, ok = p.length - bad - soon;
+    return GestureDetector(
+      onTap: () => widget.onTab(2),
+      child: Glass(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Appear(
-              child: Row(children: [
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(greet, style: const TextStyle(color: Colors.black54)),
-                    Text('${state.name} 👋', maxLines: 1, overflow: TextOverflow.ellipsis, style: titleStyle),
-                  ]),
-                ),
-                Glass(radius: 20, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), child: Row(children: [Pulse(child: const Text('🔥', style: TextStyle(fontSize: 18))), const SizedBox(width: 4), Text('${state.streakDays}d', style: const TextStyle(fontWeight: FontWeight.bold))])),
-                const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: () => Navigator.push(context, fadeSlide(ProfilePage(state: state, ai: widget.ai))),
-                  child: CircleAvatar(backgroundColor: burgundy, child: Text(state.name.isEmpty ? '?' : state.name[0].toUpperCase(), style: const TextStyle(color: Colors.white))),
-                ),
-              ]),
+            Row(
+              children: [
+                const Text('Fridge health', style: headStyle),
+                const Spacer(),
+                Text('${p.length} items  ›', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+              ],
             ),
-            Appear(
-              index: 1,
-              child: AnimatedBuilder(
-                animation: sc,
-                builder: (_, child) {
-                  final o = sc.hasClients ? sc.offset.clamp(0.0, 400.0).toDouble() : 0.0;
-                  return Transform.translate(offset: Offset(0, o * 0.22), child: Transform.scale(scale: 1 - o / 1800, child: child));
-                },
-                child: _hero(),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Appear(index: 2, child: _week()),
-            const SizedBox(height: 12),
-            Appear(
-              index: 3,
-              child: Row(children: [
-                QuickTile(emoji: '🌍', label: 'Impact', onTap: (c) => Navigator.push(c, circleReveal(ImpactPage(state: state), centerOf(c)))),
-                QuickTile(emoji: '🛒', label: 'Shopping', badge: state.shopping.length, onTap: (c) => Navigator.push(c, circleReveal(ShoppingPage(state: state), centerOf(c)))),
-                QuickTile(emoji: '⚖️', label: 'Weight', onTap: (c) => Navigator.push(c, circleReveal(WeightPage(state: state), centerOf(c)))),
-                QuickTile(emoji: '🏆', label: '${state.unlocked.length}/${medals.length}', onTap: (c) => Navigator.push(c, circleReveal(MedalsPage(state: state), centerOf(c)))),
-              ]),
-            ),
-            const SizedBox(height: 12),
-            Appear(
-              index: 4,
-              child: GestureDetector(
-                onTap: state.nextTip,
-                child: Glass(
-                  child: Row(children: [
-                    const Text('💡', style: TextStyle(fontSize: 26)),
-                    const SizedBox(width: 12),
-                    Expanded(child: AnimatedSwitcher(duration: const Duration(milliseconds: 400), child: Text(tips[state.tipIndex % tips.length], key: ValueKey(state.tipIndex), style: const TextStyle(color: Colors.black87)))),
-                  ]),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Appear(index: 5, child: Row(children: [const Text('Fridge health', style: headStyle), const Spacer(), Text('${state.pantry.length} items', style: const TextStyle(color: Colors.black54, fontSize: 12))])),
-            const SizedBox(height: 8),
-            Appear(index: 5, child: _health()),
-            const SizedBox(height: 14),
-            if (exp.isNotEmpty) ...[
-              const Text('Use these first ⚠️', style: headStyle),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 176,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: exp.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
-                  itemBuilder: (_, i) => _expiryCard(exp[i], i),
-                ),
-              ),
-              const SizedBox(height: 14),
-            ],
-            const Text('Consumed today', style: headStyle),
-            const SizedBox(height: 8),
-            if (today.isEmpty) const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('Nothing eaten yet. Mark a product as eaten!', style: TextStyle(color: Colors.black45)))),
-            for (final e in today)
-              Dismissible(
-                key: ValueKey('log_${e.id}'),
-                onDismissed: (_) => state.removeLog(e),
-                background: Container(color: Colors.red.shade900, alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 20), child: const Icon(Icons.delete, color: Colors.white)),
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Glass(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Text(e.emoji, style: const TextStyle(fontSize: 24)),
-                      title: Text(e.name),
-                      trailing: Text('${e.kcal} kcal', style: const TextStyle(fontWeight: FontWeight.bold, color: burgundy)),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 1),
+                duration: const Duration(milliseconds: 900),
+                curve: Curves.easeOutCubic,
+                builder: (_, v, _) => Align(
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: v,
+                    child: SizedBox(
+                      height: 10,
+                      child: Row(
+                        children: [
+                          if (ok > 0)
+                            Expanded(
+                              flex: ok,
+                              child: Container(color: Colors.green.shade600),
+                            ),
+                          if (soon > 0)
+                            Expanded(
+                              flex: soon,
+                              child: Container(color: Colors.orange.shade700),
+                            ),
+                          if (bad > 0)
+                            Expanded(
+                              flex: bad,
+                              child: Container(color: Colors.red.shade700),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(spacing: 14, children: [_dot(Colors.green.shade600, '$ok fresh'), _dot(Colors.orange.shade700, '$soon use soon'), _dot(Colors.red.shade700, '$bad expired')]),
           ],
         ),
       ),
-    ]);
+    );
   }
+
+  Widget _dot(Color c, String t) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 5),
+      Text(t, style: const TextStyle(color: Colors.black54, fontSize: 12)),
+    ],
+  );
+
+  Widget _emptyFridge() => Glass(
+    child: Column(
+      children: [
+        const NutrikSays(text: 'Your fridge is empty! Add what you bought — or load a demo fridge to see how food rescue works.', size: 78),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: burgundy, minimumSize: const Size(0, 46)),
+                onPressed: state.loadDemo,
+                icon: const Icon(Icons.auto_awesome, size: 18),
+                label: const Text('Demo fridge'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: burgundy,
+                  minimumSize: const Size(0, 46),
+                  side: const BorderSide(color: burgundy),
+                ),
+                onPressed: () => widget.onTab(1),
+                icon: const Icon(Icons.search, size: 18),
+                label: const Text('Add products'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+
+  Widget _expiryCard(PantryItem it, int i) => Appear(
+    index: i,
+    child: SizedBox(
+      width: 146,
+      child: GestureDetector(
+        onTap: () => itemSheet(context, state, it),
+        child: Glass(
+          padding: const EdgeInsets.all(12),
+          tint: it.daysLeft < 0 ? const Color(0xFFFFE0E0) : null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox(
+                    width: 56,
+                    height: 56,
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(end: it.fresh),
+                      duration: const Duration(milliseconds: 900),
+                      builder: (_, v, _) => CustomPaint(painter: RingPainter(v, it.color, 5)),
+                    ),
+                  ),
+                  Text(it.food.emoji, style: const TextStyle(fontSize: 26)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                it.food.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text(
+                it.status,
+                style: TextStyle(color: it.color, fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              const Spacer(),
+              Row(
+                children: [
+                  _mini(Icons.restaurant, burgundy, 'Eat', () => eatSheet(context, state, it)),
+                  if (it.daysLeft >= 0 && canFreeze(it.food) && it.storage != Storage.freezer) _mini(Icons.ac_unit, Colors.blue.shade700, 'Freeze', () => freezeWithSnack(context, state, it)),
+                  _mini(Icons.delete_outline, Colors.black54, 'Throw away', () => throwSheet(context, state, it)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _mini(IconData i, Color c, String tip, VoidCallback f) => IconButton(
+    tooltip: tip,
+    visualDensity: VisualDensity.compact,
+    padding: EdgeInsets.zero,
+    constraints: const BoxConstraints(minWidth: 38, minHeight: 32),
+    icon: Icon(i, color: c, size: 20),
+    onPressed: f,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final hr = now().hour;
+    final greet = hr < 5
+        ? 'Hello, night owl'
+        : hr < 12
+        ? 'Good morning'
+        : hr < 18
+        ? 'Good afternoon'
+        : 'Good evening';
+    final exp = state.expiringSoon;
+    final today = state.log.where((e) => e.day == dayShift).toList();
+    return Stack(
+      children: [
+        const Positioned.fill(child: LiquidBg()),
+        SafeArea(
+          child: ListView(
+            controller: sc,
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+            children: [
+              Appear(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(greet, style: const TextStyle(color: Colors.black54)),
+                          Text('${state.name} 👋', maxLines: 1, overflow: TextOverflow.ellipsis, style: titleStyle),
+                        ],
+                      ),
+                    ),
+                    Tooltip(
+                      message: 'Days without throwing food away',
+                      child: Glass(
+                        radius: 20,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        child: Row(
+                          children: [
+                            Pulse(child: const Text('🔥', style: TextStyle(fontSize: 18))),
+                            const SizedBox(width: 4),
+                            Text('${state.streakDays}d', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, fadeSlide(ProfilePage(state: state, ai: widget.ai))),
+                      child: CircleAvatar(
+                        backgroundColor: burgundy,
+                        child: Text(state.name.isEmpty ? '?' : state.name[0].toUpperCase(), style: const TextStyle(color: Colors.white)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Appear(
+                index: 1,
+                child: AnimatedBuilder(
+                  animation: sc,
+                  builder: (_, child) {
+                    final o = sc.hasClients ? sc.offset.clamp(0.0, 400.0).toDouble() : 0.0;
+                    return Opacity(
+                      opacity: (1 - o / 700).clamp(0.4, 1.0).toDouble(),
+                      child: Transform.scale(scale: 1 - o / 2400, child: child),
+                    );
+                  },
+                  child: KeyedSubtree(key: Tour.hero, child: _hero()),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (state.pantry.isEmpty) Appear(index: 2, child: _emptyFridge()),
+              if (exp.isNotEmpty) ...[
+                Appear(
+                  index: 2,
+                  child: Row(
+                    children: [
+                      const Text('Use these first ⚠️', style: headStyle),
+                      const Spacer(),
+                      Text('tap for options', style: TextStyle(color: Colors.black.withValues(alpha: 0.4), fontSize: 12)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  key: Tour.useFirst,
+                  height: 182,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    clipBehavior: Clip.none,
+                    itemCount: exp.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 10),
+                    itemBuilder: (_, i) => _expiryCard(exp[i], i),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Appear(
+                index: 3,
+                child: Row(
+                  key: Tour.tiles,
+                  children: [
+                    QuickTile(
+                      emoji: '🌍',
+                      label: 'Impact',
+                      onTap: (c) => Navigator.push(c, circleReveal(ImpactPage(state: state), centerOf(c))),
+                    ),
+                    QuickTile(
+                      emoji: '🛒',
+                      label: 'Shopping',
+                      badge: state.shopping.length,
+                      onTap: (c) => Navigator.push(c, circleReveal(ShoppingPage(state: state), centerOf(c))),
+                    ),
+                    QuickTile(
+                      emoji: '⚖️',
+                      label: 'Weight',
+                      onTap: (c) => Navigator.push(c, circleReveal(WeightPage(state: state), centerOf(c))),
+                    ),
+                    QuickTile(
+                      emoji: '🏆',
+                      label: '${state.unlocked.length}/${medals.length}',
+                      onTap: (c) => Navigator.push(c, circleReveal(MedalsPage(state: state), centerOf(c))),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (state.pantry.isNotEmpty) ...[Appear(index: 4, child: _health()), const SizedBox(height: 12)],
+              Appear(
+                index: 5,
+                child: GestureDetector(
+                  onTap: state.nextTip,
+                  child: Glass(
+                    child: Row(
+                      children: [
+                        const Text('💡', style: TextStyle(fontSize: 26)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 400),
+                            child: Text(
+                              tips[state.tipIndex % tips.length],
+                              key: ValueKey(state.tipIndex),
+                              style: const TextStyle(color: Colors.black87),
+                            ),
+                          ),
+                        ),
+                        const Icon(Icons.refresh, size: 18, color: Colors.black38),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Appear(index: 6, child: _calories()),
+              const SizedBox(height: 16),
+              const Text('Eaten today', style: headStyle),
+              const SizedBox(height: 8),
+              if (today.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(
+                    child: Text('Nothing eaten yet. Tap a product, then Eat.', style: TextStyle(color: Colors.black45)),
+                  ),
+                ),
+              for (final e in today)
+                Dismissible(
+                  key: ValueKey('log_${e.id}'),
+                  direction: DismissDirection.endToStart,
+                  onDismissed: (_) => state.removeLog(e),
+                  background: Container(
+                    color: Colors.red.shade900,
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    child: const Icon(Icons.delete, color: Colors.white),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Glass(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Text(e.emoji, style: const TextStyle(fontSize: 24)),
+                        title: Text(e.name),
+                        trailing: Text(
+                          '${e.kcal} kcal',
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: burgundy),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ───────────────────────── ДЕЙСТВИЯ С ПРОДУКТОМ (шторки) ─────────────────────────
+
+const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+String fmtDate(DateTime d) => '${d.day} ${_months[d.month - 1]}';
+
+void _snack(ScaffoldMessengerState m, String text, {Color color = burgundy}) => m
+  ..hideCurrentSnackBar()
+  ..showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: color, duration: const Duration(milliseconds: 2600), content: Text(text)));
+
+void freezeWithSnack(BuildContext ctx, AppState s, PantryItem p) {
+  s.freeze(p);
+  _snack(ScaffoldMessenger.of(ctx), '❄️ ${p.food.name} frozen — good until ${fmtDate(p.expiry)}', color: Colors.blue.shade800);
 }
 
 void eatSheet(BuildContext ctx, AppState s, PantryItem p) {
@@ -2715,29 +5572,272 @@ void eatSheet(BuildContext ctx, AppState s, PantryItem p) {
     backgroundColor: cream,
     showDragHandle: true,
     builder: (_) => StatefulBuilder(
-      builder: (c, set) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('${p.food.emoji} ${p.food.name}', style: titleStyle),
-          const SizedBox(height: 4),
-          const Text('How much did you eat?'),
-          Slider(value: g, min: 10, max: 500, divisions: 49, label: '${g.round()} g', onChanged: (v) => set(() => g = v)),
-          Text('${g.round()} g · ${(p.food.kcal * g / 100).round()} kcal', style: const TextStyle(fontWeight: FontWeight.bold, color: burgundy)),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: burgundy),
-              onPressed: () {
-                s.eat(p, g.round());
-                Navigator.pop(c);
-              },
-              child: const Text('Mark as eaten (finished)'),
-            ),
+      builder: (c, set) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('${p.food.emoji} ${p.food.name}', style: titleStyle),
+              const SizedBox(height: 4),
+              const Text('How much did you eat?'),
+              Slider(value: g, min: 10, max: 500, divisions: 49, label: '${g.round()} g', onChanged: (v) => set(() => g = v)),
+              Text(
+                '${g.round()} g · ${(p.food.kcal * g / 100).round()} kcal',
+                style: const TextStyle(fontWeight: FontWeight.bold, color: burgundy),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: burgundy),
+                  onPressed: () {
+                    s.eat(p, g.round());
+                    Navigator.pop(c);
+                  },
+                  child: const Text('Finished it 🎉'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: burgundy,
+                    side: const BorderSide(color: burgundy),
+                  ),
+                  onPressed: () {
+                    s.eat(p, g.round(), finished: false);
+                    Navigator.pop(c);
+                  },
+                  child: const Text('Ate some — keep the rest'),
+                ),
+              ),
+            ],
           ),
-        ]),
+        ),
       ),
     ),
+  );
+}
+
+/// Выбор причины выброса: копит статистику и сразу даёт совет на будущее.
+void throwSheet(BuildContext ctx, AppState s, PantryItem p) {
+  final m = ScaffoldMessenger.of(ctx);
+  showModalBottomSheet(
+    context: ctx,
+    backgroundColor: cream,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (c) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${p.food.emoji} Why does ${p.food.name} go to the bin?', style: headStyle),
+            const SizedBox(height: 4),
+            const Text('An honest answer helps Nutrik give you better tips 💛', style: TextStyle(color: Colors.black54, fontSize: 12)),
+            const SizedBox(height: 12),
+            for (final r in WasteReason.values)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: sand,
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () {
+                      Navigator.pop(c);
+                      s.throwAway(p, r);
+                      _snack(m, '💡 ${reasonInfo[r]!.$3}', color: Colors.red.shade900);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          Text(reasonInfo[r]!.$1, style: const TextStyle(fontSize: 22)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(reasonInfo[r]!.$2, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                          const Icon(Icons.chevron_right, color: Colors.black38),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (p.daysLeft >= 0 && canFreeze(p.food) && p.storage != Storage.freezer)
+              Center(
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: Colors.blue.shade800),
+                  onPressed: () {
+                    Navigator.pop(c);
+                    s.freeze(p);
+                    _snack(m, '❄️ Saved! ${p.food.name} is in the freezer until ${fmtDate(p.expiry)}', color: Colors.blue.shade800);
+                  },
+                  icon: const Icon(Icons.ac_unit),
+                  label: const Text('Wait! Freeze it instead (+90 days)'),
+                ),
+              ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// Карточка продукта со всеми действиями: съесть, приготовить, заморозить, отдать, сменить дату, выбросить.
+void itemSheet(BuildContext ctx, AppState s, PantryItem p) {
+  final m = ScaffoldMessenger.of(ctx);
+  final recs = recipes.where((r) => r.ingredients.any((i) => i.name == p.food.name)).take(4).toList();
+  final tip = storageTips[p.food.name] ?? storageTips[p.food.category];
+  final freezable = p.daysLeft >= 0 && canFreeze(p.food) && p.storage != Storage.freezer;
+  showModalBottomSheet(
+    context: ctx,
+    backgroundColor: cream,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (c) {
+      Widget act(String emoji, String label, VoidCallback? f, {Color? color}) => Expanded(
+        child: Opacity(
+          opacity: f == null ? 0.4 : 1,
+          child: Material(
+            color: color ?? Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: f == null
+                  ? null
+                  : () {
+                      Navigator.pop(c);
+                      f();
+                    },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Column(
+                  children: [
+                    Text(emoji, style: const TextStyle(fontSize: 22)),
+                    const SizedBox(height: 2),
+                    Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      return SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(p.food.emoji, style: const TextStyle(fontSize: 44)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(p.food.name, style: titleStyle),
+                        Text('${storageLabel[p.storage]} · ${p.food.kcal} kcal/100 g', style: const TextStyle(color: Colors.black54)),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(color: p.color, borderRadius: BorderRadius.circular(20)),
+                    child: Text(
+                      p.status,
+                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(value: p.fresh, minHeight: 8, color: p.color, backgroundColor: Colors.black12),
+              ),
+              const SizedBox(height: 6),
+              Text('Added ${fmtDate(p.added)} · good until ${fmtDate(p.expiry)}', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+              if (tip != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: sand, borderRadius: BorderRadius.circular(14)),
+                  child: Text('💡 Storage: $tip', style: const TextStyle(fontSize: 13)),
+                ),
+              ],
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  act('🍽️', 'Eat', () => eatSheet(ctx, s, p)),
+                  const SizedBox(width: 8),
+                  act('❄️', 'Freeze', freezable ? () => freezeWithSnack(ctx, s, p) : null, color: const Color(0xFFE3F0FB)),
+                  const SizedBox(width: 8),
+                  act('🤝', 'Share', () {
+                    s.share(p);
+                    _snack(m, '🤝 ${p.food.name} shared — food rescued, neighbor happy!');
+                  }, color: const Color(0xFFE8EFE0)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  act('📅', 'Change date', () async {
+                    final d = await showDatePicker(
+                      context: ctx,
+                      initialDate: p.expiry,
+                      firstDate: now().subtract(const Duration(days: 60)),
+                      lastDate: now().add(const Duration(days: 730)),
+                      helpText: 'Date on the package',
+                    );
+                    if (d != null) s.setExpiry(p, d);
+                  }),
+                  const SizedBox(width: 8),
+                  act(
+                    p.storage == Storage.pantry ? '🧊' : '🫙',
+                    p.storage == Storage.pantry ? 'To fridge' : 'To pantry',
+                    p.storage == Storage.freezer ? null : () => s.moveTo(p, p.storage == Storage.pantry ? Storage.fridge : Storage.pantry),
+                  ),
+                  const SizedBox(width: 8),
+                  act('🗑️', 'Throw away', () => throwSheet(ctx, s, p), color: const Color(0xFFFBE3E3)),
+                ],
+              ),
+              if (recs.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Text('Cook it into...', style: headStyle),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final r in recs)
+                      ActionChip(
+                        avatar: Text(r.emoji),
+                        label: Text(r.name),
+                        onPressed: () {
+                          Navigator.pop(c);
+                          Navigator.push(ctx, fadeSlide(RecipePage(state: s, recipe: r)));
+                        },
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    },
   );
 }
 
@@ -2748,28 +5848,90 @@ class PantryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: sand,
-      elevation: 0,
-      child: ListTile(
-        leading: Text(item.food.emoji, style: const TextStyle(fontSize: 26)),
-        title: Text(item.food.name),
-        subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(item.status, style: TextStyle(color: item.color, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(end: item.fresh),
-              duration: const Duration(milliseconds: 700),
-              builder: (_, v, __) => LinearProgressIndicator(value: v, minHeight: 5, color: item.color, backgroundColor: Colors.black12),
+    Widget bg(Color c, IconData i, String t, Alignment a) => Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      alignment: a,
+      decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(18)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(i, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            t,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+    return Dismissible(
+      key: ValueKey('tile${item.id}'),
+      background: bg(Colors.green.shade700, Icons.restaurant, 'Eat', Alignment.centerLeft),
+      secondaryBackground: bg(Colors.red.shade800, Icons.delete_outline, 'Throw away', Alignment.centerRight),
+      confirmDismiss: (d) async {
+        d == DismissDirection.startToEnd ? eatSheet(context, state, item) : throwSheet(context, state, item);
+        return false;
+      },
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: GestureDetector(
+          onTap: () => itemSheet(context, state, item),
+          child: Glass(
+            radius: 18,
+            padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+            tint: item.daysLeft < 0 ? const Color(0xFFFFE0E0) : null,
+            child: Row(
+              children: [
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(end: item.fresh),
+                        duration: const Duration(milliseconds: 800),
+                        builder: (_, v, _) => CustomPaint(painter: RingPainter(v, item.color, 4)),
+                      ),
+                    ),
+                    Text(item.food.emoji, style: const TextStyle(fontSize: 22)),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.food.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Text(
+                            item.status,
+                            style: TextStyle(color: item.color, fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                          Text('  ·  ${storageLabel[item.storage]}', style: const TextStyle(color: Colors.black45, fontSize: 12)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Eat',
+                  icon: const Icon(Icons.restaurant, color: burgundy),
+                  onPressed: () => eatSheet(context, state, item),
+                ),
+                const Icon(Icons.more_vert, color: Colors.black38),
+              ],
             ),
           ),
-        ]),
-        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-          IconButton(tooltip: 'Eat', icon: const Icon(Icons.restaurant, color: burgundy), onPressed: () => eatSheet(context, state, item)),
-          IconButton(tooltip: 'Throw away', icon: const Icon(Icons.delete_outline), onPressed: () => state.throwAway(item)),
-        ]),
+        ),
       ),
     );
   }
@@ -2814,63 +5976,81 @@ class _SearchPageState extends State<SearchPage> {
     widget.state.add(f);
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: burgundy,
-        duration: const Duration(milliseconds: 1500),
-        content: Text('${f.emoji} ${f.name} added · fresh for ${f.shelf} days'),
-      ));
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: burgundy,
+          duration: const Duration(milliseconds: 1500),
+          content: Text('${f.emoji} ${f.name} added · stays fresh for ${f.shelf} ${f.shelf == 1 ? 'day' : 'days'}'),
+        ),
+      );
   }
 
   Widget _chip(String label, String? value) => Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: ChoiceChip(
-          label: Text(value == null ? label : '${catEmoji[value]} $label'),
-          selected: cat == value,
-          selectedColor: burgundy,
-          labelStyle: TextStyle(color: cat == value ? Colors.white : Colors.black87),
-          showCheckmark: false,
-          onSelected: (_) => setState(() => cat = value),
-        ),
-      );
+    padding: const EdgeInsets.only(right: 8),
+    child: ChoiceChip(
+      label: Text(value == null ? label : '${catEmoji[value]} $label'),
+      selected: cat == value,
+      selectedColor: burgundy,
+      labelStyle: TextStyle(color: cat == value ? Colors.white : Colors.black87),
+      showCheckmark: false,
+      onSelected: (_) => setState(() => cat = value),
+    ),
+  );
 
   Widget _grid() => GridView.count(
-        key: const ValueKey('grid'),
-        crossAxisCount: 2,
-        childAspectRatio: 2.3,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        children: [
-          for (var i = 0; i < categories.length; i++)
-            Appear(
-              index: i,
-              child: Material(
-                color: sand,
-                borderRadius: BorderRadius.circular(16),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () => setState(() => cat = categories[i]),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Row(children: [
-                      Text(catEmoji[categories[i]] ?? '🍽️', style: const TextStyle(fontSize: 26)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(categories[i], maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+    key: const ValueKey('grid'),
+    padding: const EdgeInsets.only(bottom: 120),
+    crossAxisCount: 2,
+    childAspectRatio: 2.3,
+    mainAxisSpacing: 10,
+    crossAxisSpacing: 10,
+    children: [
+      for (var i = 0; i < categories.length; i++)
+        Appear(
+          index: i,
+          child: Material(
+            color: sand,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => setState(() => cat = categories[i]),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Text(catEmoji[categories[i]] ?? '🍽️', style: const TextStyle(fontSize: 26)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            categories[i],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
                           Text('${foodDatabase.where((f) => f.category == categories[i]).length} products', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                        ]),
+                        ],
                       ),
-                    ]),
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
-        ],
-      );
+          ),
+        ),
+    ],
+  );
 
   Widget _list(List<FoodItem> res) {
-    if (res.isEmpty) return Center(key: const ValueKey('none'), child: Text('Nothing found for "$q"', style: const TextStyle(color: Colors.grey)));
+    if (res.isEmpty)
+      return Center(
+        key: const ValueKey('none'),
+        child: Text('Nothing found for "$q"', style: const TextStyle(color: Colors.grey)),
+      );
     final count = <String, int>{};
     for (final p in widget.state.pantry) {
       count[p.food.name] = (count[p.food.name] ?? 0) + 1;
@@ -2879,29 +6059,36 @@ class _SearchPageState extends State<SearchPage> {
     final related = q.trim().isEmpty ? <FoodItem>[] : foodDatabase.where((f) => f.category == res.first.category && !ids.contains(f.name)).take(6).toList();
     return ListView.builder(
       key: const ValueKey('list'),
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 120),
       itemCount: res.length + 1,
       itemBuilder: (context, i) {
         if (i == res.length) {
           if (related.isEmpty) return const SizedBox.shrink();
           return Padding(
             padding: const EdgeInsets.only(top: 10),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('You may also like', style: headStyle),
-              const SizedBox(height: 8),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                for (final f in related)
-                  ActionChip(
-                    avatar: Text(f.emoji),
-                    label: Text(f.name),
-                    onPressed: () => setState(() {
-                      _c.text = f.name;
-                      _c.selection = TextSelection.collapsed(offset: f.name.length);
-                      q = f.name;
-                    }),
-                  ),
-              ]),
-            ]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('You may also like', style: headStyle),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final f in related)
+                      ActionChip(
+                        avatar: Text(f.emoji),
+                        label: Text(f.name),
+                        onPressed: () => setState(() {
+                          _c.text = f.name;
+                          _c.selection = TextSelection.collapsed(offset: f.name.length);
+                          q = f.name;
+                        }),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           );
         }
         final f = res[i];
@@ -2913,8 +6100,11 @@ class _SearchPageState extends State<SearchPage> {
           child: ListTile(
             leading: Text(f.emoji, style: const TextStyle(fontSize: 26)),
             title: Text(f.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('${f.category} · ${f.kcal} kcal/100 g · keeps ${f.shelf} d${n > 0 ? ' · in fridge ×$n' : ''}'),
-            trailing: IconButton(icon: const Icon(Icons.add_circle, color: burgundy, size: 30), onPressed: () => _add(f)),
+            subtitle: Text('${f.kcal} kcal/100 g · keeps ${f.shelf} d · ${storageLabel[defaultStorage(f)]}${n > 0 ? '\n✓ in fridge ×$n' : ''}', style: const TextStyle(fontSize: 12)),
+            trailing: IconButton(
+              icon: const Icon(Icons.add_circle, color: burgundy, size: 30),
+              onPressed: () => _add(f),
+            ),
           ),
         );
       },
@@ -2927,33 +6117,42 @@ class _SearchPageState extends State<SearchPage> {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Search products', style: titleStyle),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _c,
-            onChanged: (v) => setState(() => q = v),
-            decoration: InputDecoration(
-              hintText: 'Try "cheese", "potato", "kefir"...',
-              prefixIcon: const Icon(Icons.search, color: burgundy),
-              suffixIcon: q.isEmpty
-                  ? null
-                  : IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () {
-                        _c.clear();
-                        setState(() => q = '');
-                      }),
-              filled: true,
-              fillColor: sand,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Search products', style: titleStyle),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _c,
+              onChanged: (v) => setState(() => q = v),
+              decoration: InputDecoration(
+                hintText: 'Try "cheese", "potato", "kefir"...',
+                prefixIcon: const Icon(Icons.search, color: burgundy),
+                suffixIcon: q.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          _c.clear();
+                          setState(() => q = '');
+                        },
+                      ),
+                filled: true,
+                fillColor: sand,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(height: 40, child: ListView(scrollDirection: Axis.horizontal, children: [_chip('All', null), ...categories.map((c) => _chip(c, c))])),
-          const SizedBox(height: 8),
-          Expanded(child: AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: showGrid ? _grid() : _list(results))),
-        ]),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 40,
+              child: ListView(scrollDirection: Axis.horizontal, children: [_chip('All', null), ...categories.map((c) => _chip(c, c))]),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: showGrid ? _grid() : _list(results)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2961,40 +6160,124 @@ class _SearchPageState extends State<SearchPage> {
 
 // ───────────────────────── FRIDGE ─────────────────────────
 
-class PantryPage extends StatelessWidget {
+class PantryPage extends StatefulWidget {
   final AppState state;
   final VoidCallback onSearch;
   const PantryPage({super.key, required this.state, required this.onSearch});
+  @override
+  State<PantryPage> createState() => _PantryPageState();
+}
+
+class _PantryPageState extends State<PantryPage> {
+  Storage? place;
+
+  Widget _chip(String label, Storage? v, int n) => Padding(
+    padding: const EdgeInsets.only(right: 8),
+    child: ChoiceChip(
+      label: Text('$label  $n'),
+      selected: place == v,
+      selectedColor: burgundy,
+      labelStyle: TextStyle(color: place == v ? Colors.white : Colors.black87),
+      showCheckmark: false,
+      onSelected: (_) => setState(() => place = v),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
-    final items = [...state.pantry]..sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
-    final bad = items.where((p) => p.daysLeft <= 0).length;
-    final soon = items.where((p) => p.daysLeft > 0 && p.daysLeft <= 2).length;
+    final s = widget.state;
+    final all = [...s.pantry]..sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
+    final items = all.where((p) => place == null || p.storage == place).toList();
+    final groups = <(String, String, List<PantryItem>)>[
+      ('☠️', 'Expired', items.where((p) => p.daysLeft < 0).toList()),
+      ('🔥', 'Use today or tomorrow', items.where((p) => p.daysLeft >= 0 && p.daysLeft <= 1).toList()),
+      ('⏳', 'This week', items.where((p) => p.daysLeft >= 2 && p.daysLeft <= 7).toList()),
+      ('✅', 'Fresh', items.where((p) => p.daysLeft > 7).toList()),
+    ];
+    var idx = 0;
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Your fridge', style: titleStyle),
-          const SizedBox(height: 4),
-          Text('${items.length} products · $soon expiring soon · $bad expired', style: TextStyle(color: Colors.grey.shade700)),
-          const SizedBox(height: 12),
-          Expanded(
-            child: items.isEmpty
-                ? Center(
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      const Text('🧊', style: TextStyle(fontSize: 56)),
-                      const SizedBox(height: 8),
-                      const Text('Fridge is empty', style: TextStyle(color: Colors.grey)),
-                      const SizedBox(height: 12),
-                      FilledButton.icon(style: FilledButton.styleFrom(backgroundColor: burgundy), onPressed: onSearch, icon: const Icon(Icons.search), label: const Text('Find products')),
-                    ]),
-                  )
-                : ListView(children: [
-                    for (final e in items.asMap().entries) Appear(key: ValueKey('p${e.value.id}'), index: e.key, child: PantryTile(item: e.value, state: state)),
-                  ]),
-          ),
-        ]),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(child: Text('Your fridge', style: titleStyle)),
+                if (all.isNotEmpty) IconButton.filledTonal(tooltip: 'Add products', onPressed: widget.onSearch, icon: const Icon(Icons.add)),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text('${all.length} products · swipe → eat, ← throw away · tap for more', style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
+            const SizedBox(height: 10),
+            if (all.isNotEmpty)
+              SizedBox(
+                key: Tour.fridgeTop,
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [_chip('All', null, all.length), for (final st in Storage.values) _chip(storageLabel[st]!, st, all.where((p) => p.storage == st).length)],
+                ),
+              ),
+            const SizedBox(height: 6),
+            Expanded(
+              child: all.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('🧊', style: TextStyle(fontSize: 56)),
+                          const SizedBox(height: 8),
+                          const Text('Fridge is empty', style: TextStyle(color: Colors.grey)),
+                          const SizedBox(height: 12),
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(backgroundColor: burgundy),
+                            onPressed: widget.onSearch,
+                            icon: const Icon(Icons.search),
+                            label: const Text('Find products'),
+                          ),
+                          TextButton.icon(
+                            onPressed: s.loadDemo,
+                            icon: const Icon(Icons.auto_awesome, color: burgundy),
+                            label: const Text('Load demo fridge', style: TextStyle(color: burgundy)),
+                          ),
+                        ],
+                      ),
+                    )
+                  : items.isEmpty
+                  ? const Center(
+                      child: Text('Nothing stored here yet', style: TextStyle(color: Colors.grey)),
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.only(bottom: 120),
+                      children: [
+                        for (final g in groups)
+                          if (g.$3.isNotEmpty) ...[
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
+                              child: Row(
+                                children: [
+                                  Text('${g.$1}  ${g.$2}', style: headStyle),
+                                  const Spacer(),
+                                  Text(
+                                    '${g.$3.length}',
+                                    style: const TextStyle(color: Colors.black45, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            for (final p in g.$3)
+                              Appear(
+                                key: ValueKey('p${p.id}'),
+                                index: idx++,
+                                child: PantryTile(item: p, state: s),
+                              ),
+                          ],
+                      ],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -3002,65 +6285,175 @@ class PantryPage extends StatelessWidget {
 
 // ───────────────────────── RECIPES ─────────────────────────
 
-class RecipesPage extends StatelessWidget {
+class RecipesPage extends StatefulWidget {
   final AppState state;
   const RecipesPage({super.key, required this.state});
+  @override
+  State<RecipesPage> createState() => _RecipesPageState();
+}
+
+class _RecipesPageState extends State<RecipesPage> {
+  int filter = 0; // 0 все, 1 спасают продукты, 2 можно готовить, 3 zero-waste
+  static const _filters = ['All', '♻️ Rescue food', '✅ Ready to cook', '🌱 Zero-waste'];
 
   @override
   Widget build(BuildContext context) {
+    final state = widget.state;
     final names = state.pantryNames;
-    final expNames = state.expiringSoon.map((e) => e.food.name).toSet();
+    final expNames = state.toRescue.map((e) => e.food.name).toSet();
     var list = rankRecipes(state);
     var hidden = 0;
-    if (state.pantry.isNotEmpty) {
+    if (state.pantry.isNotEmpty && filter != 3) {
       final all = list.length;
       list = list.where((r) => r.ingredients.any((i) => names.contains(i.name))).toList();
       hidden = all - list.length;
     }
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('Recipes from your fridge', style: titleStyle), backgroundColor: Colors.transparent),
-      body: ListView(padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).padding.bottom), children: [
-        if (state.pantry.isEmpty)
-          const Padding(padding: EdgeInsets.only(bottom: 12), child: Text('Your fridge is empty — add products in Search to see what you can cook.', style: TextStyle(color: Colors.grey))),
-        for (final e in list.asMap().entries) _card(context, e.value, e.key, names, expNames),
-        if (hidden > 0) Padding(padding: const EdgeInsets.all(12), child: Center(child: Text('Add more products to unlock $hidden more recipes', style: const TextStyle(color: Colors.grey)))),
-      ]),
+    list = switch (filter) {
+      1 => list.where((r) => r.ingredients.any((i) => expNames.contains(i.name))).toList(),
+      2 => list.where((r) => r.missing(names).isEmpty).toList(),
+      3 => list.where((r) => r.zeroWaste).toList(),
+      _ => list,
+    };
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+        children: [
+          const Text('Recipes', style: titleStyle),
+          const SizedBox(height: 2),
+          Text(
+            state.pantry.isEmpty ? 'Your fridge is empty — add products to see what you can cook.' : 'Sorted so the food that spoils first gets used first.',
+            style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            key: Tour.recipeFilters,
+            height: 40,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                for (var k = 0; k < _filters.length; k++)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(_filters[k]),
+                      selected: filter == k,
+                      selectedColor: burgundy,
+                      labelStyle: TextStyle(color: filter == k ? Colors.white : Colors.black87),
+                      showCheckmark: false,
+                      onSelected: (_) => setState(() => filter = k),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (list.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 24),
+              child: NutrikSays(
+                key: ValueKey(filter),
+                text: filter == 1 ? 'Nothing is about to spoil — nothing to rescue right now! 🎉' : 'No recipes here yet. Add more products to your fridge!',
+                size: 84,
+              ),
+            ),
+          for (final e in list.asMap().entries) _card(context, e.value, e.key, names, expNames),
+          if (hidden > 0 && filter == 0)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Center(
+                child: Text('Add more products to unlock $hidden more recipes', style: const TextStyle(color: Colors.grey)),
+              ),
+            ),
+        ],
+      ),
     );
   }
+
+  Widget _tag(String t, Color c) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+    decoration: BoxDecoration(color: c, borderRadius: BorderRadius.circular(20)),
+    child: Text(
+      t,
+      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+    ),
+  );
 
   Widget _card(BuildContext context, Recipe r, int idx, Set<String> names, Set<String> expNames) {
     final missing = r.missing(names);
     final can = missing.isEmpty;
     final saves = r.ingredients.where((i) => expNames.contains(i.name)).map((i) => i.name).toList();
+    final have = r.ingredients.length - missing.length;
     return Appear(
       key: ValueKey(r.name),
       index: idx,
-      child: Card(
-        color: can ? const Color(0xFFE8EFE0) : sand,
-        margin: const EdgeInsets.only(bottom: 12),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => Navigator.push(context, fadeSlide(RecipePage(state: state, recipe: r))),
-          child: Padding(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: GestureDetector(
+          onTap: () => Navigator.push(context, fadeSlide(RecipePage(state: widget.state, recipe: r))),
+          child: Glass(
+            tint: can ? const Color(0xFFE3F0D8) : null,
             padding: const EdgeInsets.all(16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Flexible(child: Text('${r.emoji} ${r.name}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold))),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: can ? Colors.green.shade800 : Colors.orange.shade800, borderRadius: BorderRadius.circular(20)),
-                  child: Text(can ? 'Ready to cook' : '${r.ingredients.length - missing.length}/${r.ingredients.length} in fridge', style: const TextStyle(color: Colors.white, fontSize: 11)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(16)),
+                      child: Text(r.emoji, style: const TextStyle(fontSize: 28)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(r.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 2),
+                          Text('${r.kcal} kcal · ${r.time} · ${r.servings} serv.', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: have / r.ingredients.length,
+                              minHeight: 5,
+                              color: can ? Colors.green.shade700 : Colors.orange.shade700,
+                              backgroundColor: Colors.black12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ]),
-              const SizedBox(height: 6),
-              Text('${r.kcal} kcal/serving • ${r.time} • ${r.servings} servings', style: const TextStyle(color: Colors.grey)),
-              if (saves.isNotEmpty)
-                Padding(padding: const EdgeInsets.only(top: 4), child: Text('♻️ Saves from waste: ${saves.join(", ")}', style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.bold))),
-              if (missing.isNotEmpty)
-                Padding(padding: const EdgeInsets.only(top: 4), child: Text('Buy: ${missing.join(", ")}', style: TextStyle(color: Colors.red.shade900, fontWeight: FontWeight.bold))),
-            ]),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _tag(can ? 'Ready to cook' : '$have/${r.ingredients.length} in fridge', can ? Colors.green.shade800 : Colors.orange.shade800),
+                    if (r.zeroWaste) _tag('🌱 Zero-waste', const Color(0xFF3C6E71)),
+                    if (saves.isNotEmpty) _tag('♻️ Saves ${saves.length}', burgundy),
+                  ],
+                ),
+                if (saves.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Rescues: ${saves.join(", ")}',
+                      style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
+                if (missing.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text('Need: ${missing.join(", ")}', style: TextStyle(color: Colors.red.shade900, fontSize: 13)),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -3089,69 +6482,95 @@ class _RecipePageState extends State<RecipePage> {
 
     return Scaffold(
       appBar: AppBar(title: Text(r.name, style: headStyle)),
-      body: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 20), children: [
-        Appear(
-          child: Row(children: [
-            Text(r.emoji, style: const TextStyle(fontSize: 52)),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('${r.kcal * portions} kcal total', style: titleStyle),
-                Text('${r.kcal} kcal per serving · ${r.time}', style: const TextStyle(color: Colors.grey)),
-              ]),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        children: [
+          Appear(
+            child: Row(
+              children: [
+                Text(r.emoji, style: const TextStyle(fontSize: 52)),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${r.kcal * portions} kcal total', style: titleStyle),
+                      Text('${r.kcal} kcal per serving · ${r.time}', style: const TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ]),
-        ),
-        const SizedBox(height: 14),
-        Appear(
-          index: 1,
-          child: Row(children: [
-            const Text('Servings', style: headStyle),
-            const Spacer(),
-            IconButton.filledTonal(onPressed: portions > 1 ? () => setState(() => portions--) : null, icon: const Icon(Icons.remove)),
-            SizedBox(
-              width: 40,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
-                child: Text('$portions', key: ValueKey(portions), textAlign: TextAlign.center, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 14),
+          Appear(
+            index: 1,
+            child: Row(
+              children: [
+                const Text('Servings', style: headStyle),
+                const Spacer(),
+                IconButton.filledTonal(onPressed: portions > 1 ? () => setState(() => portions--) : null, icon: const Icon(Icons.remove)),
+                SizedBox(
+                  width: 40,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
+                    child: Text(
+                      '$portions',
+                      key: ValueKey(portions),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                IconButton.filledTonal(onPressed: portions < 12 ? () => setState(() => portions++) : null, icon: const Icon(Icons.add)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text('Ingredients', style: headStyle),
+          const SizedBox(height: 6),
+          for (final e in r.ingredients.asMap().entries)
+            Appear(
+              index: e.key + 2,
+              child: ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(inFridge.containsKey(e.value.name) ? Icons.check_circle : Icons.cancel, color: inFridge.containsKey(e.value.name) ? Colors.green.shade800 : Colors.red.shade800),
+                title: Text('${foodByName[e.value.name]!.emoji} ${e.value.name}'),
+                subtitle: Text(inFridge.containsKey(e.value.name) ? 'in fridge · ${inFridge[e.value.name]!.status}' : 'not in your fridge — add it in Search'),
+                trailing: Text('${(e.value.g * portions / r.servings).round()} g', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ),
             ),
-            IconButton.filledTonal(onPressed: portions < 12 ? () => setState(() => portions++) : null, icon: const Icon(Icons.add)),
-          ]),
-        ),
-        const SizedBox(height: 10),
-        const Text('Ingredients', style: headStyle),
-        const SizedBox(height: 6),
-        for (final e in r.ingredients.asMap().entries)
-          Appear(
-            index: e.key + 2,
-            child: ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(inFridge.containsKey(e.value.name) ? Icons.check_circle : Icons.cancel, color: inFridge.containsKey(e.value.name) ? Colors.green.shade800 : Colors.red.shade800),
-              title: Text('${foodByName[e.value.name]!.emoji} ${e.value.name}'),
-              subtitle: Text(inFridge.containsKey(e.value.name) ? 'in fridge · ${inFridge[e.value.name]!.status}' : 'not in fridge — add it in Search'),
-              trailing: Text('${(e.value.g * portions / r.servings).round()} g', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          if (r.staples.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('Also needed: ${r.staples}', style: const TextStyle(color: Colors.grey)),
             ),
-          ),
-        Padding(padding: const EdgeInsets.only(top: 4), child: Text('Also needed: ${r.staples}', style: const TextStyle(color: Colors.grey))),
-        const SizedBox(height: 18),
-        const Text('Instructions', style: headStyle),
-        const SizedBox(height: 8),
-        for (final e in r.steps.asMap().entries)
-          Appear(
-            index: e.key + 4,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                CircleAvatar(radius: 13, backgroundColor: burgundy, child: Text('${e.key + 1}', style: const TextStyle(color: Colors.white, fontSize: 12))),
-                const SizedBox(width: 12),
-                Expanded(child: Text(e.value, style: const TextStyle(height: 1.35))),
-              ]),
+          const SizedBox(height: 18),
+          const Text('Instructions', style: headStyle),
+          const SizedBox(height: 8),
+          for (final e in r.steps.asMap().entries)
+            Appear(
+              index: e.key + 4,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 13,
+                      backgroundColor: burgundy,
+                      child: Text('${e.key + 1}', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(e.value, style: const TextStyle(height: 1.35))),
+                  ],
+                ),
+              ),
             ),
-          ),
-      ]),
+        ],
+      ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -3163,15 +6582,18 @@ class _RecipePageState extends State<RecipePage> {
                   ? () {
                       s.cook(r, portions);
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: burgundy,
-                        content: Text('Bon appétit! ${r.kcal * portions} kcal logged, ingredients used up.'),
-                      ));
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: burgundy, content: Text('Bon appétit! ${r.kcal * portions} kcal logged, ingredients used up.')));
                     }
                   : () {
                       s.addShopping(missing);
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: burgundy, content: Text('${missing.length} items added to your shopping list 🛒')));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: burgundy,
+                          content: Text('${missing.length} ${missing.length == 1 ? 'item' : 'items'} added to your shopping list 🛒'),
+                        ),
+                      );
                     },
               child: Text(missing.isEmpty ? 'I cooked it · log ${r.kcal * portions} kcal' : 'Add missing to shopping list (${missing.length})'),
             ),
@@ -3195,18 +6617,20 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   final _c = TextEditingController();
   final _sc = ScrollController();
+  final _focus = FocusNode();
   bool _loading = false;
 
   @override
   void dispose() {
     _c.dispose();
     _sc.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
   void _scroll() => WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_sc.hasClients) _sc.animateTo(_sc.position.maxScrollExtent, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
-      });
+    if (_sc.hasClients) _sc.animateTo(_sc.position.maxScrollExtent, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+  });
 
   Future<void> _send([String? preset]) async {
     final text = (preset ?? _c.text).trim();
@@ -3214,6 +6638,7 @@ class _ChatPageState extends State<ChatPage> {
     final s = widget.state;
     s.chat.add(ChatMessage(text, isUser: true));
     _c.clear();
+    if (preset == null) _focus.requestFocus(); // можно сразу писать следующий вопрос
     setState(() => _loading = true);
     _scroll();
     String answer;
@@ -3233,62 +6658,85 @@ class _ChatPageState extends State<ChatPage> {
     final msgs = widget.state.chat;
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(title: const Text('NutriMate AI', style: titleStyle), backgroundColor: Colors.transparent),
-      body: Column(children: [
-        Expanded(
-          child: ListView.builder(
-            controller: _sc,
-            padding: const EdgeInsets.all(16),
-            itemCount: msgs.length,
-            itemBuilder: (_, i) {
-              final m = msgs[i];
-              return TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: 1),
-                duration: const Duration(milliseconds: 350),
-                curve: Curves.easeOut,
-                builder: (_, v, child) => Opacity(opacity: v, child: Transform.translate(offset: Offset(0, 14 * (1 - v)), child: child)),
-                child: Align(
-                  alignment: m.isUser ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
-                    margin: const EdgeInsets.symmetric(vertical: 5),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(color: m.isUser ? burgundy : sand, borderRadius: BorderRadius.circular(16)),
-                    child: Text(m.text, style: TextStyle(color: m.isUser ? Colors.white : Colors.black87)),
+      appBar: AppBar(
+        title: const Text('NutriMate AI', style: titleStyle),
+        backgroundColor: Colors.transparent,
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              controller: _sc,
+              padding: const EdgeInsets.all(16),
+              itemCount: msgs.length,
+              itemBuilder: (_, i) {
+                final m = msgs[i];
+                return TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: 1),
+                  duration: const Duration(milliseconds: 350),
+                  curve: Curves.easeOut,
+                  builder: (_, v, child) => Opacity(
+                    opacity: v,
+                    child: Transform.translate(offset: Offset(0, 14 * (1 - v)), child: child),
+                  ),
+                  child: Align(
+                    alignment: m.isUser ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Container(
+                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
+                      margin: const EdgeInsets.symmetric(vertical: 5),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(color: m.isUser ? burgundy : sand, borderRadius: BorderRadius.circular(16)),
+                      child: Text(m.text, style: TextStyle(color: m.isUser ? Colors.white : Colors.black87)),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (_loading) const Padding(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6), child: LinearProgressIndicator(minHeight: 2)),
+          SizedBox(
+            height: 44,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                for (final q in ['What can I cook?', 'What expires soon?', 'How to store tomatoes?', 'Can I freeze bread?', 'Another idea', 'Is it still good?', 'Do I have milk?'])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ActionChip(label: Text(q), onPressed: () => _send(q)),
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            key: Tour.chatInput,
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _c,
+                    focusNode: _focus,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _send(),
+                    decoration: InputDecoration(
+                      hintText: 'Ask anything...',
+                      filled: true,
+                      fillColor: sand,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                    ),
                   ),
                 ),
-              );
-            },
-          ),
-        ),
-        if (_loading) const Padding(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6), child: LinearProgressIndicator(minHeight: 2)),
-        SizedBox(
-          height: 44,
-          child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
-            for (final q in ['What can I cook?', 'What expires soon?', 'Another idea', 'Do I have cheese?', 'Calories in potato'])
-              Padding(padding: const EdgeInsets.only(right: 8), child: ActionChip(label: Text(q), onPressed: () => _send(q))),
-          ]),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(children: [
-            Expanded(
-              child: TextField(
-                controller: _c,
-                onSubmitted: (_) => _send(),
-                decoration: InputDecoration(
-                  hintText: 'Ask anything...',
-                  filled: true,
-                  fillColor: sand,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
+                IconButton(
+                  icon: const Icon(Icons.send, color: burgundy),
+                  onPressed: () => _send(),
                 ),
-              ),
+              ],
             ),
-            IconButton(icon: const Icon(Icons.send, color: burgundy), onPressed: () => _send()),
-          ]),
-        ),
-        SizedBox(height: MediaQuery.of(context).padding.bottom),
-      ]),
+          ),
+          SizedBox(height: MediaQuery.of(context).padding.bottom),
+        ],
+      ),
     );
   }
 }
@@ -3306,51 +6754,73 @@ class ProfilePage extends StatelessWidget {
       listenable: state,
       builder: (context, _) => Scaffold(
         appBar: AppBar(title: const Text('Profile', style: headStyle)),
-        body: ListView(padding: const EdgeInsets.symmetric(horizontal: 16), children: [
-          Appear(
-            child: ListTile(
-              leading: CircleAvatar(backgroundColor: burgundy, child: Text(state.name.isEmpty ? '?' : state.name[0].toUpperCase(), style: const TextStyle(color: Colors.white))),
-              title: Text(state.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(state.email.isEmpty ? 'Guest account' : state.email),
+        body: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          children: [
+            Appear(
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: burgundy,
+                  child: Text(state.name.isEmpty ? '?' : state.name[0].toUpperCase(), style: const TextStyle(color: Colors.white)),
+                ),
+                title: Text(state.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(state.email.isEmpty ? 'Guest account' : state.email),
+              ),
             ),
-          ),
-          ListTile(title: Text('Goal: ${state.targetCalories} kcal/day'), leading: const Icon(Icons.track_changes, color: burgundy)),
-          SwitchListTile(title: const Text('Male'), value: state.isMan, onChanged: (v) => state.updateProfile(isMan: v)),
-          _slider('Weight', '${state.weight.round()} kg', state.weight, 40, 150, (v) => state.updateProfile(weight: v)),
-          _slider('Height', '${state.height.round()} cm', state.height, 120, 220, (v) => state.updateProfile(height: v)),
-          _slider('Age', '${state.age} y', state.age.toDouble(), 14, 90, (v) => state.updateProfile(age: v.round())),
-          const Divider(height: 32),
-          const Text('Demo tools', style: headStyle),
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, children: [
-            FilledButton.tonalIcon(onPressed: () => state.nextDay(1), icon: const Icon(Icons.skip_next), label: Text('+1 day (now +$dayShift)')),
-            OutlinedButton(onPressed: () => state.nextDay(0), child: const Text('Reset time')),
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                state.startTutorial();
-              },
-              icon: const Icon(Icons.school_outlined),
-              label: const Text('Replay tutorial'),
+            ListTile(
+              title: Text('Goal: ${state.targetCalories} kcal/day'),
+              leading: const Icon(Icons.track_changes, color: burgundy),
             ),
-          ]),
-          const SizedBox(height: 8),
-          Text('Use "+1 day" to watch freshness bars drop and products expire.', style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
-          const SizedBox(height: 16),
-          TextButton.icon(
-            onPressed: () => Navigator.pushAndRemoveUntil(context, fadeSlide(RegisterScreen(state: state, ai: ai)), (_) => false),
-            icon: const Icon(Icons.logout, color: burgundy),
-            label: const Text('Log out', style: TextStyle(color: burgundy)),
-          ),
-        ]),
+            SwitchListTile(
+              title: const Text('Male'),
+              value: state.isMan,
+              onChanged: (v) => state.updateProfile(isMan: v),
+            ),
+            _slider('Weight', '${state.weight.round()} kg', state.weight, 40, 150, (v) => state.updateProfile(weight: v)),
+            _slider('Height', '${state.height.round()} cm', state.height, 120, 220, (v) => state.updateProfile(height: v)),
+            _slider('Age', '${state.age} y', state.age.toDouble(), 14, 90, (v) => state.updateProfile(age: v.round())),
+            const Divider(height: 32),
+            const Text('Demo tools', style: headStyle),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                FilledButton.tonalIcon(onPressed: () => state.nextDay(1), icon: const Icon(Icons.skip_next), label: Text('+1 day (now +$dayShift)')),
+                OutlinedButton(onPressed: () => state.nextDay(0), child: const Text('Reset time')),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    state.startTutorial();
+                  },
+                  icon: const Icon(Icons.school_outlined),
+                  label: const Text('Replay tutorial'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text('Tap "+1 day" to watch freshness bars drop and products expire.', style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: () => Navigator.pushAndRemoveUntil(context, fadeSlide(RegisterScreen(state: state, ai: ai)), (_) => false),
+              icon: const Icon(Icons.logout, color: burgundy),
+              label: const Text('Log out', style: TextStyle(color: burgundy)),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _slider(String title, String valueText, double value, double min, double max, ValueChanged<double> onChanged) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(padding: const EdgeInsets.only(left: 16, top: 8), child: Text('$title: $valueText', style: const TextStyle(fontWeight: FontWeight.bold))),
-      Slider(value: value, min: min, max: max, onChanged: onChanged),
-    ]);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 16, top: 8),
+          child: Text('$title: $valueText', style: const TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        Slider(value: value, min: min, max: max, onChanged: onChanged),
+      ],
+    );
   }
 }
