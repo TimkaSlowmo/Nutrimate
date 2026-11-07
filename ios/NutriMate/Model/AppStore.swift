@@ -103,14 +103,17 @@ final class AppStore: ObservableObject {
         UIImpactFeedbackGenerator(style: style).impactOccurred()
     }
 
-    func add(_ f: Food, days: Int? = nil, quiet: Bool = false) {
+    func add(_ f: Food, days: Int? = nil, storage: StorageKind? = nil, count: Int = 1, quiet: Bool = false) {
         let now = Date()
+        let place = storage ?? FoodDB.defaultStorage(f)
         let exp = Calendar.current.date(byAdding: .day, value: days ?? f.shelf, to: now) ?? now
-        data.pantry.append(PantryItem(name: f.name, emoji: f.emoji, category: f.category, kcal: f.kcal,
-                                      added: now, expiry: exp, storage: FoodDB.defaultStorage(f)))
+        for _ in 0..<max(1, count) {
+            data.pantry.append(PantryItem(name: f.name, emoji: f.emoji, category: f.category, kcal: f.kcal,
+                                          added: now, expiry: exp, storage: place))
+        }
         if !quiet {
             haptic()
-            say("\(f.emoji) \(f.name) added to your \(FoodDB.defaultStorage(f).title.lowercased())")
+            say("\(f.emoji) \(count > 1 ? "\(count)× " : "")\(f.name) added to your \(place.title.lowercased())")
         }
         checkMedals()
     }

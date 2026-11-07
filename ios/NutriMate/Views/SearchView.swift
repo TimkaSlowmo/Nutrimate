@@ -5,6 +5,7 @@ struct SearchView: View {
     @State private var query = ""
     @State private var category: String?
     @State private var logFood: Food?
+    @State private var addFood: Food?
     @FocusState private var focused: Bool
 
     private let suggestions = ["Kurt", "Baursaks", "Kazy", "Shubat", "Kumys", "Irimshik", "Milk", "Eggs", "Banana", "Chicken Breast", "Tomato", "Bread"]
@@ -30,6 +31,7 @@ struct SearchView: View {
             .background(LiveBackground())
             .navigationTitle("Search")
             .sheet(item: $logFood) { f in LogFoodSheet(food: f) }
+            .sheet(item: $addFood) { f in AddFoodSheet(food: f) }
         }
     }
 
@@ -97,6 +99,7 @@ struct SearchView: View {
                 .font(.caption).foregroundStyle(.secondary)
             ForEach(r.prefix(300)) { f in
                 FoodRow(food: f, inFridge: store.pantryNames.contains(f.name)) { store.add(f) }
+                    .onTapGesture { addFood = f }
                     .contextMenu {
                         Button { store.add(f) } label: { Label("Add to fridge", systemImage: "refrigerator") }
                         Button { logFood = f } label: { Label("Log as eaten…", systemImage: "fork.knife") }
@@ -220,5 +223,67 @@ struct LogFoodSheet: View {
         }
         .padding()
         .presentationDetents([.height(320)])
+    }
+}
+
+/// Добавление с настройками: место хранения, срок, количество.
+struct AddFoodSheet: View {
+    @EnvironmentObject var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    let food: Food
+    @State private var storage: StorageKind = .fridge
+    @State private var days = 7
+    @State private var count = 1
+    @State private var ready = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    HStack(spacing: 14) {
+                        EmojiBadge(emoji: food.emoji, size: 64)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(food.name).font(.title3.bold()).foregroundStyle(Color.burgundy)
+                            Text("\(food.category) · \(food.kcal) kcal / 100 g").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Section("Where and how long") {
+                    Picker("Stored in", selection: $storage) {
+                        ForEach(StorageKind.allCases) { s in Text("\(s.emoji) \(s.title)").tag(s) }
+                    }
+                    .pickerStyle(.segmented)
+                    Stepper("Keeps for \(days) \(days == 1 ? "day" : "days")", value: $days, in: 1...730)
+                    Stepper("Quantity: \(count)", value: $count, in: 1...12)
+                }
+                Section {
+                    Button("Add to \(storage.title.lowercased())") {
+                        store.add(food, days: days, storage: storage, count: count)
+                        dismiss()
+                    }
+                    .bold()
+                    Button("Add to shopping list") {
+                        store.addShopping([food.name])
+                        dismiss()
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(Color.cream)
+            .navigationTitle("Add product")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            .onAppear {
+                guard !ready else { return }
+                ready = true
+                storage = FoodDB.defaultStorage(food)
+                days = food.shelf
+            }
+            .onChange(of: storage) { _, s in
+                if s == .freezer && FoodDB.canFreeze(food) { days = max(days, 90) }
+                else if s != .freezer && days == 90 { days = food.shelf }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
