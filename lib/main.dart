@@ -27,7 +27,7 @@ int dayShift = 0;
 DateTime now() => DateTime.now().add(Duration(days: dayShift));
 // Номер дня (дни с 1970 г.) — так дневник калорий не путается после перезапуска.
 int dayNum(DateTime d) => DateTime.utc(d.year, d.month, d.day).millisecondsSinceEpoch ~/ 86400000;
-int today() => dayNum(now());
+int todayNum() => dayNum(now());
 
 // ───────────────────────── МОДЕЛИ ─────────────────────────
 
@@ -101,7 +101,7 @@ class LogEntry {
   final int day;
   final int id, kcal;
   final String emoji, name;
-  LogEntry(this.id, this.emoji, this.name, this.kcal, [int? day]) : day = day ?? today();
+  LogEntry(this.id, this.emoji, this.name, this.kcal, [int? day]) : day = day ?? todayNum();
 }
 
 class ChatMessage {
@@ -1345,7 +1345,7 @@ class AppState extends ChangeNotifier {
 
   int get targetCalories => ((10 * weight) + (6.25 * height) - (5 * age) + (isMan ? 5 : -161)).round();
   int kcalOn(int day) => log.where((e) => e.day == day).fold<int>(0, (s, e) => s + e.kcal);
-  int get eatenCalories => kcalOn(today());
+  int get eatenCalories => kcalOn(todayNum());
   List<PantryItem> get expiringSoon => (pantry.where((p) => p.daysLeft <= 2).toList()..sort((a, b) => a.daysLeft.compareTo(b.daysLeft)));
   List<PantryItem> get toRescue => expiringSoon.where((p) => p.daysLeft >= 0).toList();
   Set<String> get pantryNames => pantry.map((p) => p.food.name).toSet();
@@ -5384,7 +5384,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _calories() {
     final total = state.eatenCalories, goal = state.targetCalories, left = goal - total;
-    final vals = [for (var k = 0; k < 7; k++) state.kcalOn(today() - 6 + k)];
+    final vals = [for (var k = 0; k < 7; k++) state.kcalOn(todayNum() - 6 + k)];
     final mx = max(goal * 1.15, vals.reduce(max).toDouble());
     return Glass(
       child: Column(
@@ -5654,7 +5654,7 @@ class _HomePageState extends State<HomePage> {
         ? 'Good afternoon'
         : 'Good evening';
     final exp = state.expiringSoon;
-    final today = state.log.where((e) => e.day == today()).toList();
+    final today = state.log.where((e) => e.day == todayNum()).toList();
     return Stack(
       children: [
         const Positioned.fill(child: LiquidBg()),
