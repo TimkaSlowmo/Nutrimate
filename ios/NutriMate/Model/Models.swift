@@ -184,6 +184,34 @@ struct WeightEntry: Codable, Identifiable, Hashable {
     var kg: Double
 }
 
+/// Событие для экрана Eco Impact (по датам): съел, спас, заморозил, поделился, выбросил.
+enum EcoKind: String, Codable { case eaten, rescued, frozen, shared, wasted }
+
+struct EcoEvent: Codable, Hashable {
+    var kind: EcoKind
+    var money: Double
+    var date: Date = Date()
+}
+
+struct DayValue: Identifiable {
+    let day: Date
+    let value: Int
+    var id: Date { day }
+}
+
+struct WeekEco: Identifiable {
+    let week: Date
+    let saved: Int
+    let wasted: Int
+    var id: Date { week }
+}
+
+struct NamedCount: Identifiable {
+    let name: String
+    let count: Int
+    var id: String { name }
+}
+
 struct WasteEntry: Codable, Hashable {
     var name: String
     var category: String
@@ -252,6 +280,8 @@ struct AppData: Codable {
     var dislikes: [String] = []
     var wasteLog: [WasteEntry] = []
     var stats = Stats()
+    var events: [EcoEvent] = []
+    var notifications = false
 
     init() {}
     init(from decoder: Decoder) throws {
@@ -266,6 +296,8 @@ struct AppData: Codable {
         dislikes = (try? c.decodeIfPresent([String].self, forKey: .dislikes)) ?? []
         wasteLog = (try? c.decodeIfPresent([WasteEntry].self, forKey: .wasteLog)) ?? []
         stats = (try? c.decodeIfPresent(Stats.self, forKey: .stats)) ?? Stats()
+        events = (try? c.decodeIfPresent([EcoEvent].self, forKey: .events)) ?? []
+        notifications = (try? c.decodeIfPresent(Bool.self, forKey: .notifications)) ?? false
     }
 }
 

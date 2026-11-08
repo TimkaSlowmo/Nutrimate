@@ -5,6 +5,7 @@ struct HomeView: View {
     @Binding var tab: AppTab
     @State private var showShopping = false
     @State private var showDiary = false
+    @State private var showEco = false
     @State private var openItem: PantryItem?
 
     private var greeting: String {
@@ -41,6 +42,7 @@ struct HomeView: View {
                     caloriesCard
                     rescueCard
                     statsRow
+                    ecoBanner
                     HStack(spacing: 12) {
                         quick("🛒", "Shopping", "\(store.data.shopping.count) items") { showShopping = true }
                         quick("📒", "Diary", "\(store.todayLog.count) today") { showDiary = true }
@@ -53,6 +55,7 @@ struct HomeView: View {
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showShopping) { ShoppingView() }
             .sheet(isPresented: $showDiary) { DiaryView() }
+            .sheet(isPresented: $showEco) { EcoImpactView() }
             .sheet(item: $openItem) { p in ItemSheet(id: p.id) }
         }
     }
@@ -124,6 +127,23 @@ struct HomeView: View {
         }
     }
 
+    private var ecoBanner: some View {
+        Button { showEco = true } label: {
+            HStack(spacing: 12) {
+                Text("🌍").font(.system(size: 34))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Eco Impact").font(.headline).foregroundStyle(Color.burgundy)
+                    Text(String(format: "%.1f kg food · %.1f kg CO₂ · $%.0f saved", store.rescuedKg, store.co2, store.data.stats.rescuedMoney))
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.subheadline.bold()).foregroundStyle(Color.burgundy.opacity(0.5))
+            }
+            .glassCard(radius: 18, padding: 14)
+        }
+        .buttonStyle(.plain)
+    }
+
     private func stat(_ e: String, _ v: String, _ l: String) -> some View {
         VStack(spacing: 2) {
             Text(e).font(.title3)
@@ -179,6 +199,10 @@ struct DiaryView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    WeekCaloriesChart()
+                        .padding(.vertical, 4)
+                }
                 Section {
                     HStack {
                         Text("Eaten today")

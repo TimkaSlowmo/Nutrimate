@@ -13,6 +13,7 @@ final class AppStore: ObservableObject {
 
     private let fileURL: URL
     private var saveWork: DispatchWorkItem?
+    private var reminderWork: DispatchWorkItem?
 
     let db = FoodDB.shared
 
@@ -21,6 +22,7 @@ final class AppStore: ObservableObject {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         fileURL = dir.appendingPathComponent("nutrimate.json")
         data = AppStore.load(from: fileURL)
+        if data.notifications { Reminders.reschedule(data) }
     }
 
     private static func load(from url: URL) -> AppData {
@@ -36,6 +38,13 @@ final class AppStore: ObservableObject {
     }
 
     private func scheduleSave() {
+        reminderWork?.cancel()
+        let rw = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            Reminders.reschedule(self.data)
+        }
+        reminderWork = rw
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: rw)
         saveWork?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.saveNow() }
         saveWork = work
@@ -123,8 +132,60 @@ final class AppStore: ObservableObject {
         if p.daysLeft >= 0 && p.daysLeft <= 2 {
             data.stats.rescued += 1
             data.stats.rescuedMoney += price(p.category)
+            data.events.append(EcoEvent(kind: .rescued, money: price(p.category)))
+        } else {
+            data.events.append(EcoEvent(kind: .eaten, money: 0))
         }
     }
+
+    // MARK: - Eco Impact и статистика
+
+    /// Калории по дням за последние `days` дней (включая сегодня).
+    func caloriesByDay(_ days: Int = 7) -> [DayValue] {
+        let today = dayStart(Date())
+        var out: [DayValue] = []
+        for back in stride(from: days - 1, through: 0, by: -1) {
+            let d = Calendar.current.date(byAdding: .day, value: -back, to: today) ?? today
+            let k = data.log.filter { dayStart($0.date) == d }.reduce(0) { $0 + $1.kcal }
+            out.append(DayValue(day: d, value: k))
+        }
+        return out
+    }
+
+    /// Спасено / выброшено по неделям (последние `weeks` недель).
+    func ecoByWeek(_ weeks: Int = 6) -> [WeekEco] {
+        let cal = Calendar.current
+        let thisWeek = cal.dateInterval(of: .weekOfYear, for: Date())?.start ?? dayStart(Date())
+        var out: [WeekEco] = []
+        for back in stride(from: weeks - 1, through: 0, by: -1) {
+            let start = cal.date(byAdding: .weekOfYear, value: -back, to: thisWeek) ?? thisWeek
+            let end = cal.date(byAdding: .weekOfYear, value: 1, to: start) ?? start
+            let inWeek = data.events.filter { $0.date >= start && $0.date < end }
+            let saved = inWeek.filter { $0.kind == .rescued || $0.kind == .frozen || $0.kind == .shared }.count
+            let lost = inWeek.filter { $0.kind == .wasted }.count
+            out.append(WeekEco(week: start, saved: saved, wasted: lost))
+        }
+        return out
+    }
+
+    var wasteReasons: [NamedCount] {
+        var out: [NamedCount] = []
+        for r in WasteReason.allCases {
+            let n = data.wasteLog.filter { $0.reason == r }.count
+            if n > 0 { out.append(NamedCount(name: r.title, count: n)) }
+        }
+        return out
+    }
+
+    var wasteCategories: [NamedCount] {
+        var counts: [String: Int] = [:]
+        for w in data.wasteLog { counts[w.category, default: 0] += 1 }
+        return counts.map { NamedCount(name: $0.key, count: $0.value) }.sorted { $0.count > $1.count }
+    }
+
+    /// Сколько кг еды спасено (≈ 0.3 кг на продукт, как в веб-версии)
+    var rescuedKg: Double { Double(data.stats.rescued) * 0.3 }
+    var wastedKg: Double { Double(data.stats.wasted) * 0.3 }
 
     func eat(_ id: UUID, grams: Int, finished: Bool) {
         guard let p = item(id) else { return }
@@ -154,6 +215,7 @@ final class AppStore: ObservableObject {
         data.stats.wastedMoney += price(p.category)
         data.stats.streakStart = Date()
         data.wasteLog.append(WasteEntry(name: p.name, category: p.category, reason: reason, money: price(p.category)))
+        data.events.append(EcoEvent(kind: .wasted, money: price(p.category)))
         if reason == .disliked && !data.dislikes.contains(p.name.lowercased()) { data.dislikes.append(p.name.lowercased()) }
         haptic(.rigid)
         say("Nutrik is a little sad 😿 Next time we'll save it!")
@@ -166,6 +228,7 @@ final class AppStore: ObservableObject {
             data.stats.rescued += 1
             data.stats.rescuedMoney += price(p.category)
         }
+        data.events.append(EcoEvent(kind: .frozen, money: price(p.category)))
         data.pantry[i].storage = .freezer
         data.pantry[i].expiry = Calendar.current.date(byAdding: .day, value: 90, to: Date()) ?? Date()
         data.stats.frozen += 1
@@ -181,6 +244,7 @@ final class AppStore: ObservableObject {
         data.stats.rescued += 1
         data.stats.consumed += 1
         data.stats.rescuedMoney += price(p.category)
+        data.events.append(EcoEvent(kind: .shared, money: price(p.category)))
         haptic(.medium)
         say("🤝 Shared! That's real zero waste")
         checkMedals()
@@ -268,6 +332,35 @@ final class AppStore: ObservableObject {
     func eraseAll() {
         data = AppData()
         saveNow()
+        Reminders.clear()
+    }
+
+    // MARK: - Туториал и уведомления
+
+    func finishTutorial() {
+        withAnimation(.easeInOut(duration: 0.4)) { data.profile.tutorialDone = true }
+    }
+
+    func replayTutorial() {
+        withAnimation(.easeInOut(duration: 0.4)) { data.profile.tutorialDone = false }
+    }
+
+    func setNotifications(_ on: Bool) {
+        if !on {
+            data.notifications = false
+            Reminders.clear()
+            return
+        }
+        Reminders.requestPermission { [weak self] granted in
+            guard let self else { return }
+            self.data.notifications = granted
+            if granted {
+                Reminders.reschedule(self.data)
+                self.say("🔔 Nutrik will remind you at 9:00")
+            } else {
+                self.say("Notifications are off in iPhone Settings")
+            }
+        }
     }
 
     // MARK: - Достижения

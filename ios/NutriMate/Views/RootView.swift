@@ -26,6 +26,7 @@ enum AppTab: Int, CaseIterable, Identifiable {
 struct RootView: View {
     @EnvironmentObject var store: AppStore
     @State private var tab: AppTab = .home
+    @State private var tutorialStep = 0
 
     var body: some View {
         ZStack {
@@ -69,6 +70,12 @@ struct RootView: View {
         }
         .id(tab)
         .transition(.opacity)
+        .overlay {
+            if !store.data.profile.tutorialDone {
+                TutorialOverlay(step: $tutorialStep, tab: $tab)
+                    .transition(.opacity)
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             GlassTabBar(selection: $tab)
                 .padding(.horizontal, 14)

@@ -4,6 +4,7 @@ struct ProfileView: View {
     @EnvironmentObject var store: AppStore
     @State private var confirmErase = false
     @State private var newWeight = ""
+    @State private var showEco = false
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -55,7 +56,20 @@ struct ProfileView: View {
                 }
                 .listRowBackground(Color.white.opacity(0.55))
 
+                Section("Weight trend") {
+                    WeightChart(entries: store.data.weights)
+                        .padding(.vertical, 4)
+                }
+                .listRowBackground(Color.white.opacity(0.55))
+
                 Section("Eco impact") {
+                    Button { showEco = true } label: {
+                        HStack {
+                            Text("🌍 Open Eco Impact").bold().foregroundStyle(Color.burgundy)
+                            Spacer()
+                            Image(systemName: "chart.bar.fill").foregroundStyle(Color.burgundy)
+                        }
+                    }
                     row("🦸 Products rescued", "\(store.data.stats.rescued)")
                     row("💰 Money saved", String(format: "$%.2f", store.data.stats.rescuedMoney))
                     row("🌍 CO₂ avoided", String(format: "%.1f kg", store.co2))
@@ -83,6 +97,19 @@ struct ProfileView: View {
                 .listRowBackground(Color.white.opacity(0.55))
 
                 Section {
+                    Toggle(isOn: Binding(get: { store.data.notifications }, set: { store.setNotifications($0) })) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("🔔 Daily reminders")
+                            Text("At 9:00 Nutrik tells you what expires today and tomorrow").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Button("🎓 Replay tutorial") { store.replayTutorial() }
+                } header: {
+                    Text("Nutrik")
+                }
+                .listRowBackground(Color.white.opacity(0.55))
+
+                Section {
                     Button("Add demo products") { store.loadDemo() }
                     Button("Erase all data", role: .destructive) { confirmErase = true }
                 } header: {
@@ -105,6 +132,7 @@ struct ProfileView: View {
             .scrollDismissesKeyboard(.immediately)
             .background(LiveBackground())
             .navigationTitle("Profile")
+            .sheet(isPresented: $showEco) { EcoImpactView() }
             .alert("Erase all data?", isPresented: $confirmErase) {
                 Button("Erase", role: .destructive) { store.eraseAll() }
                 Button("Cancel", role: .cancel) {}
