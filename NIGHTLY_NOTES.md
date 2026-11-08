@@ -1,12 +1,21 @@
 # NutriMate — журнал ночного агента
 
 ## Текущее состояние
-- Веб: **v10** · iOS: **v1** · продуктов: **1246** · рецептов: **91** (zero-waste: 33)
+- Веб: **v11** · iOS: **v2** · продуктов: **1272** · рецептов: **96** (zero-waste: 36)
 - Главная версия теперь iOS (папка ios/, журнал ios/NIGHTLY_NOTES_IOS.md). Веб — только баги.
 - Единая база: `python3 tool/export_data.py` проверяет дубли/ингредиенты и пишет ios/NutriMate/Resources/foods.json.
 - Иконки: все продукты показываются 3D-картинками (Fluent 3D + свои). Уникальная иконка: **40 / 1218**.
 - Локально Flutter недоступен (сервер Google заблокирован прокси) → компиляцию проверяет GitHub Actions.
   Неудачная сборка не публикуется, так что сайт остаётся на прошлой версии.
+
+## 2026-11-08 (ночь 3) · веб v11 · iOS v2
+- **iOS v2**: экран Eco Impact с графиками, графики веса и калорий за неделю, туториал с Нутриком, уведомления в 9:00.
+- **Веб v11**: только данные (сохранение уже работает с v10, багов не поступало).
+- +26 продуктов: Sary Mai (топлёное масло), Chuchuk, Tary, Kattama, Chalap, Kozhe, Varenets, Aport Apple, Rowan Berry, Uzvar, Sbiten,
+  Lobio, Bone Broth, Oatmeal, Overnight Oats; США: Hamburger Buns, Zucchini Bread, Funnel Cake, Key Lime Pie, Sweet Tea, Meatloaf,
+  Clam Chowder, Jambalaya, Gumbo, Deviled Eggs, Sloppy Joe.
+- +5 рецептов: Tary with Milk & Butter, Katyk Kozhe with Millet (zw), Stale Baursak Bread Pudding (zw), Dorm Lobio with Walnuts,
+  Bruised Aport Apple Pastila (zw).
 
 ## 2026-11-07 (ночь 2) · веб v10 · iOS v1
 - **Веб: данные больше не сбрасываются** — shared_preferences (localStorage): профиль, холодильник, дневник,
