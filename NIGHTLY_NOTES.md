@@ -8,6 +8,15 @@
 - Локально Flutter недоступен (сервер Google заблокирован прокси) → компиляцию проверяет GitHub Actions.
   Неудачная сборка не публикуется, так что сайт остаётся на прошлой версии.
 
+## 2026-11-09 (ночь 4) · веб v12 · iOS v3
+- **iOS v3**: Нутрик бегает, ест продукт в лапке, спотыкается и падает, радуется, говорит; сценки на действия; «рецепт дня» на Home; рецепт в утреннем уведомлении.
+- **Веб v12**: только данные (багов не поступало).
+- +29 продуктов: Suzma, Snezhok, Zhal, Lamb Ribs, Pastrami, Tandyr Samsa, Kystyby, Bublik, Dimlama, Chuchvara, Korean Carrot Salad,
+  Funchoza Salad, Heh Fish, Achichuk Salad, Lula Kebab, Buckwheat Porridge, Oladi, Mannik, Medovik, Kisel; США: French Toast, Quesadilla,
+  Buffalo Wings, Chicken Pot Pie, Biscuits and Gravy, Philly Cheesesteak, Peach Cobbler, Banana Pudding, S'mores.
+- +5 рецептов: Leftover Plov Fried Rice (zw), Kystyby with Leftover Mash (zw), One-Pot Dimlama, Stale Bread French Toast (zw),
+  Homemade Korean Carrot Salad. Всего: 1301 продукт, 101 рецепт (39 zero-waste).
+
 ## 2026-11-08 (ночь 3) · веб v11 · iOS v2
 - **iOS v2**: экран Eco Impact с графиками, графики веса и калорий за неделю, туториал с Нутриком, уведомления в 9:00.
 - **Веб v11**: только данные (сохранение уже работает с v10, багов не поступало).
