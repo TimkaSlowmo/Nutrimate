@@ -7,6 +7,37 @@ struct HomeView: View {
     @State private var showDiary = false
     @State private var showEco = false
     @State private var openItem: PantryItem?
+    @State private var tipIndex: Int?
+
+    private static let tips = [
+        "Tip: put older food in front of the fridge, new food at the back 🧊",
+        "Bread going stale? Freeze it in slices — toast straight from the freezer 🍞",
+        "Brown bananas make the sweetest banana bread 🍌",
+        "Wilted greens? 10 minutes in ice water brings them back 🥬",
+        "Leftover rice + egg + veggies = fried rice in 10 minutes 🍳",
+        "Kurt keeps for months — a perfect zero-waste snack 🧀",
+        "Plan 3 dinners before shopping — you'll buy 30% less 🛒",
+        "Stale baursaks? Bake them into a sweet bread pudding 🍮",
+        "Tap me again for another tip! (careful, I trip sometimes 😅)",
+    ]
+
+    private var shownLine: (String, NutrikMood) {
+        if let i = tipIndex { return (Self.tips[i % Self.tips.count], .happy) }
+        return nutrikLine
+    }
+
+    /// «Рецепт дня»: сначала тот, что спасает продукты, которые скоро испортятся.
+    private var recipeOfDay: (Recipe, [String])? {
+        let urgent = Set(store.toRescue.map(\.name))
+        let ranked = store.rankedRecipes()
+        if !urgent.isEmpty, let r = ranked.first(where: { $0.ingredients.contains { urgent.contains($0.name) } }) {
+            return (r, r.ingredients.map(\.name).filter { urgent.contains($0) })
+        }
+        let pool = Array(ranked.prefix(12))
+        guard !pool.isEmpty else { return nil }
+        let day = Calendar.current.ordinality(of: .day, in: .era, for: Date()) ?? 0
+        return (pool[day % pool.count], [])
+    }
 
     private var greeting: String {
         let h = Calendar.current.component(.hour, from: Date())
@@ -37,10 +68,13 @@ struct HomeView: View {
                     }
                     .padding(.top, 8)
 
-                    NutrikSays(text: nutrikLine.0, mood: nutrikLine.1)
+                    NutrikSays(text: shownLine.0, mood: shownLine.1) {
+                        withAnimation { tipIndex = (tipIndex ?? -1) + 1 }
+                    }
 
                     caloriesCard
                     rescueCard
+                    recipeOfDayCard
                     statsRow
                     ecoBanner
                     HStack(spacing: 12) {
@@ -57,6 +91,7 @@ struct HomeView: View {
             .sheet(isPresented: $showDiary) { DiaryView() }
             .sheet(isPresented: $showEco) { EcoImpactView() }
             .sheet(item: $openItem) { p in ItemSheet(id: p.id) }
+            .navigationDestination(for: Recipe.self) { r in RecipeDetail(recipe: r) }
         }
     }
 
@@ -116,6 +151,30 @@ struct HomeView: View {
             }
         }
         .glassCard()
+    }
+
+    @ViewBuilder private var recipeOfDayCard: some View {
+        if let rod = recipeOfDay {
+            let r = rod.0
+            let rescues = rod.1
+            NavigationLink(value: r) {
+                HStack(spacing: 12) {
+                    Text(r.emoji).font(.system(size: 40)).frame(width: 62, height: 62)
+                        .background(Circle().fill(Color.white.opacity(0.65)))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(rescues.isEmpty ? "RECIPE OF THE DAY" : "RESCUE RECIPE OF THE DAY")
+                            .font(.caption2.weight(.heavy)).foregroundStyle(rescues.isEmpty ? Color.burgundy.opacity(0.6) : Color.warnOrange)
+                        Text(r.name).font(.headline).foregroundStyle(Color.burgundy).lineLimit(2)
+                        Text(rescues.isEmpty ? "⏱ \(r.time) · \(r.kcal) kcal/serving" : "Uses \(rescues.prefix(3).joined(separator: ", ")) before it spoils")
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").font(.subheadline.bold()).foregroundStyle(Color.burgundy.opacity(0.5))
+                }
+                .glassCard(radius: 20, padding: 14)
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     private var statsRow: some View {

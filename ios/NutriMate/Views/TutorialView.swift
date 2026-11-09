@@ -37,6 +37,7 @@ struct TutorialOverlay: View {
     @Binding var step: Int
     @Binding var tab: AppTab
     @State private var arrowUp = false
+    @State private var talking = false
 
     private var current: TutorialStep { Tutorial.steps[min(step, Tutorial.steps.count - 1)] }
     private var isLast: Bool { step >= Tutorial.steps.count - 1 }
@@ -67,7 +68,9 @@ struct TutorialOverlay: View {
         }
         .onAppear {
             withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) { arrowUp = true }
+            talk()
         }
+        .onChange(of: step) { talk() }
     }
 
     /// Центр нужной вкладки: таб-бар имеет отступ 14 + 6 по бокам и 5 равных кнопок.
@@ -80,7 +83,7 @@ struct TutorialOverlay: View {
     private var card: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
-                NutrikView(mood: current.mood, size: 78)
+                NutrikView(mood: talking ? .talk : current.mood, size: 78)
                     .id(step)
                     .transition(.asymmetric(insertion: .move(edge: .leading).combined(with: .opacity), removal: .opacity))
                 VStack(alignment: .leading, spacing: 4) {
@@ -124,6 +127,15 @@ struct TutorialOverlay: View {
         .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.white.opacity(0.9), lineWidth: 1))
         .shadow(color: .black.opacity(0.18), radius: 20, y: 8)
         .animation(.spring(response: 0.45, dampingFraction: 0.75), value: step)
+    }
+
+    /// Нутрик «говорит», пока появляется текст шага
+    private func talk() {
+        talking = true
+        let s = step
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            if s == step { talking = false }
+        }
     }
 
     private func next() {

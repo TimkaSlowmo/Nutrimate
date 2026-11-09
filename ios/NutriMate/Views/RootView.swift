@@ -70,6 +70,11 @@ struct RootView: View {
         }
         .id(tab)
         .transition(.opacity)
+        .overlay(alignment: .bottomLeading) {
+            if store.data.profile.tutorialDone && store.data.nutrikBuddy {
+                NutrikBuddy()
+            }
+        }
         .overlay {
             if !store.data.profile.tutorialDone {
                 TutorialOverlay(step: $tutorialStep, tab: $tab)

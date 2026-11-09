@@ -43,9 +43,10 @@ enum Reminders {
                 let content = UNMutableNotificationContent()
                 if !todayItems.isEmpty {
                     content.title = "Eat today: \(list(todayItems))"
+                    let idea = recipe(for: todayItems).map { "Try \($0.emoji) \($0.name)" } ?? "Nutrik found a recipe for it"
                     content.body = tomorrowItems.isEmpty
-                        ? "Nutrik found a recipe for it — open NutriMate and rescue your food 🦸"
-                        : "Tomorrow: \(list(tomorrowItems)). Open NutriMate for a recipe idea 🍲"
+                        ? "\(idea) — open NutriMate and rescue your food 🦸"
+                        : "Tomorrow: \(list(tomorrowItems)). \(idea) 🍲"
                 } else {
                     content.title = "Expires tomorrow: \(list(tomorrowItems))"
                     content.body = "Plan it for dinner or freeze it tonight ❄️ — Nutrik"
@@ -56,6 +57,16 @@ enum Reminders {
                 center.add(UNNotificationRequest(identifier: prefix + "\(offset)", content: content, trigger: trigger))
             }
         }
+    }
+
+    /// Рецепт, который использует больше всего продуктов из списка.
+    private static func recipe(for items: [PantryItem]) -> Recipe? {
+        let names = Set(items.map(\.name))
+        let best = FoodDB.shared.recipes
+            .map { r in (r, r.ingredients.filter { names.contains($0.name) }.count) }
+            .filter { $0.1 > 0 }
+            .max { $0.1 < $1.1 }
+        return best?.0
     }
 
     private static func list(_ items: [PantryItem]) -> String {

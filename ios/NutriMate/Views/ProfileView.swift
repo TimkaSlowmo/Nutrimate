@@ -103,6 +103,12 @@ struct ProfileView: View {
                             Text("At 9:00 Nutrik tells you what expires today and tomorrow").font(.caption).foregroundStyle(.secondary)
                         }
                     }
+                    Toggle(isOn: $store.data.nutrikBuddy) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("🐾 Nutrik reacts")
+                            Text("Runs in when you eat, cook, freeze or bin food").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                     Button("🎓 Replay tutorial") { store.replayTutorial() }
                 } header: {
                     Text("Nutrik")

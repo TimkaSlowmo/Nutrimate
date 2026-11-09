@@ -3,36 +3,58 @@ import SwiftUI
 /// Нутрик — маскот NutriMate: чиби-кошечка на коротких ножках, чёрное каре с ушками,
 /// бежевая рубашка-оверсайз с красным бантом, хвост и листик-заколка. Немного неряшливая:
 /// торчащая прядка, крошка на рубашке, бант чуть набок. Рисуется целиком в Canvas.
-enum NutrikMood { case happy, sad, eating, wave, sleepy }
+/// Настроения: бег, падение (звёздочки), еда с продуктом в лапке, разговор, радость.
+enum NutrikMood: Equatable { case happy, sad, eating, wave, sleepy, run, fall, talk, cheer }
 
 struct NutrikView: View {
     var mood: NutrikMood = .happy
     var size: CGFloat = 120
+    /// Эмодзи продукта в лапке (для .eating)
+    var food: String? = nil
+    /// Нутрик неуклюжий: по нажатию иногда спотыкается и падает.
+    var clumsy = true
     @State private var hop = false
+    @State private var tripping = false
 
     var body: some View {
+        let shown: NutrikMood = tripping ? .fall : mood
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
             Canvas { ctx, sz in
-                NutrikPainter(t: t, mood: mood).draw(&ctx, sz)
+                NutrikPainter(t: t, mood: shown, food: food).draw(&ctx, sz)
             }
             .frame(width: size, height: size * 1.15)
         }
+        .rotationEffect(.degrees(tripping ? -78 : 0), anchor: .bottomLeading)
+        .offset(y: tripping ? size * 0.08 : 0)
         .scaleEffect(x: hop ? 1.08 : 1, y: hop ? 0.9 : 1, anchor: .bottom)
-        .onTapGesture {
-            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-            withAnimation(.spring(response: 0.18, dampingFraction: 0.4)) { hop = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.35)) { hop = false }
-            }
-        }
+        .onTapGesture { tap() }
         .accessibilityLabel("Nutrik the mascot")
+    }
+
+    private func tap() {
+        guard !tripping else { return }
+        if clumsy && Int.random(in: 0..<4) == 0 {
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.5)) { tripping = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.55)) { tripping = false }
+            }
+            return
+        }
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        withAnimation(.spring(response: 0.18, dampingFraction: 0.4)) { hop = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.35)) { hop = false }
+        }
     }
 }
 
 struct NutrikPainter {
     let t: Double
     let mood: NutrikMood
+    var food: String? = nil
 
     private let hair = Color(hex: 0x1E1A1D)
     private let skin = Color(hex: 0xFFE6D3)
@@ -47,7 +69,14 @@ struct NutrikPainter {
         let s = min(size.width / 100, size.height / 115)
         let ox = (size.width - 100 * s) / 2
         let oy = (size.height - 115 * s) / 2
-        let bob = mood == .sleepy ? sin(t * 1.2) * 0.8 : abs(sin(t * 2.6)) * -2.2
+        let bob: Double
+        switch mood {
+        case .sleepy: bob = sin(t * 1.2) * 0.8
+        case .run: bob = abs(sin(t * 9)) * -3.5
+        case .cheer: bob = abs(sin(t * 5)) * -6
+        case .fall: bob = 0
+        default: bob = abs(sin(t * 2.6)) * -2.2
+        }
         func p(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: ox + x * s, y: oy + (y + bob) * s) }
         func pf(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: ox + x * s, y: oy + y * s) } // без подпрыгивания
         func r(_ x: Double, _ y: Double, _ w: Double, _ h: Double) -> CGRect {
@@ -59,18 +88,31 @@ struct NutrikPainter {
         ctx.fill(Path(ellipseIn: CGRect(x: ox + (50 - shadowW / 2) * s, y: oy + 108 * s, width: shadowW * s, height: 6 * s)),
                  with: .color(Color.black.opacity(0.10)))
 
+        // Пыль из-под ножек при беге
+        if mood == .run {
+            for k in 0..<3 {
+                let ph = (t * 2.2 + Double(k) / 3).truncatingRemainder(dividingBy: 1)
+                let d = 4 + ph * 7
+                ctx.fill(Path(ellipseIn: CGRect(x: ox + (30 - ph * 22 - d / 2) * s, y: oy + (104 - ph * 6 - d / 2) * s, width: d * s, height: d * s)),
+                         with: .color(Color(hex: 0xC9B48F).opacity(0.45 * (1 - ph))))
+            }
+        }
+
         // Хвост (виляет)
-        let wag = sin(t * 3.2) * 6
+        let wag = sin(t * (mood == .run ? 9 : 3.2)) * 6
         var tail = Path()
         tail.move(to: p(66, 92))
         tail.addCurve(to: p(86 + wag, 70), control1: p(82, 96), control2: p(90, 84))
         ctx.stroke(tail, with: .color(hair), style: StrokeStyle(lineWidth: 4.5 * s, lineCap: .round))
 
         // Ножки — короткие, переступают
-        let step = mood == .sleepy ? 0 : sin(t * 5.2) * 1.3
+        let running = mood == .run
+        let step = (mood == .sleepy || mood == .fall) ? 0 : sin(t * (running ? 18 : 5.2)) * (running ? 4 : 1.3)
         for (x, ph) in [(40.0, step), (54.0, -step)] {
-            ctx.fill(Path(roundedRect: CGRect(x: ox + x * s, y: oy + (98 + ph * 0.5 + bob * 0.4) * s, width: 7 * s, height: 10 * s), cornerRadius: 3 * s), with: .color(skin))
-            ctx.fill(Path(ellipseIn: CGRect(x: ox + (x - 1.5) * s, y: oy + (105 + ph * 0.5) * s, width: 10 * s, height: 5 * s)), with: .color(Color(hex: 0x6A041C)))
+            let dx = running ? ph : 0
+            let lift = running ? max(0, ph) * 0.9 : 0
+            ctx.fill(Path(roundedRect: CGRect(x: ox + (x + dx) * s, y: oy + (98 + ph * 0.5 + bob * 0.4 - lift) * s, width: 7 * s, height: 10 * s), cornerRadius: 3 * s), with: .color(skin))
+            ctx.fill(Path(ellipseIn: CGRect(x: ox + (x - 1.5 + dx) * s, y: oy + (105 + ph * 0.5 - lift) * s, width: 10 * s, height: 5 * s)), with: .color(Color(hex: 0x6A041C)))
         }
 
         // Рубашка-оверсайз (трапеция со скруглением), чуть мятая
@@ -93,17 +135,35 @@ struct NutrikPainter {
         // крошка на рубашке (неряшливость)
         ctx.fill(Path(ellipseIn: r(55, 88, 1.6, 1.3)), with: .color(Color(hex: 0xB07A3A)))
 
-        // Ручки: в режиме wave одна машет
-        let waveA = mood == .wave ? sin(t * 9) * 14 : sin(t * 2.6) * 3
-        var armL = Path()
-        armL.move(to: p(36, 70)); armL.addQuadCurve(to: p(27, 86), control: p(28, 76))
-        ctx.stroke(armL, with: .color(shirt), style: StrokeStyle(lineWidth: 7 * s, lineCap: .round))
-        ctx.fill(Path(ellipseIn: r(23.5, 84, 6, 6)), with: .color(skin))
-        var armR = Path()
-        let hand = mood == .wave ? p(80 + waveA * 0.3, 52 - abs(waveA) * 0.2) : p(73, 86 + waveA * 0.2)
-        armR.move(to: p(64, 70)); armR.addQuadCurve(to: hand, control: mood == .wave ? p(76, 66) : p(72, 76))
-        ctx.stroke(armR, with: .color(shirt), style: StrokeStyle(lineWidth: 7 * s, lineCap: .round))
-        ctx.fill(Path(ellipseIn: CGRect(x: hand.x - 3 * s, y: hand.y - 3 * s, width: 6 * s, height: 6 * s)), with: .color(skin))
+        // Ручки: wave — машет, run — размахивает, cheer — обе вверх, eating — подносит еду ко рту
+        let sway = sin(t * 2.6) * 3
+        var handL = p(27, 87 + sway * 0.2), ctrlL = p(28, 76)
+        var handR = p(73, 86 + sway * 0.2), ctrlR = p(72, 76)
+        let bite = (sin(t * 4) + 1) / 2 // 0 — лапка внизу, 1 — у рта
+        switch mood {
+        case .wave:
+            let w = sin(t * 9) * 14
+            handR = p(80 + w * 0.3, 52 - abs(w) * 0.2); ctrlR = p(76, 66)
+        case .run:
+            let sw = sin(t * 18) * 7
+            handL = p(28 + sw, 84 - abs(sw) * 0.3); handR = p(72 - sw, 84 - abs(sw) * 0.3)
+        case .cheer:
+            let w = sin(t * 10) * 5
+            handL = p(20 - w * 0.4, 50 + w * 0.3); ctrlL = p(24, 64)
+            handR = p(80 + w * 0.4, 50 - w * 0.3); ctrlR = p(76, 64)
+        case .fall:
+            handL = p(22, 78); ctrlL = p(26, 70)
+            handR = p(78, 78); ctrlR = p(74, 70)
+        case .eating where food != nil:
+            handR = p(73 - 17 * bite, 86 - 30 * bite); ctrlR = p(70, 72 - 6 * bite)
+        default: break
+        }
+        for (start, ctrl, hand) in [(p(36, 70), ctrlL, handL), (p(64, 70), ctrlR, handR)] {
+            var arm = Path()
+            arm.move(to: start); arm.addQuadCurve(to: hand, control: ctrl)
+            ctx.stroke(arm, with: .color(shirt), style: StrokeStyle(lineWidth: 7 * s, lineCap: .round))
+            ctx.fill(Path(ellipseIn: CGRect(x: hand.x - 3 * s, y: hand.y - 3 * s, width: 6 * s, height: 6 * s)), with: .color(skin))
+        }
 
         // Бант (чуть набок)
         var bowPath = Path()
@@ -179,10 +239,16 @@ struct NutrikPainter {
         // Глаза (моргают)
         let cycle = t.truncatingRemainder(dividingBy: 3.6)
         let blink: Double = mood == .sleepy ? 0.12 : (cycle < 0.14 ? 0.1 : 1)
-        let look = sin(t * 0.7) * 1.2
+        let look = mood == .run ? 1.8 : sin(t * 0.7) * 1.2
         for x in [39.0, 61.0] {
             let eh = 9 * blink
-            if mood == .happy && blink > 0.5 && cycle > 1.8 && cycle < 2.6 {
+            if mood == .fall {
+                // глазки-крестики после падения
+                var xx = Path()
+                xx.move(to: p(x - 3, 41)); xx.addLine(to: p(x + 3, 47))
+                xx.move(to: p(x + 3, 41)); xx.addLine(to: p(x - 3, 47))
+                head.stroke(xx, with: .color(hair), style: StrokeStyle(lineWidth: 1.8 * s, lineCap: .round))
+            } else if mood == .cheer || (mood == .happy && blink > 0.5 && cycle > 1.8 && cycle < 2.6) {
                 // счастливые глазки-дуги
                 var arc = Path()
                 arc.move(to: p(x - 4, 44)); arc.addQuadCurve(to: p(x + 4, 44), control: p(x, 38))
@@ -196,37 +262,89 @@ struct NutrikPainter {
             }
         }
         // Румянец
-        head.fill(Path(ellipseIn: r(29, 50, 8, 4.5)), with: .color(blush.opacity(0.7)))
-        head.fill(Path(ellipseIn: r(63, 50, 8, 4.5)), with: .color(blush.opacity(0.7)))
+        head.fill(Path(ellipseIn: r(29, 50, 8, 4.5)), with: .color(blush.opacity(mood == .cheer ? 0.95 : 0.7)))
+        head.fill(Path(ellipseIn: r(63, 50, 8, 4.5)), with: .color(blush.opacity(mood == .cheer ? 0.95 : 0.7)))
         // Рот
+        let mouthColor = Color(hex: 0x8B2635)
         var mouth = Path()
         switch mood {
         case .sad:
             mouth.move(to: p(46, 56)); mouth.addQuadCurve(to: p(54, 56), control: p(50, 52.5))
             head.stroke(mouth, with: .color(hair), style: StrokeStyle(lineWidth: 1.4 * s, lineCap: .round))
         case .eating:
-            let open = 1.5 + abs(sin(t * 10)) * 3
-            head.fill(Path(ellipseIn: r(47, 53, 6, open)), with: .color(Color(hex: 0x8B2635)))
+            let open = food != nil ? 1 + bite * 4 : 1.5 + abs(sin(t * 10)) * 3
+            head.fill(Path(ellipseIn: r(47, 53, 6, open)), with: .color(mouthColor))
+        case .talk:
+            let open = 0.8 + abs(sin(t * 11)) * abs(sin(t * 3.1)) * 4
+            head.fill(Path(ellipseIn: r(46.8, 53, 6.4, open)), with: .color(mouthColor))
+        case .run:
+            head.fill(Path(ellipseIn: r(47.5, 53.5, 5, 2.5 + abs(sin(t * 9)))), with: .color(mouthColor))
+        case .fall:
+            head.stroke(Path(ellipseIn: r(48, 53, 4, 4)), with: .color(hair), lineWidth: 1.3 * s)
+        case .cheer:
+            var d = Path()
+            d.move(to: p(45, 53)); d.addLine(to: p(55, 53))
+            d.addQuadCurve(to: p(45, 53), control: p(50, 61))
+            head.fill(d, with: .color(mouthColor))
         case .sleepy:
-            head.fill(Path(ellipseIn: r(48.5, 54, 3, 2.4)), with: .color(Color(hex: 0x8B2635)))
+            head.fill(Path(ellipseIn: r(48.5, 54, 3, 2.4)), with: .color(mouthColor))
         default:
             mouth.move(to: p(46, 53.5)); mouth.addQuadCurve(to: p(50, 55.5), control: p(48, 56))
             mouth.addQuadCurve(to: p(54, 53.5), control: p(52, 56))
             head.stroke(mouth, with: .color(hair), style: StrokeStyle(lineWidth: 1.3 * s, lineCap: .round))
         }
+
+        // Капелька пота при беге
+        if mood == .run {
+            let dy = (t * 1.5).truncatingRemainder(dividingBy: 1) * 6
+            var drop = Path()
+            drop.move(to: p(76, 28 + dy))
+            drop.addQuadCurve(to: p(76, 35 + dy), control: p(72, 33 + dy))
+            drop.addQuadCurve(to: p(76, 28 + dy), control: p(80, 33 + dy))
+            ctx.fill(drop, with: .color(Color(hex: 0x8FD3F4).opacity(0.9)))
+        }
+        // Звёздочки над головой после падения
+        if mood == .fall {
+            for k in 0..<3 {
+                let a = t * 3 + Double(k) * 2.094
+                let c = p(50 + cos(a) * 22, 12 + sin(a) * 5)
+                ctx.draw(Text("⭐️").font(.system(size: 7 * s)), at: c)
+            }
+        }
+        // Искорки радости
+        if mood == .cheer {
+            for k in 0..<4 {
+                let ph = (t * 0.9 + Double(k) / 4).truncatingRemainder(dividingBy: 1)
+                let x = [14.0, 86.0, 22.0, 80.0][k]
+                ctx.draw(Text("✨").font(.system(size: (5 + ph * 4) * s)), at: pf(x, 40 - ph * 30))
+            }
+        }
+        // Еда в лапке
+        if mood == .eating, let food {
+            ctx.draw(Text(food).font(.system(size: 13 * s)), at: CGPoint(x: handR.x, y: handR.y - 4 * s))
+            if bite > 0.92 {
+                ctx.fill(Path(ellipseIn: r(44, 60, 1.6, 1.4)), with: .color(Color(hex: 0xB07A3A)))
+                ctx.fill(Path(ellipseIn: r(57, 62, 1.3, 1.2)), with: .color(Color(hex: 0xB07A3A)))
+            }
+        }
         _ = pf(0, 0)
     }
 }
 
-/// Нутрик с облачком реплики.
+/// Нутрик с облачком реплики. Когда реплика меняется, Нутрик «говорит» (рот двигается).
 struct NutrikSays: View {
     let text: String
     var mood: NutrikMood = .happy
     var size: CGFloat = 86
+    var food: String? = nil
+    /// Нажатие на облачко (например, следующий совет)
+    var onTap: (() -> Void)? = nil
+    @State private var talking = false
+    @State private var talkToken = 0
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            NutrikView(mood: mood, size: size)
+            NutrikView(mood: talking ? .talk : mood, size: size, food: food)
             Text(text)
                 .font(.callout)
                 .foregroundStyle(Color.burgundy)
@@ -235,9 +353,22 @@ struct NutrikSays: View {
                 .overlay(BubbleShape().stroke(Color.white.opacity(0.9), lineWidth: 1))
                 .id(text)
                 .transition(.asymmetric(insertion: .scale(scale: 0.85, anchor: .leading).combined(with: .opacity), removal: .opacity))
+                .onTapGesture { onTap?() }
             Spacer(minLength: 0)
         }
         .animation(.spring(response: 0.45, dampingFraction: 0.7), value: text)
+        .onAppear { talk() }
+        .onChange(of: text) { talk() }
+    }
+
+    private func talk() {
+        talkToken += 1
+        let token = talkToken
+        talking = true
+        let secs = min(3.0, 0.6 + Double(text.count) * 0.035)
+        DispatchQueue.main.asyncAfter(deadline: .now() + secs) {
+            if token == talkToken { talking = false }
+        }
     }
 }
 

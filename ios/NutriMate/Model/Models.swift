@@ -282,6 +282,8 @@ struct AppData: Codable {
     var stats = Stats()
     var events: [EcoEvent] = []
     var notifications = false
+    /// Нутрик выбегает и реагирует на действия (съел, выбросил, заморозил…)
+    var nutrikBuddy = true
 
     init() {}
     init(from decoder: Decoder) throws {
@@ -298,6 +300,7 @@ struct AppData: Codable {
         stats = (try? c.decodeIfPresent(Stats.self, forKey: .stats)) ?? Stats()
         events = (try? c.decodeIfPresent([EcoEvent].self, forKey: .events)) ?? []
         notifications = (try? c.decodeIfPresent(Bool.self, forKey: .notifications)) ?? false
+        nutrikBuddy = (try? c.decodeIfPresent(Bool.self, forKey: .nutrikBuddy)) ?? true
     }
 }
 

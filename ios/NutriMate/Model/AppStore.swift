@@ -10,6 +10,8 @@ final class AppStore: ObservableObject {
     }
     @Published var toast: String?
     @Published var newMedal: Medal?
+    /// Сценка Нутрика (выбегает снизу слева, ест / падает / радуется)
+    @Published var reaction: NutrikReaction?
 
     private let fileURL: URL
     private var saveWork: DispatchWorkItem?
@@ -108,6 +110,15 @@ final class AppStore: ObservableObject {
         }
     }
 
+    /// Реакция Нутрика вместо обычного тоста (если сценки включены и туториал пройден).
+    func react(_ kind: NutrikReaction.Kind, _ text: String, emoji: String? = nil) {
+        if data.nutrikBuddy && data.profile.tutorialDone {
+            reaction = NutrikReaction(kind: kind, text: text, emoji: emoji)
+        } else {
+            say(text)
+        }
+    }
+
     private func haptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {
         UIImpactFeedbackGenerator(style: style).impactOccurred()
     }
@@ -195,7 +206,7 @@ final class AppStore: ObservableObject {
         }
         data.log.append(LogEntry(emoji: p.emoji, name: "\(p.name) · \(grams) g", kcal: Int((Double(p.kcal) * Double(grams) / 100).rounded())))
         haptic(.medium)
-        say("Yum! \(p.emoji) logged")
+        react(.eat, finished && p.daysLeft >= 0 && p.daysLeft <= 2 ? "Rescued & yummy! \(p.name) logged 🦸" : "Yum! \(p.name) logged", emoji: p.emoji)
         checkMedals()
     }
 
@@ -218,7 +229,7 @@ final class AppStore: ObservableObject {
         data.events.append(EcoEvent(kind: .wasted, money: price(p.category)))
         if reason == .disliked && !data.dislikes.contains(p.name.lowercased()) { data.dislikes.append(p.name.lowercased()) }
         haptic(.rigid)
-        say("Nutrik is a little sad 😿 Next time we'll save it!")
+        react(.sad, "Oops… \(p.emoji) went to the bin 😿 Next time we'll save it!")
     }
 
     func freeze(_ id: UUID) {
@@ -233,7 +244,7 @@ final class AppStore: ObservableObject {
         data.pantry[i].expiry = Calendar.current.date(byAdding: .day, value: 90, to: Date()) ?? Date()
         data.stats.frozen += 1
         haptic()
-        say("❄️ Frozen — good for 3 more months")
+        react(.cheer, "❄️ Frozen — good for 3 more months!")
         checkMedals()
     }
 
@@ -246,7 +257,7 @@ final class AppStore: ObservableObject {
         data.stats.rescuedMoney += price(p.category)
         data.events.append(EcoEvent(kind: .shared, money: price(p.category)))
         haptic(.medium)
-        say("🤝 Shared! That's real zero waste")
+        react(.cheer, "🤝 Shared! That's real zero waste")
         checkMedals()
     }
 
@@ -273,7 +284,7 @@ final class AppStore: ObservableObject {
         data.log.append(LogEntry(emoji: r.emoji, name: "\(r.name) ×\(portions)", kcal: r.kcal * portions))
         data.stats.cooked += 1
         haptic(.medium)
-        say("👩‍🍳 Bon appétit! \(r.name) cooked")
+        react(.eat, "Bon appétit! \(r.name) cooked 👩‍🍳", emoji: r.emoji)
         checkMedals()
     }
 
@@ -389,4 +400,13 @@ final class AppStore: ObservableObject {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
     }
+}
+
+/// Сценка Нутрика для оверлея `NutrikBuddy`.
+struct NutrikReaction: Identifiable, Equatable {
+    enum Kind: Equatable { case eat, sad, cheer }
+    let id = UUID()
+    let kind: Kind
+    let text: String
+    let emoji: String?
 }
