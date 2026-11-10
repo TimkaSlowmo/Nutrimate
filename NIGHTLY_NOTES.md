@@ -1,12 +1,21 @@
 # NutriMate — журнал ночного агента
 
 ## Текущее состояние
-- Веб: **v12** · iOS: **v3** · продуктов: **1301** · рецептов: **101** (zero-waste: 39)
+- Веб: **v13** · iOS: **v4** · продуктов: **1326** · рецептов: **106** (zero-waste: 42)
 - Главная версия теперь iOS (папка ios/, журнал ios/NIGHTLY_NOTES_IOS.md). Веб — только баги.
 - Единая база: `python3 tool/export_data.py` проверяет дубли/ингредиенты и пишет ios/NutriMate/Resources/foods.json.
 - Иконки: все продукты показываются 3D-картинками (Fluent 3D + свои). Уникальная иконка: **40 / 1218**.
 - Локально Flutter недоступен (сервер Google заблокирован прокси) → компиляцию проверяет GitHub Actions.
   Неудачная сборка не публикуется, так что сайт остаётся на прошлой версии.
+
+## 2026-11-10 (ночь 5) · веб v13 · iOS v4
+- **iOS v4**: офлайн-чат с Нутриком (рецепты, сроки, хранение, заморозка, калории, покупки, нелюбимые продукты), история сохраняется.
+- **Веб v13**: только данные (багов не поступало).
+- +25 продуктов: Khvorost, Churchkhela, Zharkoe, Mimosa Salad, Shalgam Salad, Sirne, Orama, Sochniki, Mutton, Lamb Liver,
+  Jida Berries, Alycha Cherry Plum, Vobla, Caspian Kilka, Koktal, Bryndza; США: Snickerdoodle Cookies, Grilled Cheese Sandwich,
+  BLT Sandwich, Chicken Noodle Soup, Fish Tacos, Sweet Potato Casserole, Breakfast Burrito, Kettle Corn, Hush Puppies.
+- +5 рецептов: Leftover Zharkoe Pot Roast (zw), Shalgam Turnip Salad, Sour Kefir Khvorost (zw), Leftover Chicken Noodle Soup (zw),
+  Dorm Grilled Cheese with Tomato. Всего: 1326 продуктов, 106 рецептов (42 zero-waste).
 
 ## 2026-11-09 (ночь 4) · веб v12 · iOS v3
 - **iOS v3**: Нутрик бегает, ест продукт в лапке, спотыкается и падает, радуется, говорит; сценки на действия; «рецепт дня» на Home; рецепт в утреннем уведомлении.
