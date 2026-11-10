@@ -12,7 +12,7 @@ struct TutorialStep {
 enum Tutorial {
     static let steps: [TutorialStep] = [
         TutorialStep(tab: .home, title: "Home",
-                     text: "Hi again! This is Home. I show what to eat first, your calories today and the money at risk.",
+                     text: "Hi again! This is Home. I show what to eat first, your calories today and the money at risk. Tap \"Ask Nutrik\" to chat with me!",
                      mood: .wave),
         TutorialStep(tab: .fridge, title: "Fridge",
                      text: "Your fridge! Every product has a freshness bar. Swipe right if you ate it, left to freeze, share or bin it.",

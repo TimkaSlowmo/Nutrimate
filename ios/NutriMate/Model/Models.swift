@@ -43,6 +43,7 @@ struct Recipe: Codable, Hashable, Identifiable {
 private struct DBFile: Codable {
     let foods: [Food]
     let recipes: [Recipe]
+    let tips: [String: String]?
 }
 
 struct FoodDB {
@@ -50,12 +51,14 @@ struct FoodDB {
     let recipes: [Recipe]
     let byName: [String: Food]
     let categories: [String]
+    /// Советы по хранению (по названию продукта или категории) — из storageTips в lib/main.dart
+    var tips: [String: String] = [:]
 
     static let shared: FoodDB = {
         guard let url = Bundle.main.url(forResource: "foods", withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let file = try? JSONDecoder().decode(DBFile.self, from: data)
-        else { return FoodDB(foods: [], recipes: [], byName: [:], categories: []) }
+        else { return FoodDB(foods: [], recipes: [], byName: [:], categories: [], tips: [:]) }
         var seen = Set<String>()
         var cats: [String] = []
         for f in file.foods where !seen.contains(f.category) {
@@ -64,7 +67,7 @@ struct FoodDB {
         }
         var map: [String: Food] = [:]
         for f in file.foods where map[f.name] == nil { map[f.name] = f }
-        return FoodDB(foods: file.foods, recipes: file.recipes, byName: map, categories: cats)
+        return FoodDB(foods: file.foods, recipes: file.recipes, byName: map, categories: cats, tips: file.tips ?? [:])
     }()
 
     static let catEmoji: [String: String] = [
@@ -178,6 +181,15 @@ struct LogEntry: Codable, Identifiable, Hashable {
     var date: Date = Date()
 }
 
+/// Сообщение в чате с Нутриком. `recipe` — название рецепта, который можно открыть из ответа.
+struct ChatMessage: Codable, Identifiable, Hashable {
+    var id: UUID = UUID()
+    var text: String
+    var fromUser: Bool
+    var recipe: String? = nil
+    var date: Date = Date()
+}
+
 struct WeightEntry: Codable, Identifiable, Hashable {
     var id: UUID = UUID()
     var date: Date
@@ -284,6 +296,10 @@ struct AppData: Codable {
     var notifications = false
     /// Нутрик выбегает и реагирует на действия (съел, выбросил, заморозил…)
     var nutrikBuddy = true
+    /// История чата с Нутриком (последние 80 сообщений)
+    var chat: [ChatMessage] = []
+    /// Какой по счёту рецепт предлагать на «another»
+    var suggestIndex = 0
 
     init() {}
     init(from decoder: Decoder) throws {
@@ -301,6 +317,8 @@ struct AppData: Codable {
         events = (try? c.decodeIfPresent([EcoEvent].self, forKey: .events)) ?? []
         notifications = (try? c.decodeIfPresent(Bool.self, forKey: .notifications)) ?? false
         nutrikBuddy = (try? c.decodeIfPresent(Bool.self, forKey: .nutrikBuddy)) ?? true
+        chat = (try? c.decodeIfPresent([ChatMessage].self, forKey: .chat)) ?? []
+        suggestIndex = (try? c.decodeIfPresent(Int.self, forKey: .suggestIndex)) ?? 0
     }
 }
 
@@ -322,5 +340,6 @@ struct Medal: Identifiable {
         Medal(id: "freezer", emoji: "❄️", title: "Ice Saver", desc: "Freeze 3 products before they spoil"),
         Medal(id: "share", emoji: "🤝", title: "Good Neighbor", desc: "Share food with someone instead of binning it"),
         Medal(id: "cleanfridge", emoji: "✨", title: "Clean Fridge", desc: "5+ products and nothing expired"),
+        Medal(id: "chatty", emoji: "💬", title: "Chatterbox", desc: "Ask Nutrik 5 questions"),
     ]
 }

@@ -389,6 +389,7 @@ final class AppStore: ObservableObject {
         case "freezer": return s.frozen >= 3
         case "share": return s.shared >= 1
         case "cleanfridge": return data.pantry.count >= 5 && expired.isEmpty
+        case "chatty": return data.chat.filter(\.fromUser).count >= 5
         default: return co2 >= 2
         }
     }

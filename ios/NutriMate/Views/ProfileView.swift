@@ -5,6 +5,7 @@ struct ProfileView: View {
     @State private var confirmErase = false
     @State private var newWeight = ""
     @State private var showEco = false
+    @State private var showChat = false
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -109,6 +110,22 @@ struct ProfileView: View {
                             Text("Runs in when you eat, cook, freeze or bin food").font(.caption).foregroundStyle(.secondary)
                         }
                     }
+                    Button("💬 Chat with Nutrik") { showChat = true }
+                    if !store.data.dislikes.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("🙅 Skipped in recipes").font(.subheadline)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(store.data.dislikes, id: \.self) { d in
+                                        Button {
+                                            withAnimation { store.data.dislikes.removeAll { $0 == d } }
+                                        } label: { Chip(text: "\(d) ✕") }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                        }
+                    }
                     Button("🎓 Replay tutorial") { store.replayTutorial() }
                 } header: {
                     Text("Nutrik")
@@ -139,6 +156,7 @@ struct ProfileView: View {
             .background(LiveBackground())
             .navigationTitle("Profile")
             .sheet(isPresented: $showEco) { EcoImpactView() }
+            .sheet(isPresented: $showChat) { ChatView() }
             .alert("Erase all data?", isPresented: $confirmErase) {
                 Button("Erase", role: .destructive) { store.eraseAll() }
                 Button("Cancel", role: .cancel) {}

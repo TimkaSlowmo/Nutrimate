@@ -35,6 +35,9 @@ for chunk in re.split(r'\n  Recipe\(', block)[1:]:
     recipes.append({'name': dstr(name), 'emoji': dstr(emoji), 'time': dstr(time), 'servings': int(serv),
                     'ingredients': ing, 'steps': [dstr(x) for x in re.findall(STR, steps)],
                     'staples': dstr(staples), 'zeroWaste': bool(zw)})
+tb = src[src.index('const storageTips = {'):]
+tb = tb[:tb.index('\n};')]
+tips = {dstr(a): dstr(b) for a, b in re.findall(STR + r":\s*" + STR, tb)}
 rn = [r['name'].lower() for r in recipes]
 for n in set(rn):
     if rn.count(n) > 1: errors.append('duplicate recipe: ' + n)
@@ -42,9 +45,9 @@ expected = src.count('\n  Recipe(\n')
 if expected != len(recipes): errors.append(f'parsed {len(recipes)} recipes, expected {expected}')
 if errors:
     print('\n'.join(errors)); sys.exit(1)
-print(f'OK: {len(foods)} products, {len(recipes)} recipes ({sum(r["zeroWaste"] for r in recipes)} zero-waste), {len(set(f["category"] for f in foods))} categories')
+print(f'OK: {len(foods)} products, {len(recipes)} recipes ({sum(r["zeroWaste"] for r in recipes)} zero-waste), {len(set(f["category"] for f in foods))} categories, {len(tips)} storage tips')
 if '--check' not in sys.argv:
     out = root / 'ios/NutriMate/Resources/foods.json'
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps({'foods': foods, 'recipes': recipes}, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+    out.write_text(json.dumps({'foods': foods, 'recipes': recipes, 'tips': tips}, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     print('wrote', out.relative_to(root))

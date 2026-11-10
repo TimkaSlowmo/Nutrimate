@@ -6,6 +6,7 @@ struct HomeView: View {
     @State private var showShopping = false
     @State private var showDiary = false
     @State private var showEco = false
+    @State private var showChat = false
     @State private var openItem: PantryItem?
     @State private var tipIndex: Int?
 
@@ -72,6 +73,7 @@ struct HomeView: View {
                         withAnimation { tipIndex = (tipIndex ?? -1) + 1 }
                     }
 
+                    chatCard
                     caloriesCard
                     rescueCard
                     recipeOfDayCard
@@ -90,9 +92,32 @@ struct HomeView: View {
             .sheet(isPresented: $showShopping) { ShoppingView() }
             .sheet(isPresented: $showDiary) { DiaryView() }
             .sheet(isPresented: $showEco) { EcoImpactView() }
+            .sheet(isPresented: $showChat) { ChatView() }
             .sheet(item: $openItem) { p in ItemSheet(id: p.id) }
             .navigationDestination(for: Recipe.self) { r in RecipeDetail(recipe: r) }
         }
+    }
+
+    /// Кнопка чата с Нутриком + последняя реплика.
+    private var chatCard: some View {
+        Button { showChat = true } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle().fill(LinearGradient(colors: [.burgundyLight, .burgundy], startPoint: .top, endPoint: .bottom))
+                    Image(systemName: "bubble.left.and.bubble.right.fill").foregroundStyle(Color.cream).font(.system(size: 17, weight: .semibold))
+                }
+                .frame(width: 44, height: 44)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Ask Nutrik").font(.headline).foregroundStyle(Color.burgundy)
+                    Text(store.data.chat.last(where: { !$0.fromUser })?.text ?? "What can I cook? What expires soon? How to store…")
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.caption.bold()).foregroundStyle(Color.burgundy.opacity(0.5))
+            }
+            .glassCard(radius: 18, padding: 12)
+        }
+        .buttonStyle(.plain)
     }
 
     private var caloriesCard: some View {
