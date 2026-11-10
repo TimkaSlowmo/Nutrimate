@@ -16,7 +16,7 @@ Future<void> main() async {
 }
 
 // Номер версии: ночной агент увеличивает его на 1 при каждом обновлении.
-const appVersion = 13;
+const appVersion = 14;
 
 const burgundy = Color(0xFF6A041C);
 const cream = Color(0xFFF5F1E5);
@@ -1563,7 +1563,8 @@ class AppState extends ChangeNotifier {
   double weight = 70, height = 175;
   int age = 22;
 
-  int get targetCalories => ((10 * weight) + (6.25 * height) - (5 * age) + (isMan ? 5 : -161)).round();
+  // BMR (Миффлин — Сан-Жеор) × 1.375 (лёгкая активность) = калории, чтобы держать вес. Раньше показывался только BMR — цель была занижена.
+  int get targetCalories => (((10 * weight) + (6.25 * height) - (5 * age) + (isMan ? 5 : -161)) * 1.375).round();
   int kcalOn(int day) => log.where((e) => e.day == day).fold<int>(0, (s, e) => s + e.kcal);
   int get eatenCalories => kcalOn(todayNum());
   List<PantryItem> get expiringSoon => (pantry.where((p) => p.daysLeft <= 2).toList()..sort((a, b) => a.daysLeft.compareTo(b.daysLeft)));

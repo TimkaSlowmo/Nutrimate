@@ -6,6 +6,7 @@ struct ProfileView: View {
     @State private var newWeight = ""
     @State private var showEco = false
     @State private var showChat = false
+    @State private var showBody = false
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -49,10 +50,25 @@ struct ProfileView: View {
                         }
                         .disabled(newWeight.isEmpty)
                     }
+                    Picker("Activity", selection: $store.data.profile.activity) {
+                        ForEach(0..<Profile.activityShort.count, id: \.self) { i in Text(Profile.activityShort[i]).tag(i) }
+                    }
+                    Picker("Goal", selection: $store.data.profile.goal) {
+                        Text("Lose").tag(-1)
+                        Text("Keep").tag(0)
+                        Text("Gain").tag(1)
+                    }
                     HStack {
                         Text("Daily goal")
                         Spacer()
                         Text("\(store.targetCalories) kcal").bold().foregroundStyle(Color.burgundy)
+                    }
+                    Button { showBody = true } label: {
+                        HStack {
+                            Text("📟 Body dashboard (BMI)").bold().foregroundStyle(Color.burgundy)
+                            Spacer()
+                            Text(String(format: "BMI %.1f", store.data.profile.bmi)).font(.subheadline).foregroundStyle(store.data.profile.bmiCategory.color)
+                        }
                     }
                 }
                 .listRowBackground(Color.white.opacity(0.55))
@@ -157,6 +173,7 @@ struct ProfileView: View {
             .navigationTitle("Profile")
             .sheet(isPresented: $showEco) { EcoImpactView() }
             .sheet(isPresented: $showChat) { ChatView() }
+            .sheet(isPresented: $showBody) { BodyView() }
             .alert("Erase all data?", isPresented: $confirmErase) {
                 Button("Erase", role: .destructive) { store.eraseAll() }
                 Button("Cancel", role: .cancel) {}

@@ -243,6 +243,10 @@ struct Profile: Codable {
     var age = 20
     var weight = 70.0
     var height = 175.0
+    /// Уровень активности: 0 сидячий … 4 очень активный (множитель к BMR)
+    var activity = 1
+    /// Цель: -1 похудеть, 0 держать вес, 1 набрать
+    var goal = 0
 
     init() {}
     init(from decoder: Decoder) throws {
@@ -256,11 +260,56 @@ struct Profile: Codable {
         age = (try? c.decodeIfPresent(Int.self, forKey: .age)) ?? d.age
         weight = (try? c.decodeIfPresent(Double.self, forKey: .weight)) ?? d.weight
         height = (try? c.decodeIfPresent(Double.self, forKey: .height)) ?? d.height
+        activity = min(4, max(0, (try? c.decodeIfPresent(Int.self, forKey: .activity)) ?? d.activity))
+        goal = min(1, max(-1, (try? c.decodeIfPresent(Int.self, forKey: .goal)) ?? d.goal))
     }
 
-    /// Формула Миффлина — Сан-Жеора (как в веб-версии)
-    var targetCalories: Int {
+    static let activityTitles = ["🛋️ Sitting most of the day", "🚶 Light (walks, 1–2 workouts/week)", "🏃 Moderate (3–5 workouts/week)", "🏋️ Active (6–7 workouts/week)", "⚡ Very active (sport + physical job)"]
+    static let activityShort = ["Sitting", "Light", "Moderate", "Active", "Very active"]
+    static let activityFactor = [1.2, 1.375, 1.55, 1.725, 1.9]
+    static let goalTitles = [-1: "Lose", 0: "Keep", 1: "Gain"]
+
+    /// Обмен веществ в покое — формула Миффлина — Сан-Жеора
+    var bmr: Int {
         Int((10 * weight + 6.25 * height - 5 * Double(age) + (isMan ? 5 : -161)).rounded())
+    }
+    /// Сколько нужно, чтобы держать вес (BMR × активность)
+    var maintenance: Int { Int((Double(bmr) * Profile.activityFactor[min(4, max(0, activity))]).rounded()) }
+    /// Поправка на цель: −400 ккал похудеть, +300 ккал набрать
+    var goalAdjust: Int { goal < 0 ? -400 : goal > 0 ? 300 : 0 }
+    /// Цель на день (не ниже BMR при похудении)
+    var targetCalories: Int { goal < 0 ? max(bmr, maintenance + goalAdjust) : maintenance + goalAdjust }
+
+    /// Индекс массы тела
+    var bmi: Double { height > 0 ? weight / pow(height / 100, 2) : 0 }
+    var bmiCategory: BMICategory { BMICategory(bmi) }
+    /// Здоровый вес для этого роста (ИМТ 18.5–24.9)
+    var healthyRange: ClosedRange<Double> {
+        let h2 = pow(height / 100, 2)
+        return (18.5 * h2)...(24.9 * h2)
+    }
+}
+
+enum BMICategory: String {
+    case under, normal, over, obese
+    init(_ bmi: Double) {
+        self = bmi < 18.5 ? .under : bmi < 25 ? .normal : bmi < 30 ? .over : .obese
+    }
+    var title: String {
+        switch self {
+        case .under: return "Underweight"
+        case .normal: return "Healthy weight"
+        case .over: return "Overweight"
+        case .obese: return "Obesity"
+        }
+    }
+    var emoji: String {
+        switch self {
+        case .under: return "🪶"
+        case .normal: return "💚"
+        case .over: return "🟠"
+        case .obese: return "❤️‍🩹"
+        }
     }
 }
 

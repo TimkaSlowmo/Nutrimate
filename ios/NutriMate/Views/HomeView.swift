@@ -7,6 +7,7 @@ struct HomeView: View {
     @State private var showDiary = false
     @State private var showEco = false
     @State private var showChat = false
+    @State private var showBody = false
     @State private var openItem: PantryItem?
     @State private var tipIndex: Int?
 
@@ -75,6 +76,7 @@ struct HomeView: View {
 
                     chatCard
                     caloriesCard
+                    Button { showBody = true } label: { BodyMiniCard() }.buttonStyle(.plain)
                     rescueCard
                     recipeOfDayCard
                     statsRow
@@ -93,6 +95,7 @@ struct HomeView: View {
             .sheet(isPresented: $showDiary) { DiaryView() }
             .sheet(isPresented: $showEco) { EcoImpactView() }
             .sheet(isPresented: $showChat) { ChatView() }
+            .sheet(isPresented: $showBody) { BodyView() }
             .sheet(item: $openItem) { p in ItemSheet(id: p.id) }
             .navigationDestination(for: Recipe.self) { r in RecipeDetail(recipe: r) }
         }

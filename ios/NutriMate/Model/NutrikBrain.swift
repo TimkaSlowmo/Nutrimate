@@ -118,13 +118,17 @@ enum NutrikBrain {
             return NutrikReply(text: "Today: \(eaten) of \(target) kcal. \(tail)", mood: .happy)
         }
 
-        if has(["weight", "weigh", "вес"]) {
+        if has(["weight", "weigh", "bmi", "вес"]) {
             let w = store.data.weights.sorted { $0.date < $1.date }
             guard let last = w.last else { return NutrikReply(text: "No weigh-ins yet. Add one in Profile → Weight ⚖️", mood: .happy) }
             let diff = last.kg - (w.first?.kg ?? last.kg)
             let sign = diff > 0 ? "+" : ""
             let trend = abs(diff) < 0.05 ? "stable since your first weigh-in" : sign + String(format: "%.1f", diff) + " kg since your first weigh-in"
-            return NutrikReply(text: String(format: "⚖️ Latest: %.1f kg, ", last.kg) + trend + ".", mood: .happy)
+            let pr = store.data.profile
+            let bmi = String(format: "%.1f", pr.bmi)
+            let r = pr.healthyRange
+            let range = "\(Int(r.lowerBound.rounded()))–\(Int(r.upperBound.rounded())) kg"
+            return NutrikReply(text: String(format: "⚖️ Latest: %.1f kg, ", last.kg) + trend + ". BMI \(bmi) — \(pr.bmiCategory.title.lowercased()) (healthy for your height: \(range)). Open Profile → Body dashboard for the full gauge 📟", mood: .happy)
         }
 
         if has(["co2", "co₂", "impact", "saved", "planet", "money", "экол"]) || t.range(of: #"\beco\b"#, options: .regularExpression) != nil {
