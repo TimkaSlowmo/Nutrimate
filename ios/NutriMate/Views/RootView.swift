@@ -25,7 +25,8 @@ enum AppTab: Int, CaseIterable, Identifiable {
 
 struct RootView: View {
     @EnvironmentObject var store: AppStore
-    @State private var tab: AppTab = .home
+    @State private var tab: AppTab = UIShot.enabled ? UIShot.tab : .home
+    @State private var shotSheet: ShotSheet? = UIShot.sheet.map { ShotSheet(id: $0) }
     @State private var tutorialStep = 0
 
     var body: some View {
@@ -49,6 +50,15 @@ struct RootView: View {
                     .padding(.top, 6)
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .onTapGesture { withAnimation { store.toast = nil } }
+            }
+        }
+        .sheet(item: $shotSheet) { s in
+            switch s.id {
+            case "body": BodyView()
+            case "chat": ChatView()
+            case "eco": EcoImpactView()
+            case "shopping": ShoppingView()
+            default: DiaryView()
             }
         }
         .sheet(item: $store.newMedal) { m in
@@ -88,6 +98,9 @@ struct RootView: View {
         }
     }
 }
+
+/// Лист, который открывается сразу при запуске в режиме скриншотов (`-sheet body`).
+struct ShotSheet: Identifiable { let id: String }
 
 extension Medal: Equatable {
     static func == (a: Medal, b: Medal) -> Bool { a.id == b.id }

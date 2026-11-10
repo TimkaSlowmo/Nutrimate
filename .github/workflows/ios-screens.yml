@@ -1,0 +1,106 @@
+name: iOS screenshots (simulator)
+
+# Собирает приложение для симулятора, запускает его на iPhone (iOS 18) с демо-данными
+# и делает скриншоты всех экранов + короткое видео. Результат — artifact «screens»
+# (ночной агент скачивает его и смотрит картинки, чтобы видеть приложение глазами).
+on:
+  push:
+    branches: [main]
+    paths: ['ios/**', '.github/workflows/ios-screens.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: ios-screens
+  cancel-in-progress: true
+
+jobs:
+  screens:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build for simulator
+        working-directory: ios
+        run: |
+          xcodebuild -project NutriMate.xcodeproj -scheme NutriMate -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO build > build.log 2>&1 || {
+              grep -E "error:|fatal" build.log | sort -u | head -80; tail -40 build.log; exit 1; }
+
+      - name: Boot simulator
+        run: |
+          xcrun simctl list runtimes
+          # самый похожий на iPhone 13 Pro Max (6.7") из доступных, на iOS 18
+          RUNTIME=$(xcrun simctl list runtimes -j | python3 -c "import json,sys; r=[x for x in json.load(sys.stdin)['runtimes'] if x['isAvailable'] and x['platform']=='iOS' and x['version'].startswith('18')]; print(sorted(r,key=lambda x:[int(p) for p in x['version'].split('.')])[-1]['identifier'] if r else '')")
+          if [ -z "$RUNTIME" ]; then
+            RUNTIME=$(xcrun simctl list runtimes -j | python3 -c "import json,sys; r=[x for x in json.load(sys.stdin)['runtimes'] if x['isAvailable'] and x['platform']=='iOS']; print(r[-1]['identifier'])")
+          fi
+          echo "Runtime: $RUNTIME"
+          for M in "iPhone 16 Pro Max" "iPhone 15 Pro Max" "iPhone 16 Plus" "iPhone 16 Pro" "iPhone 16"; do
+            TYPE=$(xcrun simctl list devicetypes -j | python3 -c "import json,sys; t=[x['identifier'] for x in json.load(sys.stdin)['devicetypes'] if x['name']=='$M']; print(t[0] if t else '')")
+            if [ -n "$TYPE" ]; then UDID=$(xcrun simctl create shots "$TYPE" "$RUNTIME") && break; fi
+          done
+          echo "Device: $M $UDID"
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time "9:41" --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3 || true
+          xcrun simctl install "$UDID" ios/build/Build/Products/Debug-iphonesimulator/NutriMate.app
+
+      - name: Take screenshots
+        run: |
+          mkdir -p screens
+          BID=kz.innotech.nutrimate.app
+          shot() { # имя, ожидание, аргументы
+            NAME=$1; WAIT=$2; shift 2
+            xcrun simctl terminate "$UDID" $BID 2>/dev/null || true
+            xcrun simctl launch "$UDID" $BID -uiShot "$@"
+            sleep "$WAIT"
+            xcrun simctl io "$UDID" screenshot --type=png "screens/$NAME.png"
+            echo "📸 $NAME"
+          }
+          shot 00-onboarding 10 -onboarding
+          shot 01-home 6 -tab home
+          shot 02-fridge 5 -tab fridge
+          shot 03-search 5 -tab search
+          shot 04-recipes 5 -tab recipes
+          shot 05-profile 5 -tab profile
+          shot 06-body 6 -sheet body
+          shot 07-chat 5 -sheet chat
+          shot 08-eco 5 -sheet eco
+          shot 09-diary 5 -sheet diary
+          shot 10-shopping 5 -sheet shopping
+          shot 11-tutorial 6 -tutorial
+          # короткое видео: Home и анимации Нутрика
+          xcrun simctl terminate "$UDID" $BID 2>/dev/null || true
+          xcrun simctl io "$UDID" recordVideo --codec=h264 --force screens/home.mp4 &
+          REC=$!
+          sleep 1
+          xcrun simctl launch "$UDID" $BID -uiShot -sheet body
+          sleep 7
+          kill -INT $REC; wait $REC || true
+          ls -la screens
+          # проверка на падение: приложение должно быть живо
+          xcrun simctl spawn "$UDID" launchctl list | grep -q "$BID" && echo "App is running ✅" || echo "::warning::App is not running — possible crash"
+
+      - name: Crash logs
+        if: always()
+        run: |
+          mkdir -p screens/crash
+          find ~/Library/Logs/DiagnosticReports -name "NutriMate*" -newer ios/project.yml -exec cp {} screens/crash/ \; 2>/dev/null || true
+          ls screens/crash
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screens
+          path: screens
+          retention-days: 14

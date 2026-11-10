@@ -1,0 +1,83 @@
+import Foundation
+
+/// Режим скриншотов для CI (симулятор): запуск с аргументами
+/// `-uiShot` (демо-данные, ничего не сохраняет), `-tab fridge`, `-sheet body`, `-onboarding`, `-tutorial`.
+/// На телефоне владельца эти аргументы никогда не передаются, поэтому режим не мешает обычной работе.
+enum UIShot {
+    static let args = ProcessInfo.processInfo.arguments
+    static var enabled: Bool { args.contains("-uiShot") }
+    static func value(_ key: String) -> String? {
+        guard let i = args.firstIndex(of: key), i + 1 < args.count else { return nil }
+        return args[i + 1]
+    }
+    static var tab: AppTab {
+        switch value("-tab") {
+        case "fridge": return .fridge
+        case "search": return .search
+        case "recipes": return .recipes
+        case "profile": return .profile
+        default: return .home
+        }
+    }
+    static var sheet: String? { value("-sheet") }
+
+    /// Правдоподобный пользователь: продукты разной свежести, дневник, вес, статистика, чат.
+    static func demoData() -> AppData {
+        var d = AppData()
+        let onboarding = args.contains("-onboarding")
+        d.profile.registered = !onboarding
+        d.profile.tutorialDone = !args.contains("-tutorial")
+        d.profile.name = "Alex"
+        d.profile.isMan = true
+        d.profile.age = 19
+        d.profile.height = 176
+        d.profile.weight = 52
+        d.profile.activity = 1
+        d.notifications = false
+        if onboarding { return d }
+        let db = FoodDB.shared
+        let now = Date()
+        func day(_ n: Int) -> Date { Calendar.current.date(byAdding: .day, value: n, to: now) ?? now }
+        let items: [(String, Int, StorageKind?)] = [
+            ("Banana", 0, nil), ("Milk", 1, nil), ("Spinach", -1, nil), ("Tomato", 2, nil), ("Chicken Breast", 1, nil),
+            ("Eggs", 12, nil), ("Cheddar Cheese", 9, nil), ("Kefir", 3, nil), ("Apple", 10, nil), ("Carrot", 14, nil),
+            ("Potato", 20, nil), ("Onion", 25, nil), ("Rice", 300, nil), ("Butter", 18, nil), ("White Bread", 2, nil),
+            ("Strawberry", 1, nil), ("Pelmeni", 120, .freezer), ("Kurt", 60, nil),
+        ]
+        for (n, left, place) in items {
+            guard let f = db.byName[n] else { continue }
+            d.pantry.append(PantryItem(name: f.name, emoji: f.emoji, category: f.category, kcal: f.kcal,
+                                       added: day(-max(1, f.shelf - left)), expiry: day(left),
+                                       storage: place ?? FoodDB.defaultStorage(f)))
+        }
+        d.log = [
+            LogEntry(emoji: "🥣", name: "Oatmeal · 250 g", kcal: 220, date: now.addingTimeInterval(-5 * 3600)),
+            LogEntry(emoji: "🍌", name: "Banana · 120 g", kcal: 107, date: now.addingTimeInterval(-4 * 3600)),
+            LogEntry(emoji: "🍗", name: "Chicken Breast · 200 g", kcal: 330, date: now.addingTimeInterval(-2 * 3600)),
+        ]
+        for back in 1...6 {
+            d.log.append(LogEntry(emoji: "🍽️", name: "Meals", kcal: 1500 + back * 90, date: day(-back)))
+        }
+        d.weights = [WeightEntry(date: day(-28), kg: 51.2), WeightEntry(date: day(-21), kg: 51.5),
+                     WeightEntry(date: day(-14), kg: 51.6), WeightEntry(date: day(-7), kg: 51.9),
+                     WeightEntry(date: now, kg: 52)]
+        d.shopping = ["Yogurt", "Oats", "Peanut Butter"]
+        d.stats.consumed = 24; d.stats.rescued = 9; d.stats.wasted = 2; d.stats.cooked = 4
+        d.stats.frozen = 3; d.stats.shared = 1; d.stats.bought = 2
+        d.stats.rescuedMoney = 21.5; d.stats.wastedMoney = 4
+        d.stats.streakStart = day(-5)
+        for back in 0..<30 {
+            let kind: EcoKind = back % 9 == 4 ? .wasted : back % 3 == 0 ? .rescued : back % 4 == 1 ? .frozen : .eaten
+            d.events.append(EcoEvent(kind: kind, money: 2, date: day(-back)))
+        }
+        d.wasteLog = [WasteEntry(name: "Lettuce", category: "Vegetables", reason: .forgot, money: 1.2, date: day(-9)),
+                      WasteEntry(name: "Yogurt", category: "Dairy", reason: .expired, money: 2, date: day(-18))]
+        d.unlocked = ["first", "rescue", "chef", "fridge", "freezer", "share", "shop"]
+        d.chat = [
+            ChatMessage(text: "What can I cook?", fromUser: true),
+            ChatMessage(text: "🍳 Rescue omelette — 310 kcal per serving, 10 min. ♻️ Zero-waste! You have everything! Say \"another\" for more ideas.",
+                        fromUser: false, recipe: db.recipes.first?.name),
+        ]
+        return d
+    }
+}

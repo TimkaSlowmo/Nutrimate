@@ -22,6 +22,12 @@ final class AppStore: ObservableObject {
     init() {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        if UIShot.enabled {
+            // режим скриншотов: демо-данные в отдельном файле, настоящие данные не трогаем
+            fileURL = dir.appendingPathComponent("nutrimate-uishot.json")
+            data = UIShot.demoData()
+            return
+        }
         fileURL = dir.appendingPathComponent("nutrimate.json")
         data = AppStore.load(from: fileURL)
         if data.notifications { Reminders.reschedule(data) }
