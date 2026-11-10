@@ -9,6 +9,9 @@ on:
     paths: ['ios/**', '.github/workflows/ios-screens.yml']
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 concurrency:
   group: ios-screens
   cancel-in-progress: true
@@ -104,3 +107,19 @@ jobs:
           name: screens
           path: screens
           retention-days: 14
+
+      - name: Publish to branch ios-screens (для агента и владельца)
+        if: always() && github.ref == 'refs/heads/main'
+        run: |
+          cd screens
+          cat > README.md <<MD
+          # NutriMate — скриншоты из симулятора
+          Сборка: ${GITHUB_SHA::7}, $(date -u '+%Y-%m-%d %H:%M UTC'). Устройство: iPhone 16 Pro Max (iOS 18), демо-данные.
+          MD
+          for f in *.png; do echo "### ${f%.png}" >> README.md; echo "<img src=\"$f\" width=\"300\">" >> README.md; echo >> README.md; done
+          git init -q -b ios-screens
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -qm "screens for ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ios-screens
