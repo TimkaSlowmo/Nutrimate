@@ -5,6 +5,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'food_icons.dart';
@@ -2133,6 +2134,85 @@ abstract class AiService {
   Future<String> reply(String message, AppState state);
 }
 
+// Настоящий ИИ-Нутрик: тот же бесплатный Cloudflare Worker, что и в iOS (server/).
+// Команды, меняющие данные («не люблю X», список покупок), — локально; при любой ошибке,
+// лимите или без сети — молча ответ офлайн-помощника MockAiService.
+class SmartAiService implements AiService {
+  static const serverUrl = 'https://nutrimate-nutrik.temirlanzaks.workers.dev';
+  final _local = MockAiService();
+  int _pausedDay = -1; // после 429 — до завтра только офлайн
+  String? _deviceId;
+
+  static bool isLocalCommand(String message) {
+    final t = message.toLowerCase();
+    bool has(List<String> w) => w.any(t.contains);
+    if (RegExp(r"(don't like|dont like|do not like|hate|allergic to|не люблю|без)\s+([^\s,.!?]+)").hasMatch(t)) return true;
+    if (RegExp(r"i (like|love) ([^\s,.!?]+) again").hasMatch(t)) return true;
+    if (has(['shopping', 'to buy', 'need to buy', 'купить', 'add ']) && has(['shopping list', 'list', 'buy', 'купить'])) return true;
+    return false;
+  }
+
+  Future<String> _device() async {
+    if (_deviceId != null) return _deviceId!;
+    var id = '';
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      id = prefs.getString('nutrik_device_id') ?? '';
+      if (id.isEmpty) {
+        final r = Random.secure();
+        id = 'web-${List.generate(24, (_) => 'abcdefghijklmnopqrstuvwxyz0123456789'[r.nextInt(36)]).join()}';
+        await prefs.setString('nutrik_device_id', id);
+      }
+    } catch (_) {
+      id = 'web-${DateTime.now().millisecondsSinceEpoch}';
+    }
+    return _deviceId = id;
+  }
+
+  Map<String, dynamic> _context(AppState s) {
+    final have = s.pantryNames;
+    final fridge = [...s.pantry]..sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
+    return {
+      'name': s.name,
+      'fridge': fridge.take(40).map((p) => {'name': p.food.name, 'daysLeft': p.daysLeft}).toList(),
+      'kcalToday': s.eatenCalories,
+      'kcalGoal': s.targetCalories,
+      'dislikes': s.dislikes.take(20).toList(),
+      'recipes': rankRecipes(s).take(8).map((r) => {
+            'name': r.name,
+            'kcal': r.kcal,
+            'time': r.time,
+            'ingredients': r.ingredients.map((i) => '${i.name} ${i.g} g').toList(),
+            'missing': r.missing(have),
+          }).toList(),
+    };
+  }
+
+  @override
+  Future<String> reply(String message, AppState s) async {
+    if (serverUrl.isEmpty || isLocalCommand(message) || _pausedDay == todayNum()) return _local.reply(message, s);
+    try {
+      final history = s.chat.skip(1).toList();
+      final msgs = history
+          .skip(history.length > 10 ? history.length - 10 : 0)
+          .map((m) => {'role': m.isUser ? 'user' : 'assistant', 'content': m.text})
+          .toList();
+      if (msgs.isEmpty || msgs.last['role'] != 'user') msgs.add({'role': 'user', 'content': message});
+      final res = await http
+          .post(Uri.parse('$serverUrl/chat'),
+              headers: {'content-type': 'application/json', 'x-nutrimate-client': 'web'},
+              body: jsonEncode({'deviceId': await _device(), 'messages': msgs, 'context': _context(s)}))
+          .timeout(const Duration(seconds: 12));
+      if (res.statusCode == 429) _pausedDay = todayNum();
+      if (res.statusCode == 200) {
+        final reply = (jsonDecode(utf8.decode(res.bodyBytes)) as Map)['reply'];
+        if (reply is String && reply.trim().isNotEmpty) return '${reply.trim()}\n\n✨ AI · can be wrong';
+      }
+    } catch (_) {/* офлайн-режим */}
+    return _local.reply(message, s);
+  }
+}
+
 class MockAiService implements AiService {
   List<FoodItem> _mentioned(String t) {
     final exact = foodDatabase.where((f) => t.contains(f.name.toLowerCase())).toList();
@@ -2300,7 +2380,7 @@ const headStyle = TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: bu
 // ───────────────────────── ПРИЛОЖЕНИЕ ─────────────────────────
 
 final appState = AppState();
-final aiService = MockAiService();
+final aiService = SmartAiService();
 
 class CalorieApp extends StatelessWidget {
   const CalorieApp({super.key});
