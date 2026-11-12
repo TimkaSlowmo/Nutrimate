@@ -8391,7 +8391,7 @@ class PantryTile extends StatelessWidget {
 class QuickAddParse {
   static final _names = <(FoodItem, List<String>)>[
     for (final f in foodDatabase)
-      (f, [f.name, ...?nameTr[f.name]].where((x) => x.isNotEmpty).map((x) => x.toLowerCase().replaceAll('ё', 'е')).toList()),
+      (f, nameVariants(f.name).where((x) => x.isNotEmpty).map((x) => x.toLowerCase().replaceAll('ё', 'е')).toList()),
   ];
 
   static List<String> split(String text) => text

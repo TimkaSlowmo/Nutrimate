@@ -186,3 +186,6 @@ String trStaples(String s) {
     return opt + (t == null ? core : t[i]);
   }).join(', ');
 }
+
+/// Название продукта на всех языках: [английское, русское, казахское] (для разбора списков).
+List<String> nameVariants(String en) => [en, ...?nameTr[en]];
