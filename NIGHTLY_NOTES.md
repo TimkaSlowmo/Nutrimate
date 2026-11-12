@@ -1,11 +1,21 @@
 # NutriMate — журнал ночного агента
 
 ## Текущее состояние
-- Веб: **v19** · iOS: **v17** (нумерация продолжает версии из DartPad: v1–v15 были там) · продуктов: **1473** · рецептов: **124** (zero-waste: 51) · переводов названий ru/kk: **653** (529 продуктов + 124 рецепта) · строк интерфейса iOS: **540**
+- Веб: **v20** · iOS: **v18** (нумерация продолжает версии из DartPad: v1–v15 были там) · продуктов: **1506** · рецептов: **127** (zero-waste: 53) · переводы ru/kk: **все** названия продуктов и рецептов + шаги всех рецептов · строк интерфейса iOS: **540**
 - ИИ-сервер работает (Cloudflare Workers AI, бесплатно); с v10 предлагает действия только структурированно (`actions`), приложение выполняет само.
 - Главная версия — iOS (ios/, журнал ios/NIGHTLY_NOTES_IOS.md, жалобы ios/BUILD_ERRORS.md). Веб — баги и перенос закрытых жалоб.
 - Единая база: `python3 tool/export_data.py` проверяет дубли/ингредиенты и пишет ios/NutriMate/Resources/foods.json.
 - Локально Flutter недоступен → компиляцию проверяет GitHub Actions.
+
+## 2026-11-12 (вечер) · веб v20 · iOS v18
+- iOS v18: переведены все оставшиеся ~950 названий продуктов и шаги всех рецептов (ru/kk); Recipes легче; Edit profile — подпись не под таб-баром.
+- Веб v20: одинаковые продукты складываются (жалоба 2 на вебе): одна строка «×N», −/＋, «N batches», съел/выбросил — сначала старая партия;
+  данные не мигрируют (каждая штука — по-прежнему отдельная запись, складывается только отображение).
+- +33 продукта (Sugar Apple, Sudachi, Greengage, Damson, Sloe Berries, Nettles, Beech Mushrooms, Sea Grapes, Borlotti Beans,
+  Sichuan Peppercorns, Nigella Seeds, Ajwain, Asafoetida, Annatto Seeds, Kewpie Mayo, Mole Paste, Shrimp Paste, Doubanjiang,
+  Shaoxing Wine, Chinkiang Vinegar, Moringa/Spirulina Powder, Lap Cheong, Char Siu Pork, Hojicha, Horchata, Comté, Fontina,
+  Taleggio, Raclette Cheese, Queso Fresco, Okara, Yuba); +3 рецепта: Mapo Tofu, Char Siu Leftover Fried Rice (zw), Viral Cucumber Kewpie Salad (zw).
+- Бэклог веба: три языка интерфейса (названия уже переведены в базе).
 
 ## 2026-11-12 (ночь) · веб v19 · iOS v17
 - iOS v17: три языка EN/RU/KK во всём приложении (жалоба 3 — все жалобы 12.11 закрыты), Home 21 → 60 fps (Нутрик замирает при прокрутке).
