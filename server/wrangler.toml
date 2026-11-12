@@ -1,0 +1,14 @@
+# Cloudflare Worker «Нутрик» — только бесплатный тариф (Workers Free + Workers AI free allocation).
+name = "nutrimate-nutrik"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+[ai]
+binding = "AI"
+
+# Необязательно: точный дневной лимит через Workers KV (бесплатно до 1000 записей в день).
+# Без этого лимит считается в памяти воркера — тоже работает, просто «примерно».
+# [[kv_namespaces]]
+# binding = "LIMITS"
+# id = "<id из Cloudflare → Storage & Databases → KV>"

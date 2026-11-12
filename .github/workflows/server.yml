@@ -1,0 +1,108 @@
+name: Nutrik AI server (Cloudflare Worker)
+
+# Проверяет воркер, деплоит его на бесплатный Cloudflare Workers (если есть секреты),
+# проверяет /chat и сам вписывает адрес воркера в iOS-приложение (и запускает сборку iOS).
+on:
+  push:
+    branches: [main]
+    paths: ['server/**', '.github/workflows/server.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: server-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Test worker locally
+        run: node server/test.mjs
+
+      - name: Check Cloudflare secrets
+        id: secrets
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$TOKEN" ] && [ -n "$ACCOUNT" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            echo "Secrets found — deploying."
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Nutrik AI is not set up yet::Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID (see server/SETUP_RU.md), then run this workflow again. The app keeps working with offline Nutrik."
+          fi
+
+      - name: Deploy to Cloudflare Workers (free plan)
+        id: deploy
+        if: steps.secrets.outputs.ok == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: server
+          wranglerVersion: "4.150.0"
+          command: deploy
+
+      - name: Find worker URL
+        id: url
+        if: steps.secrets.outputs.ok == 'true'
+        env:
+          OUT_URL: ${{ steps.deploy.outputs.deployment-url }}
+          OUT_LOG: ${{ steps.deploy.outputs.command-output }}
+        run: |
+          URL="$OUT_URL"
+          if [ -z "$URL" ]; then URL=$(printf '%s' "$OUT_LOG" | grep -oE 'https://[A-Za-z0-9.-]+\.workers\.dev' | head -1); fi
+          URL="${URL%/}"
+          echo "Worker URL: $URL"
+          if [ -z "$URL" ]; then echo "::warning::Deployed, but workers.dev URL not found. Open Cloudflare → Workers & Pages → nutrimate-nutrik and enable the workers.dev route."; fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "### 🤖 Nutrik AI: $URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke test /chat
+        if: steps.url.outputs.url != ''
+        env:
+          URL: ${{ steps.url.outputs.url }}
+        run: |
+          sleep 8
+          curl -sS "$URL/health"; echo
+          for i in 1 2 3; do
+            CODE=$(curl -sS -o reply.json -w '%{http_code}' -X POST "$URL/chat" \
+              -H 'content-type: application/json' -H 'x-nutrimate-client: ci' \
+              -d '{"deviceId":"ci-smoke-test-'"$GITHUB_RUN_ID"'","messages":[{"role":"user","content":"What can I cook with a banana and eggs?"}],"context":{"name":"CI","fridge":[{"name":"Banana","daysLeft":0},{"name":"Eggs","daysLeft":9}],"kcalToday":500,"kcalGoal":2100}}' || echo 000)
+            echo "HTTP $CODE"; cat reply.json; echo
+            [ "$CODE" = "200" ] && break
+            sleep 10
+          done
+          if [ "$CODE" != "200" ]; then echo "::warning::/chat answered $CODE — the app will fall back to offline Nutrik. If it is 503 with no_ai_binding/ai_error, check that the API token has the Workers AI permission."; fi
+
+      - name: Put worker URL into the iOS app
+        if: steps.url.outputs.url != ''
+        env:
+          URL: ${{ steps.url.outputs.url }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          F=ios/NutriMate/Model/NutrikServer.swift
+          CUR=$(grep -oE 'static let url = "[^"]*"' "$F" | sed -E 's/.*"(.*)"/\1/')
+          if [ "$CUR" = "$URL" ]; then echo "URL already in the app."; exit 0; fi
+          sed -i -E "s|static let url = \"[^\"]*\"|static let url = \"$URL\"|" "$F"
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add "$F"
+          git commit -m "server: connect iOS app to Nutrik AI ($URL)"
+          git pull --rebase -q origin main
+          git push -q origin HEAD:main
+          # push от GITHUB_TOKEN не запускает другие workflow — запускаем сборки вручную
+          gh workflow run ios.yml --ref main || true
+          gh workflow run ios-screens.yml --ref main || true
