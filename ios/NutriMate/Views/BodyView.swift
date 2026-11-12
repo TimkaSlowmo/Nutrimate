@@ -207,7 +207,7 @@ struct BodyView: View {
                     fuelPanel
                     planCard
                     weightCard
-                    Text("BMI is a quick screening number for adults 18+. It doesn't see muscles or body shape — this isn't medical advice. If you're worried about your weight, talk to a doctor.")
+                    Text(L("BMI is a quick screening number for adults 18+. It doesn't see muscles or body shape — this isn't medical advice. If you're worried about your weight, talk to a doctor."))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -217,13 +217,13 @@ struct BodyView: View {
             }
             .pausesNutrikWhileScrolling()
             .background(LiveBackground())
-            .navigationTitle("Body dashboard")
+            .navigationTitle(L("Body dashboard"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() }.fontWeight(.semibold) }
+                ToolbarItem(placement: .topBarTrailing) { Button(L("Done")) { dismiss() }.fontWeight(.semibold) }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("Done") { weightFocused = false }
+                    Button(L("Done")) { weightFocused = false }
                 }
             }
         }
@@ -235,10 +235,10 @@ struct BodyView: View {
         let cat = p.bmiCategory
         return VStack(spacing: 4) {
             HStack {
-                Text("BODY MASS INDEX").font(.system(size: 12, weight: .heavy, design: .rounded)).tracking(1.5)
+                Text(L("BODY MASS INDEX")).lineLimit(1).minimumScaleFactor(0.7).font(.system(size: 12, weight: .heavy, design: .rounded)).tracking(1.5)
                     .foregroundStyle(Color.cream.opacity(0.7))
                 Spacer()
-                Text("\(Int(p.height)) cm · " + String(format: "%.1f kg", p.weight))
+                Text(L("{0} cm · {1} kg", Int(p.height), String(format: "%.1f", p.weight)))
                     .font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(Color.cream.opacity(0.7))
             }
             DialGauge(value: p.bmi, range: 14...40, zones: Self.bmiZones,
@@ -251,7 +251,7 @@ struct BodyView: View {
                     .foregroundStyle(Color.cream)
                     .contentTransition(.numericText())
                     .shadow(color: cat.color.opacity(0.6), radius: 10)
-                Text("\(cat.emoji) \(cat.title)")
+                Text("\(cat.emoji) \(L(cat.title))")
                     .font(.subheadline.weight(.bold))
                     .padding(.horizontal, 12).padding(.vertical, 4)
                     .background(Capsule().fill(cat.color.opacity(0.22)))
@@ -259,10 +259,10 @@ struct BodyView: View {
                     .foregroundStyle(cat.color)
             }
             HStack(spacing: 0) {
-                legend("Under", BMICategory.under.color)
-                legend("Healthy", BMICategory.normal.color)
-                legend("Over", BMICategory.over.color)
-                legend("Obesity", BMICategory.obese.color)
+                legend(L("Under"), BMICategory.under.color)
+                legend(L("Healthy"), BMICategory.normal.color)
+                legend(L("Over"), BMICategory.over.color)
+                legend(L("Obesity"), BMICategory.obese.color)
             }
             .padding(.top, 8)
             rangeBar
@@ -276,6 +276,7 @@ struct BodyView: View {
         HStack(spacing: 4) {
             Circle().fill(c).frame(width: 7, height: 7)
             Text(t).font(.system(size: 11, weight: .semibold, design: .rounded)).foregroundStyle(Color.cream.opacity(0.8))
+                .lineLimit(1).minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity)
     }
@@ -287,7 +288,7 @@ struct BodyView: View {
         let f = min(1, max(0, (p.weight - lo) / (hi - lo)))
         let f0 = (r.lowerBound - lo) / (hi - lo), f1 = (r.upperBound - lo) / (hi - lo)
         return VStack(alignment: .leading, spacing: 6) {
-            Text("Healthy weight for \(Int(p.height)) cm: \(Int(r.lowerBound.rounded()))–\(Int(r.upperBound.rounded())) kg")
+            Text(L("Healthy weight for {0} cm: {1}–{2} kg", Int(p.height), Int(r.lowerBound.rounded()), Int(r.upperBound.rounded())))
                 .font(.footnote.weight(.semibold)).foregroundStyle(Color.cream)
             GeometryReader { geo in
                 let w = geo.size.width
@@ -309,9 +310,9 @@ struct BodyView: View {
 
     private var distanceText: String {
         let r = p.healthyRange
-        if p.weight < r.lowerBound { return String(format: "You're %.1f kg below the healthy range.", r.lowerBound - p.weight) }
-        if p.weight > r.upperBound { return String(format: "You're %.1f kg above the healthy range.", p.weight - r.upperBound) }
-        return "You're inside the healthy range 🎉"
+        if p.weight < r.lowerBound { return L("You're {0} kg below the healthy range.", String(format: "%.1f", r.lowerBound - p.weight)) }
+        if p.weight > r.upperBound { return L("You're {0} kg above the healthy range.", String(format: "%.1f", p.weight - r.upperBound)) }
+        return L("You're inside the healthy range 🎉")
     }
 
     private var nutrikAdvice: some View {
@@ -320,16 +321,16 @@ struct BodyView: View {
         switch cat {
         case .under:
             line = p.goal > 0
-                ? ("Great plan! Add an extra snack: nuts, kurt, yogurt, peanut butter toast 🥜 Small steps every day.", .eating)
-                : ("You're a bit light. Try the \"Gain\" goal — I'll add ~300 kcal a day with tasty, filling food 🍲", .happy)
+                ? (L("Great plan! Add an extra snack: nuts, kurt, yogurt, peanut butter toast 🥜 Small steps every day."), .eating)
+                : (L("You're a bit light. Try the \"Gain\" goal — I'll add ~300 kcal a day with tasty, filling food 🍲"), .happy)
         case .normal:
-            line = ("Your weight is in the healthy zone! Keep eating well and wasting nothing 💚", .cheer)
+            line = (L("Your weight is in the healthy zone! Keep eating well and wasting nothing 💚"), .cheer)
         case .over:
             line = p.goal < 0
-                ? ("Nice! Fill half the plate with veggies, drink water, and keep moving 🥗 No crash diets.", .happy)
-                : ("A little above the healthy zone. A gentle \"Lose\" goal and more walks can help 🚶", .happy)
+                ? (L("Nice! Fill half the plate with veggies, drink water, and keep moving 🥗 No crash diets."), .happy)
+                : (L("A little above the healthy zone. A gentle \"Lose\" goal and more walks can help 🚶"), .happy)
         case .obese:
-            line = ("Let's take care of you step by step 🤝 A gentle \"Lose\" goal and a chat with a doctor are a great start.", .happy)
+            line = (L("Let's take care of you step by step 🤝 A gentle \"Lose\" goal and a chat with a doctor are a great start."), .happy)
         }
         return NutrikSays(text: line.0, mood: line.1, size: 70)
     }
@@ -339,7 +340,7 @@ struct BodyView: View {
         let target = max(1, store.targetCalories)
         let eaten = store.eatenToday
         let f = Double(eaten) / Double(target)
-        let status = f < 0.25 ? "Tank almost empty ⛽ — time to eat" : f < 0.85 ? "Refuel during the day 🍽️" : f <= 1.1 ? "Tank full — goal reached 🎯" : "Over the goal today 🛑"
+        let status = f < 0.25 ? L("Tank almost empty ⛽ — time to eat") : f < 0.85 ? L("Refuel during the day 🍽️") : f <= 1.1 ? L("Tank full — goal reached 🎯") : L("Over the goal today 🛑")
         return HStack(spacing: 14) {
             DialGauge(value: min(1.3, f), range: 0...1.3,
                       zones: [GaugeZone(from: 0, to: 0.25, color: Color(hex: 0xFF4D4D)),
@@ -349,9 +350,9 @@ struct BodyView: View {
                       labels: [(0, "E"), (0.5, "½"), (1, "F")], minorStep: 0.1, lineWidth: 10)
                 .frame(width: 150, height: 95)
             VStack(alignment: .leading, spacing: 4) {
-                Text("FUEL TODAY").font(.system(size: 12, weight: .heavy, design: .rounded)).tracking(1.5).foregroundStyle(Color.cream.opacity(0.7))
+                Text(L("FUEL TODAY")).lineLimit(1).minimumScaleFactor(0.7).font(.system(size: 12, weight: .heavy, design: .rounded)).tracking(1.5).foregroundStyle(Color.cream.opacity(0.7))
                 Text("\(eaten) / \(target)").font(.system(size: 24, weight: .bold, design: .rounded)).monospacedDigit().foregroundStyle(Color.cream)
-                Text("kcal").font(.caption).foregroundStyle(Color.cream.opacity(0.7))
+                Text(L("kcal")).font(.caption).foregroundStyle(Color.cream.opacity(0.7))
                 Text(status).font(.caption.weight(.semibold)).foregroundStyle(Color.cream.opacity(0.9))
             }
             Spacer(minLength: 0)
@@ -362,22 +363,22 @@ struct BodyView: View {
     // Как считается цель
     private var planCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionTitle(text: "Your daily plan")
-            Text("Goal").font(.subheadline.weight(.semibold)).foregroundStyle(Color.burgundy)
-            Picker("Goal", selection: $store.data.profile.goal) {
-                Text("📉 Lose").tag(-1)
-                Text("⚖️ Keep").tag(0)
-                Text("📈 Gain").tag(1)
+            SectionTitle(text: L("Your daily plan"))
+            Text(L("Goal")).font(.subheadline.weight(.semibold)).foregroundStyle(Color.burgundy)
+            Picker(L("Goal"), selection: $store.data.profile.goal) {
+                Text(L("📉 Lose")).tag(-1)
+                Text(L("⚖️ Keep")).tag(0)
+                Text(L("📈 Gain")).tag(1)
             }
             .pickerStyle(.segmented)
-            Text("Activity").font(.subheadline.weight(.semibold)).foregroundStyle(Color.burgundy)
+            Text(L("Activity")).font(.subheadline.weight(.semibold)).foregroundStyle(Color.burgundy)
             Menu {
-                Picker("Activity", selection: $store.data.profile.activity) {
-                    ForEach(0..<Profile.activityTitles.count, id: \.self) { i in Text(Profile.activityTitles[i]).tag(i) }
+                Picker(L("Activity"), selection: $store.data.profile.activity) {
+                    ForEach(0..<Profile.activityTitles.count, id: \.self) { i in Text(L(Profile.activityTitles[i])).tag(i) }
                 }
             } label: {
                 HStack {
-                    Text(Profile.activityTitles[min(4, max(0, p.activity))]).foregroundStyle(Color.burgundy)
+                    Text(L(Profile.activityTitles[min(4, max(0, p.activity))])).foregroundStyle(Color.burgundy)
                     Spacer()
                     Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(Color.burgundy.opacity(0.6))
                 }
@@ -385,19 +386,19 @@ struct BodyView: View {
                 .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.burgundy.opacity(0.07)))
             }
             Divider()
-            planRow("🔥 Body at rest (BMR)", "\(p.bmr) kcal")
-            planRow("🏃 × activity \(Profile.activityFactor[min(4, max(0, p.activity))])", "\(p.maintenance) kcal")
+            planRow(L("🔥 Body at rest (BMR)"), L("{0} kcal", p.bmr))
+            planRow(L("🏃 × activity {0}", Profile.activityFactor[min(4, max(0, p.activity))]), L("{0} kcal", p.maintenance))
             if p.goalAdjust != 0 {
-                planRow(p.goalAdjust > 0 ? "📈 + for gaining" : "📉 − for losing", "\(p.goalAdjust > 0 ? "+" : "")\(p.goalAdjust) kcal")
+                planRow(p.goalAdjust > 0 ? L("📈 + for gaining") : L("📉 − for losing"), L("{0} kcal", "\(p.goalAdjust > 0 ? "+" : "")\(p.goalAdjust)"))
             }
             HStack {
-                Text("Daily goal").font(.headline).foregroundStyle(Color.burgundy)
+                Text(L("Daily goal")).font(.headline).foregroundStyle(Color.burgundy)
                 Spacer()
-                Text("\(store.targetCalories) kcal")
+                Text(L("{0} kcal", store.targetCalories))
                     .font(.title3.bold()).foregroundStyle(Color.burgundy)
                     .contentTransition(.numericText())
             }
-            Text("Keeping your weight needs about \(p.maintenance) kcal a day. The rest-only number (\(p.bmr)) is what your body burns lying in bed.")
+            Text(L("Keeping your weight needs about {0} kcal a day. The rest-only number ({1}) is what your body burns lying in bed.", p.maintenance, p.bmr))
                 .font(.caption).foregroundStyle(.secondary)
         }
         .glassCard()
@@ -414,9 +415,9 @@ struct BodyView: View {
 
     private var weightCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionTitle(text: "Weight tracker")
+            SectionTitle(text: L("Weight tracker"))
             HStack(spacing: 10) {
-                TextField("Today's weight, kg", text: $newWeight)
+                TextField(L("Today's weight, kg"), text: $newWeight)
                     .keyboardType(.decimalPad)
                     .focused($weightFocused)
                     .padding(12)
@@ -426,16 +427,16 @@ struct BodyView: View {
                         withAnimation { store.addWeight(kg) }
                         newWeight = ""
                         weightFocused = false
-                        store.say("⚖️ " + String(format: "%.1f", kg) + " kg logged")
+                        store.say(L("⚖️ {0} kg logged", String(format: "%.1f", kg)))
                     }
-                } label: { Text("Log").padding(.horizontal, 10) }
+                } label: { Text(L("Log")).padding(.horizontal, 10) }
                 .buttonStyle(SoftButtonStyle())
                 .disabled(newWeight.isEmpty)
             }
             HStack {
-                Stepper("Height: \(Int(p.height)) cm", value: $store.data.profile.height, in: 120...220, step: 1)
+                Stepper(L("Height: {0} cm", Int(p.height)), value: $store.data.profile.height, in: 120...220, step: 1)
             }
-            Stepper("Age: \(p.age)", value: $store.data.profile.age, in: 10...100)
+            Stepper(L("Age: {0}", p.age), value: $store.data.profile.age, in: 10...100)
             WeightChart(entries: store.data.weights)
         }
         .glassCard()
@@ -452,10 +453,10 @@ struct BodyMiniCard: View {
             DialGauge(value: p.bmi, range: 14...40, zones: BodyView.bmiZones, labels: [], minorStep: 2, lineWidth: 8)
                 .frame(width: 96, height: 58)
             VStack(alignment: .leading, spacing: 3) {
-                Text("BMI " + String(format: "%.1f", p.bmi)).font(.headline).foregroundStyle(Color.cream)
-                Text("\(cat.emoji) \(cat.title)").font(.caption.weight(.bold)).foregroundStyle(cat.color)
-                Text("Goal \(store.targetCalories) kcal · \(Profile.activityShort[min(4, max(0, p.activity))])")
-                    .font(.caption).foregroundStyle(Color.cream.opacity(0.75))
+                Text(L("BMI {0}", String(format: "%.1f", p.bmi))).font(.headline).foregroundStyle(Color.cream)
+                Text("\(cat.emoji) \(L(cat.title))").font(.caption.weight(.bold)).lineLimit(1).minimumScaleFactor(0.7).foregroundStyle(cat.color)
+                Text(L("Goal {0} kcal · {1}", store.targetCalories, L(Profile.activityShort[min(4, max(0, p.activity))])))
+                    .font(.caption).lineLimit(2).minimumScaleFactor(0.8).foregroundStyle(Color.cream.opacity(0.75))
             }
             Spacer(minLength: 0)
             Image(systemName: "chevron.right").font(.caption.bold()).foregroundStyle(Color.cream.opacity(0.6))

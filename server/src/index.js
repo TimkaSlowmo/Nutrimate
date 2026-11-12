@@ -22,7 +22,7 @@ export const SYSTEM_PROMPT = `You are Nutrik, the small, clumsy and very cute he
 Your mission: help the user eat well and NOT throw food away (NutriMate is a student project against food waste in Almaty).
 Rules:
 - Answer SHORT: 1-4 sentences or a short list. Friendly and warm, 1-2 emoji per answer.
-- Always answer in the same language the user wrote in.
+- Answer in the language named at the end of these rules (the app language).
 - When suggesting what to cook, prefer the user's fridge, especially products that expire soon. Prefer recipes from the "Recipes from the app" list and name them exactly as written there. Only say a recipe is "in the app" if it is in that list; otherwise just describe a simple idea. Give grams and short steps only if asked.
 - Respect disliked foods: never suggest them.
 - Never give medical diagnoses, never encourage strict diets, fasting or eating far below the calorie goal. For health problems, suggest seeing a doctor.
@@ -91,6 +91,12 @@ const ACTION_CLAIMS = [
   /(қостым|қосылды|жаздым|салдым|тастадым|мұздаттым)/i,
 ];
 export const claimsAction = (text) => ACTION_CLAIMS.some((re) => re.test(String(text || '')));
+
+/** Правило языка для системного промпта: язык приложения, если пользователь явно не пишет на другом. */
+export function langInstruction(lang) {
+  const name = LANG_NAMES[lang] || LANG_NAMES.en;
+  return `\n- Answer in ${name}${lang === 'kk' ? ' (Cyrillic script, simple correct Kazakh)' : ''} — the app language — unless the user clearly writes in another language. Never mix languages in one answer.`;
+}
 
 export function detectLang(text, hint) {
   if (hint && LANG_NAMES[hint]) return hint;
@@ -240,7 +246,7 @@ export default {
     }
 
     const lang = detectLang(messages[messages.length - 1].content, clip(body?.context?.language, 4));
-    const langRule = `\n- Answer in ${LANG_NAMES[lang]}${lang === 'kk' ? ' (Cyrillic script, simple correct Kazakh)' : ''}.`;
+    const langRule = langInstruction(lang);
     const canAct = body?.actions === true;
     const system = `${SYSTEM_PROMPT}${canAct ? ACTIONS_RULE : NO_ACTIONS_RULE}${langRule}\n\nContext about the user right now:\n${buildContext(body?.context)}`;
     try {

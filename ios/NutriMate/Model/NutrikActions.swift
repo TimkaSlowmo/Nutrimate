@@ -53,10 +53,55 @@ enum NutrikActions {
         t.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
     }
 
-    static func lang(_ t: String) -> Lang {
+    /// Язык ответа: казахские буквы → kk; кириллица → ru (или kk, если приложение на казахском);
+    /// латиница → en, но короткое «hi / ok / thanks» или одни эмодзи → язык приложения.
+    static func replyLang(_ message: String) -> AppLang {
+        let t = message.lowercased()
         if t.range(of: "[әғқңөұүһі]", options: .regularExpression) != nil { return .kk }
-        if t.range(of: "[а-яё]", options: .regularExpression) != nil { return .ru }
+        if t.range(of: "[а-яё]", options: .regularExpression) != nil { return AppLang.current == .kk ? .kk : .ru }
+        let letters = t.filter(\.isLetter)
+        if letters.isEmpty { return AppLang.current }
+        if letters.count <= 12, t.range(of: #"^\W*(hi|hello|hey|yo|ok|okay|thanks|thank you|thx|lol|yes|no)\W*$"#, options: .regularExpression) != nil {
+            return AppLang.current
+        }
         return .en
+    }
+
+    static func lang(_ t: String) -> Lang {
+        switch replyLang(t) {
+        case .kk: return .kk
+        case .ru: return .ru
+        case .en: return .en
+        }
+    }
+
+    /// Название продукта на языке ответа (перевод из базы; нет — английское).
+    static func display(_ f: Food, _ L: Lang) -> String {
+        switch L {
+        case .ru: return (f.ru?.isEmpty == false ? f.ru : nil) ?? f.name
+        case .kk: return (f.kk?.isEmpty == false ? f.kk : nil) ?? f.name
+        case .en: return f.name
+        }
+    }
+
+    /// Продукты по переводам названий из базы (foods.json ru/kk): целиком или по основе слова.
+    static func translatedFoods(_ t: String, db: FoodDB) -> [Food] {
+        let ws = words(t)
+        var hits: [(Food, Int)] = []
+        for f in db.foods {
+            for tr in [f.ru, f.kk].compactMap({ $0?.lowercased() }) where tr.count >= 3 {
+                if t.contains(tr) { hits.append((f, tr.count + 10)); break }
+                let parts = words(tr)
+                // одно слово: «помидоры» ↔ «помидор», «яйца» ↔ «яйцо» — общая основа (без 1–2 последних букв)
+                if parts.count == 1, tr.count >= 5 {
+                    let stem = String(tr.prefix(tr.count - 2))
+                    if ws.contains(where: { $0.hasPrefix(stem) && $0.count <= tr.count + 3 }) { hits.append((f, stem.count)); break }
+                }
+            }
+        }
+        var out: [Food] = []
+        for (f, _) in hits.sorted(by: { $0.1 > $1.1 }) where !out.contains(f) { out.append(f) }
+        return Array(out.prefix(3))
     }
 
     /// Продукты, названные по-русски или по-казахски (по началу слова, «яйца» → Eggs).
@@ -76,6 +121,9 @@ enum NutrikActions {
     static func foods(in t: String, db: FoodDB) -> [Food] {
         var list = NutrikBrain.mentioned(t, db: db)
         for f in aliasFoods(t, db: db) where !list.contains(f) { list.append(f) }
+        if list.isEmpty || t.range(of: "[а-яёәғқңөұүһі]", options: .regularExpression) != nil {
+            for f in translatedFoods(t, db: db) where !list.contains(f) { list.append(f) }
+        }
         return Array(list.prefix(3))
     }
 
@@ -142,7 +190,7 @@ enum NutrikActions {
         func tr(_ en: String, _ ru: String, _ kk: String) -> String { L == .ru ? ru : L == .kk ? kk : en }
 
         guard !p.foods.isEmpty else {
-            let sugg = p.unknownWord.map { store.db.search($0, category: nil).prefix(3).map { "\($0.emoji) \($0.name)" } } ?? []
+            let sugg = p.unknownWord.map { store.db.search($0, category: nil).prefix(3).map { "\($0.emoji) \(display($0, L))" } } ?? []
             let tail = sugg.isEmpty
                 ? tr("Try: \"add 2 eggs to fridge\".", "Попробуй так: «добавь 2 яйца в холодильник».", "Былай жазып көр: «тоңазытқышқа 2 жұмыртқа қос».")
                 : tr("Did you mean: ", "Может, ты имел в виду: ", "Мүмкін, мынау: ") + sugg.joined(separator: ", ") + "?"
@@ -159,31 +207,32 @@ enum NutrikActions {
     /// Одно действие с одним продуктом — выполняется по-настоящему, текст пишется по факту.
     static func run(_ kind: Kind, place: StorageKind?, qty: Int, food f: Food, lang L: Lang, store: AppStore) -> String {
         func tr(_ en: String, _ ru: String, _ kk: String) -> String { L == .ru ? ru : L == .kk ? kk : en }
+        let nm = display(f, L)
         switch kind {
         case .addFridge:
             let place = place ?? FoodDB.defaultStorage(f)
             store.add(f, storage: place, count: qty, quiet: true)
             let total = store.data.pantry.filter { $0.name == f.name && $0.storage == place }.reduce(0) { $0 + $1.qty }
-            let where_ = tr(place.title.lowercased(),
+            let where_ = tr(place.key.lowercased(),
                             place == .fridge ? "холодильник" : place == .freezer ? "морозилку" : "шкаф",
                             place == .fridge ? "тоңазытқышқа" : place == .freezer ? "мұздатқышқа" : "шкафқа")
-            return (tr("✅ Added \(f.emoji) \(f.name) ×\(qty) to your \(where_)", "✅ Добавил \(f.emoji) \(f.name) ×\(qty) в \(where_)",
-                            "✅ \(f.emoji) \(f.name) ×\(qty) \(where_) қосылды") + (total > qty ? tr(" — now ×\(total).", " — теперь ×\(total).", " — енді ×\(total).") : "."))
+            return (tr("✅ Added \(f.emoji) \(nm) ×\(qty) to your \(where_)", "✅ Добавил \(f.emoji) \(nm) ×\(qty) в \(where_)",
+                            "✅ \(f.emoji) \(nm) ×\(qty) \(where_) қосылды") + (total > qty ? tr(" — now ×\(total).", " — теперь ×\(total).", " — енді ×\(total).") : "."))
         case .eat, .discard, .freeze:
             let rows = store.sortedPantry.filter { $0.name == f.name && (kind != .freeze || $0.storage != .freezer) }
             guard let g = rows.first else {
-                return (tr("❌ There's no \(f.emoji) \(f.name) in your fridge — I didn't change anything.",
-                                "❌ \(f.emoji) \(f.name) нет в холодильнике — я ничего не менял.",
-                                "❌ Тоңазытқышта \(f.emoji) \(f.name) жоқ — ештеңе өзгертпедім."))
+                return (tr("❌ There's no \(f.emoji) \(nm) in your fridge — I didn't change anything.",
+                                "❌ \(f.emoji) \(nm) нет в холодильнике — я ничего не менял.",
+                                "❌ Тоңазытқышта \(f.emoji) \(nm) жоқ — ештеңе өзгертпедім."))
             }
             let have = rows.reduce(0) { $0 + $1.qty }
             switch kind {
             case .eat:
                 let n = min(qty, have)
                 for _ in 0..<n { if let r = store.sortedPantry.first(where: { $0.name == f.name }) { store.eat(r.first.id, grams: 100, finished: true) } }
-                return (tr("🍽️ Logged: you ate \(f.emoji) \(f.name) ×\(n) (≈\(f.kcal * n) kcal, 100 g each). ",
-                                "🍽️ Записал: ты съел \(f.emoji) \(f.name) ×\(n) (≈\(f.kcal * n) ккал, по 100 г). ",
-                                "🍽️ Жазып қойдым: \(f.emoji) \(f.name) ×\(n) жедің (≈\(f.kcal * n) ккал, әрқайсысы 100 г). ") + left(f, store, tr))
+                return (tr("🍽️ Logged: you ate \(f.emoji) \(nm) ×\(n) (≈\(f.kcal * n) kcal, 100 g each). ",
+                                "🍽️ Записал: ты съел \(f.emoji) \(nm) ×\(n) (≈\(f.kcal * n) ккал, по 100 г). ",
+                                "🍽️ Жазып қойдым: \(f.emoji) \(nm) ×\(n) жедің (≈\(f.kcal * n) ккал, әрқайсысы 100 г). ") + left(f, store, tr))
             case .discard:
                 let n = min(qty, have)
                 for _ in 0..<n {
@@ -191,15 +240,15 @@ enum NutrikActions {
                         store.throwAway(r.first.id, reason: r.daysLeft < 0 ? .expired : .spoiled)
                     }
                 }
-                return (tr("🗑️ Marked \(f.emoji) \(f.name) ×\(n) as thrown away (oldest first). ",
-                                "🗑️ Отметил: \(f.emoji) \(f.name) ×\(n) выброшено (сначала старое). ",
-                                "🗑️ Белгіледім: \(f.emoji) \(f.name) ×\(n) тасталды (алдымен ескісі). ") + left(f, store, tr))
+                return (tr("🗑️ Marked \(f.emoji) \(nm) ×\(n) as thrown away (oldest first). ",
+                                "🗑️ Отметил: \(f.emoji) \(nm) ×\(n) выброшено (сначала старое). ",
+                                "🗑️ Белгіледім: \(f.emoji) \(nm) ×\(n) тасталды (алдымен ескісі). ") + left(f, store, tr))
             default:
                 let units = rows.filter { $0.storage == g.storage }.reduce(0) { $0 + $1.qty }
                 store.freeze(g.first.id)
-                return (tr("❄️ Moved \(f.emoji) \(f.name) ×\(units) to the freezer — good for ~3 months.",
-                                "❄️ Переложил \(f.emoji) \(f.name) ×\(units) в морозилку — хватит примерно на 3 месяца.",
-                                "❄️ \(f.emoji) \(f.name) ×\(units) мұздатқышқа салынды — шамамен 3 айға жетеді."))
+                return (tr("❄️ Moved \(f.emoji) \(nm) ×\(units) to the freezer — good for ~3 months.",
+                                "❄️ Переложил \(f.emoji) \(nm) ×\(units) в морозилку — хватит примерно на 3 месяца.",
+                                "❄️ \(f.emoji) \(nm) ×\(units) мұздатқышқа салынды — шамамен 3 айға жетеді."))
             }
         }
     }
@@ -229,7 +278,7 @@ enum NutrikActions {
         for a in actions.prefix(5) {
             let qty = min(99, max(1, a.qty ?? 1))
             guard let f = resolve(a.name, db: store.db) else {
-                let sugg = store.db.search(a.name, category: nil).prefix(3).map { "\($0.emoji) \($0.name)" }
+                let sugg = store.db.search(a.name, category: nil).prefix(3).map { "\($0.emoji) \(display($0, L))" }
                 lines.append(tr("🙈 I couldn't find \"\(a.name)\" in my food base, so I didn't change anything.",
                                 "🙈 Не нашёл «\(a.name)» в базе продуктов, поэтому ничего не менял.",
                                 "🙈 «\(a.name)» өнімін базадан таппадым, сондықтан ештеңе өзгертпедім.")
@@ -245,8 +294,8 @@ enum NutrikActions {
             case "add_shopping":
                 let had = store.data.shopping.contains(f.name)
                 if !had { store.addShopping([f.name]) }
-                lines.append(had ? tr("🛒 \(f.emoji) \(f.name) is already on your shopping list.", "🛒 \(f.emoji) \(f.name) уже есть в списке покупок.", "🛒 \(f.emoji) \(f.name) сатып алу тізімінде бар.")
-                                 : tr("🛒 Added \(f.emoji) \(f.name) to your shopping list.", "🛒 Добавил \(f.emoji) \(f.name) в список покупок.", "🛒 \(f.emoji) \(f.name) сатып алу тізіміне қосылды."))
+                lines.append(had ? tr("🛒 \(f.emoji) \(display(f, L)) is already on your shopping list.", "🛒 \(f.emoji) \(display(f, L)) уже есть в списке покупок.", "🛒 \(f.emoji) \(display(f, L)) сатып алу тізімінде бар.")
+                                 : tr("🛒 Added \(f.emoji) \(display(f, L)) to your shopping list.", "🛒 Добавил \(f.emoji) \(display(f, L)) в список покупок.", "🛒 \(f.emoji) \(display(f, L)) сатып алу тізіміне қосылды."))
             default: continue
             }
         }

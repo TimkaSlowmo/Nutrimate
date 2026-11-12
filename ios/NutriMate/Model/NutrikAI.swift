@@ -50,9 +50,8 @@ enum NutrikAI {
             Payload.Msg(role: $0.fromUser ? "user" : "assistant", content: String($0.text.prefix(600)))
         }
         guard let lastUser = history.last, lastUser.role == "user" else { return nil }
-        let lang: String = {
-            switch NutrikActions.lang(lastUser.content.lowercased()) { case .ru: return "ru"; case .kk: return "kk"; case .en: return "en" }
-        }()
+        // язык приложения; если сообщение явно на другом из трёх языков — на нём
+        let lang = NutrikActions.replyLang(lastUser.content).rawValue
         let have = store.pantryNames
         let recipes = store.rankedRecipes().prefix(8).map { r in
             Payload.RecipeInfo(name: r.name, kcal: r.kcal, time: r.time,
@@ -99,9 +98,13 @@ enum NutrikAI {
     @MainActor
     static func recipeMentioned(in text: String, store: AppStore) -> String? {
         let t = text.lowercased()
+        // по-английски или по переводу названия (ИИ отвечает на языке приложения)
         return store.db.recipes
-            .filter { $0.name.count >= 5 && t.contains($0.name.lowercased()) }
-            .max { $0.name.count < $1.name.count }?.name
+            .compactMap { r -> (String, Int)? in
+                let hit = [r.name, r.ru ?? "", r.kk ?? ""].filter { $0.count >= 5 && t.contains($0.lowercased()) }.map(\.count).max()
+                return hit.map { (r.name, $0) }
+            }
+            .max { $0.1 < $1.1 }?.0
     }
 
     static func claimsAction(_ text: String) -> Bool {
@@ -118,9 +121,9 @@ enum NutrikAI {
 
     private static func mood(for text: String) -> NutrikMood {
         let t = text.lowercased()
-        if ["🎉", "great", "yay", "awesome", "well done", "супер", "молодец"].contains(where: t.contains) { return .cheer }
-        if ["cook", "recipe", "eat", "🍳", "🥗", "готов", "рецепт"].contains(where: t.contains) { return .eating }
-        if ["sorry", "😿", "unfortunately", "к сожалению"].contains(where: t.contains) { return .sad }
+        if ["🎉", "great", "yay", "awesome", "well done", "супер", "молодец", "жарайсың", "керемет"].contains(where: t.contains) { return .cheer }
+        if ["cook", "recipe", "eat", "🍳", "🥗", "готов", "рецепт", "пісір", "тамақ"].contains(where: t.contains) { return .eating }
+        if ["sorry", "😿", "unfortunately", "к сожалению", "өкінішке"].contains(where: t.contains) { return .sad }
         return .happy
     }
 }

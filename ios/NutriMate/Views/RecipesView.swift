@@ -28,15 +28,15 @@ struct RecipesView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
-                    Picker("Show", selection: $mode) {
-                        Text("For you").tag(0)
-                        Text("Cook now").tag(1)
-                        Text("♻️ Zero-waste").tag(2)
+                    Picker(L("Show"), selection: $mode) {
+                        Text(L("For you")).tag(0)
+                        Text(L("Cook now")).tag(1)
+                        Text(L("♻️ Zero-waste")).tag(2)
                     }
                     .pickerStyle(.segmented)
                     HStack {
                         Image(systemName: "magnifyingglass").foregroundStyle(Color.burgundy)
-                        TextField("Recipe or ingredient", text: $query).autocorrectionDisabled()
+                        TextField(L("Recipe or ingredient"), text: $query).autocorrectionDisabled()
                     }
                     .padding(12)
                     .background(Color.glassFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -45,7 +45,7 @@ struct RecipesView: View {
                     if items.isEmpty {
                         VStack(spacing: 10) {
                             NutrikView(mood: .sad, size: 100)
-                            Text(mode == 1 ? "Nothing can be cooked only from your fridge yet. Try \"For you\" — I'll show what's missing." : "No recipes found.")
+                            Text(mode == 1 ? L("Nothing can be cooked only from your fridge yet. Try \"For you\" — I'll show what's missing.") : L("No recipes found."))
                                 .multilineTextAlignment(.center).foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity).padding(.top, 20)
@@ -60,7 +60,7 @@ struct RecipesView: View {
             }
             .scrollDismissesKeyboard(.immediately)
             .background(LiveBackground())
-            .navigationTitle("Recipes")
+            .navigationTitle(L("Recipes"))
             .navigationDestination(for: Recipe.self) { r in RecipeDetail(recipe: r) }
         }
     }
@@ -79,11 +79,11 @@ struct RecipeCard: View {
             Text(recipe.emoji).font(.system(size: 38)).frame(width: 58, height: 58)
                 .background(Circle().fill(Color.white.opacity(0.6)))
             VStack(alignment: .leading, spacing: 4) {
-                Text(recipe.name).font(.headline).foregroundStyle(Color.burgundy).lineLimit(2)
-                Text("⏱ \(recipe.time) · \(recipe.kcal) kcal/serving").font(.caption).foregroundStyle(.secondary)
+                Text(N(recipe.name)).font(.headline).foregroundStyle(Color.burgundy).lineLimit(2)
+                Text(L("⏱ {0} · {1} kcal/serving", recipe.localTime, recipe.kcal)).font(.caption).foregroundStyle(.secondary)
                 HStack(spacing: 6) {
-                    tag("\(haveCount)/\(recipe.ingredients.count) in fridge", haveCount == recipe.ingredients.count ? .freshGreen : .burgundy)
-                    if rescues > 0 { tag("rescues \(rescues) 🦸", .warnOrange) }
+                    tag(L("{0}/{1} in fridge", haveCount, recipe.ingredients.count), haveCount == recipe.ingredients.count ? .freshGreen : .burgundy)
+                    if rescues > 0 { tag(L("rescues {0} 🦸", rescues), .warnOrange) }
                     if recipe.zeroWaste { tag("♻️", .freshGreen) }
                 }
             }
@@ -94,7 +94,7 @@ struct RecipeCard: View {
     }
 
     private func tag(_ t: String, _ c: Color) -> some View {
-        Text(t).font(.caption2.weight(.bold)).foregroundStyle(c)
+        Text(t).font(.caption2.weight(.bold)).foregroundStyle(c).lineLimit(1).minimumScaleFactor(0.75)
             .padding(.horizontal, 7).padding(.vertical, 3)
             .background(Capsule().fill(c.opacity(0.12)))
     }
@@ -114,31 +114,31 @@ struct RecipeDetail: View {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(spacing: 6) {
                     Text(recipe.emoji).font(.system(size: 72))
-                    Text(recipe.name).font(.title.bold()).foregroundStyle(Color.burgundy).multilineTextAlignment(.center)
-                    Text("⏱ \(recipe.time) · \(recipe.servings) servings · \(recipe.kcal) kcal each")
+                    Text(N(recipe.name)).font(.title.bold()).foregroundStyle(Color.burgundy).multilineTextAlignment(.center)
+                    Text(L("⏱ {0} · {1} · {2} kcal each", recipe.localTime, Lp(recipe.servings, "serving|servings"), recipe.kcal))
                         .font(.subheadline).foregroundStyle(.secondary)
                     if recipe.zeroWaste {
-                        Text("♻️ Zero-waste recipe — rescues leftovers").font(.caption.bold()).foregroundStyle(Color.freshGreen)
+                        Text(L("♻️ Zero-waste recipe — rescues leftovers")).font(.caption.bold()).foregroundStyle(Color.freshGreen)
                     }
                 }
                 .frame(maxWidth: .infinity)
 
                 VStack(alignment: .leading, spacing: 8) {
-                    SectionTitle(text: "Ingredients")
+                    SectionTitle(text: L("Ingredients"))
                     ForEach(recipe.ingredients, id: \.name) { i in
                         HStack {
                             Text(store.db.byName[i.name]?.emoji ?? "•")
-                            Text(i.name)
+                            Text(N(i.name))
                             Spacer()
-                            Text("\(i.g) g").foregroundStyle(.secondary)
+                            Text(L("{0} g", i.g)).foregroundStyle(.secondary)
                             Image(systemName: have.contains(i.name) ? "checkmark.circle.fill" : "circle")
                                 .foregroundStyle(have.contains(i.name) ? Color.freshGreen : Color.burgundy.opacity(0.35))
                         }
                     }
-                    Text("Also: \(recipe.staples)").font(.caption).foregroundStyle(.secondary)
+                    Text(L("Also: {0}", recipe.staples)).font(.caption).foregroundStyle(.secondary)
                     if !missing.isEmpty {
                         Button { store.addShopping(missing) } label: {
-                            Label("Add \(missing.count) missing to shopping list", systemImage: "cart.badge.plus")
+                            Label(L("Add {0} missing to shopping list", missing.count), systemImage: "cart.badge.plus")
                         }
                         .buttonStyle(SoftButtonStyle())
                     }
@@ -146,7 +146,7 @@ struct RecipeDetail: View {
                 .glassCard()
 
                 VStack(alignment: .leading, spacing: 10) {
-                    SectionTitle(text: "Steps")
+                    SectionTitle(text: L("Steps"))
                     ForEach(Array(recipe.steps.enumerated()), id: \.offset) { n, s in
                         Button {
                             UISelectionFeedbackGenerator().selectionChanged()
@@ -170,13 +170,13 @@ struct RecipeDetail: View {
                 .glassCard()
 
                 VStack(spacing: 10) {
-                    Stepper("Portions eaten: \(portions) · \(recipe.kcal * portions) kcal", value: $portions, in: 1...max(1, recipe.servings))
-                    Button("I cooked it! 👩‍🍳") {
+                    Stepper(L("Portions eaten: {0} · {1} kcal", portions, recipe.kcal * portions), value: $portions, in: 1...max(1, recipe.servings))
+                    Button(L("I cooked it! 👩‍🍳")) {
                         store.cook(recipe, portions: portions)
                         dismiss()
                     }
                     .buttonStyle(PrimaryButtonStyle())
-                    Text("Ingredients from your fridge are used up — the ones expiring first.")
+                    Text(L("Ingredients from your fridge are used up — the ones expiring first."))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 .glassCard()
@@ -186,5 +186,21 @@ struct RecipeDetail: View {
         }
         .background(LiveBackground())
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+extension Recipe {
+    /// Время приготовления из данных («15 min») с переведённой единицей.
+    var localTime: String {
+        guard AppLang.current != .en else { return time }
+        return time.split(separator: " ").map { w -> String in
+            switch w {
+            case "min": return L("min")
+            case "h": return L("h")
+            case "night": return L("night")
+            case "chill": return L("chill")
+            default: return String(w)
+            }
+        }.joined(separator: " ")
     }
 }

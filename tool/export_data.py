@@ -47,9 +47,10 @@ if tr_path.exists():
         parts = [x.strip() for x in line.split('|')]
         if len(parts) != 3 or not all(parts): errors.append('bad translation line: ' + line); continue
         en, ru, kk = parts
-        target = byname.get(en) or next((r for r in recipes if r['name'] == en), None)
-        if target is None: errors.append('translation for unknown product/recipe: ' + en); continue
-        target['ru'], target['kk'] = ru, kk
+        # одно название может быть и продуктом, и рецептом (French Toast) — переводим оба
+        targets = [t for t in [byname.get(en)] if t] + [r for r in recipes if r['name'] == en]
+        if not targets: errors.append('translation for unknown product/recipe: ' + en); continue
+        for target in targets: target['ru'], target['kk'] = ru, kk
         n_tr += 1
 rn = [r['name'].lower() for r in recipes]
 for n in set(rn):

@@ -25,44 +25,44 @@ struct ProfileView: View {
                     statsRow
                     medalsStrip
 
-                    SettingsGroup(title: "Body & goal") {
-                        SettingsRow(icon: "gauge.with.dots.needle.67percent", tint: Color(hex: 0xD84315), title: "Body dashboard",
-                                    value: String(format: "BMI %.1f", store.data.profile.bmi), valueColor: store.data.profile.bmiCategory.color) { showBody = true }
+                    SettingsGroup(title: L("Body & goal")) {
+                        SettingsRow(icon: "gauge.with.dots.needle.67percent", tint: Color(hex: 0xD84315), title: L("Body dashboard"),
+                                    value: L("BMI {0}", String(format: "%.1f", store.data.profile.bmi)), valueColor: store.data.profile.bmiCategory.color) { showBody = true }
                         RowDivider()
-                        SettingsRow(icon: "flame.fill", tint: .warnOrange, title: "Daily goal",
-                                    value: "\(store.targetCalories) kcal") { path.append(.edit) }
+                        SettingsRow(icon: "flame.fill", tint: .warnOrange, title: L("Daily goal"),
+                                    value: L("{0} kcal", store.targetCalories)) { path.append(.edit) }
                         RowDivider()
-                        SettingsRow(icon: "scalemass.fill", tint: Color(hex: 0x5E35B1), title: "Weight",
-                                    value: String(format: "%.1f kg", store.data.profile.weight)) { path.append(.edit) }
+                        SettingsRow(icon: "scalemass.fill", tint: Color(hex: 0x5E35B1), title: L("Weight"),
+                                    value: L("{0} kg", String(format: "%.1f", store.data.profile.weight))) { path.append(.edit) }
                     }
 
-                    SettingsGroup(title: "Progress") {
-                        SettingsRow(icon: "chart.bar.xaxis", tint: .burgundyLight, title: "Weekly report",
-                                    value: "score \(WeekStats(store: store).score)") { showWeek = true }
+                    SettingsGroup(title: L("Progress")) {
+                        SettingsRow(icon: "chart.bar.xaxis", tint: .burgundyLight, title: L("Weekly report"),
+                                    value: L("score {0}", WeekStats(store: store).score)) { showWeek = true }
                         RowDivider()
-                        SettingsRow(icon: "leaf.fill", tint: .freshGreen, title: "Eco impact",
-                                    value: String(format: "%.1f kg CO₂", store.co2)) { showEco = true }
+                        SettingsRow(icon: "leaf.fill", tint: .freshGreen, title: L("Eco impact"),
+                                    value: L("{0} kg CO₂", String(format: "%.1f", store.co2))) { showEco = true }
                         RowDivider()
-                        SettingsRow(icon: "medal.fill", tint: Color(hex: 0xF9A825), title: "Medals",
+                        SettingsRow(icon: "medal.fill", tint: Color(hex: 0xF9A825), title: L("Medals"),
                                     value: "\(store.data.unlocked.count)/\(Medal.all.count)") { path.append(.medals) }
                     }
 
-                    SettingsGroup(title: "Nutrik") {
-                        SettingsRow(icon: "bubble.left.and.bubble.right.fill", tint: Color(hex: 0x1E88E5), title: "Chat with Nutrik") { showChat = true }
+                    SettingsGroup(title: L("Nutrik")) {
+                        SettingsRow(icon: "bubble.left.and.bubble.right.fill", tint: Color(hex: 0x1E88E5), title: L("Chat with Nutrik")) { showChat = true }
                         RowDivider()
-                        SettingsToggle(icon: "sparkles", tint: Color(hex: 0x8E24AA), title: "Smart Nutrik (online AI)",
+                        SettingsToggle(icon: "sparkles", tint: Color(hex: 0x8E24AA), title: L("Smart Nutrik (online AI)"),
                                        subtitle: NutrikAI.isConfigured
-                                       ? "Free AI answers in chat. AI answers can be wrong. Sends only your name, fridge, today's kcal and the last messages."
-                                       : "AI answers can be wrong. The AI server isn't connected yet — Nutrik answers offline for now.",
+                                       ? L("Free AI answers in chat. AI answers can be wrong. Sends only your name, fridge, today's kcal and the last messages.")
+                                       : L("AI answers can be wrong. The AI server isn't connected yet — Nutrik answers offline for now."),
                                        isOn: $store.data.smartNutrik)
                         RowDivider()
-                        SettingsToggle(icon: "pawprint.fill", tint: Color(hex: 0x6D4C41), title: "Nutrik reacts",
-                                       subtitle: "Runs in when you eat, cook, freeze or bin food", isOn: $store.data.nutrikBuddy)
+                        SettingsToggle(icon: "pawprint.fill", tint: Color(hex: 0x6D4C41), title: L("Nutrik reacts"),
+                                       subtitle: L("Runs in when you eat, cook, freeze or bin food"), isOn: $store.data.nutrikBuddy)
                         RowDivider()
-                        SettingsRow(icon: "hand.thumbsdown.fill", tint: Color(hex: 0x757575), title: "Skipped in recipes",
-                                    value: store.data.dislikes.isEmpty ? "none" : "\(store.data.dislikes.count)") { path.append(.dislikes) }
+                        SettingsRow(icon: "hand.thumbsdown.fill", tint: Color(hex: 0x757575), title: L("Skipped in recipes"),
+                                    value: store.data.dislikes.isEmpty ? L("none") : "\(store.data.dislikes.count)") { path.append(.dislikes) }
                         RowDivider()
-                        SettingsRow(icon: "graduationcap.fill", tint: Color(hex: 0x00897B), title: "Replay tutorial", chevron: false) { store.replayTutorial() }
+                        SettingsRow(icon: "graduationcap.fill", tint: Color(hex: 0x00897B), title: L("Replay tutorial"), chevron: false) { store.replayTutorial() }
                     }
 
                     SettingsGroup(title: L("Language")) {
@@ -87,21 +87,21 @@ struct ProfileView: View {
                         .buttonStyle(RowPressStyle())
                     }
 
-                    SettingsGroup(title: "Notifications") {
-                        SettingsToggle(icon: "bell.badge.fill", tint: .badRed, title: "Daily reminders",
-                                       subtitle: "At 9:00 Nutrik tells you what expires today and tomorrow",
+                    SettingsGroup(title: L("Notifications")) {
+                        SettingsToggle(icon: "bell.badge.fill", tint: .badRed, title: L("Daily reminders"),
+                                       subtitle: L("At 9:00 Nutrik tells you what expires today and tomorrow"),
                                        isOn: Binding(get: { store.data.notifications }, set: { store.setNotifications($0) }))
                     }
 
-                    SettingsGroup(title: "Data", footer: "Everything is saved on this iPhone automatically. Reinstalling the app on top keeps your data.") {
-                        SettingsRow(icon: "basket.fill", tint: Color(hex: 0x7CB342), title: "Add demo products", chevron: false) { store.loadDemo() }
+                    SettingsGroup(title: L("Data"), footer: L("Everything is saved on this iPhone automatically. Reinstalling the app on top keeps your data.")) {
+                        SettingsRow(icon: "basket.fill", tint: Color(hex: 0x7CB342), title: L("Add demo products"), chevron: false) { store.loadDemo() }
                         RowDivider()
-                        SettingsRow(icon: "trash.fill", tint: .badRed, title: "Erase all data", titleColor: .badRed, chevron: false) { confirmErase = true }
+                        SettingsRow(icon: "trash.fill", tint: .badRed, title: L("Erase all data"), titleColor: .badRed, chevron: false) { confirmErase = true }
                     }
 
                     VStack(spacing: 4) {
                         Text("NutriMate Pro · iOS v\(version)").font(.footnote.bold()).foregroundStyle(Color.burgundy.opacity(0.7))
-                        Text("CEE 181 «Fostering Sustainability in Almaty» — fighting food waste. Prof. Alberto Frigerio.")
+                        Text(L("CEE 181 «Fostering Sustainability in Almaty» — fighting food waste. Prof. Alberto Frigerio."))
                             .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     }
                     .padding(.horizontal, 24)
@@ -120,7 +120,7 @@ struct ProfileView: View {
             }
             }
             .background(LiveBackground())
-            .navigationTitle("Profile")
+            .navigationTitle(L("Profile"))
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: ProfileRoute.self) { r in
                 switch r {
@@ -136,11 +136,11 @@ struct ProfileView: View {
             .sheet(isPresented: $showAvatar) {
                 AvatarPicker().presentationDetents([.medium]).presentationBackground(Color.cream)
             }
-            .alert("Erase all data?", isPresented: $confirmErase) {
-                Button("Erase", role: .destructive) { store.eraseAll() }
-                Button("Cancel", role: .cancel) {}
+            .alert(L("Erase all data?"), isPresented: $confirmErase) {
+                Button(L("Erase"), role: .destructive) { store.eraseAll() }
+                Button(L("Cancel"), role: .cancel) {}
             } message: {
-                Text("Fridge, diary, weight, shopping list and medals will be deleted. This cannot be undone.")
+                Text(L("Fridge, diary, weight, shopping list and medals will be deleted. This cannot be undone."))
             }
         }
     }
@@ -161,34 +161,34 @@ struct ProfileView: View {
                     }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Change avatar")
+            .accessibilityLabel(L("Change avatar"))
 
             VStack(spacing: 3) {
                 Text(store.data.profile.name)
                     .font(.system(.title, design: .serif).bold())
                     .foregroundStyle(Color.burgundy)
                     .lineLimit(1).minimumScaleFactor(0.6)
-                Text(store.daysWithUs == 1 ? "With NutriMate since today 🌱" : "With NutriMate for \(store.daysWithUs) days 🌱")
+                Text(store.daysWithUs == 1 ? L("With NutriMate since today 🌱") : L("With NutriMate for {0} 🌱", Lp(store.daysWithUs, "day|days")))
                     .font(.subheadline).foregroundStyle(.secondary)
             }
 
             HStack(spacing: 8) {
-                Badge(text: "Lv \(lv.n) · \(lv.title)", icon: "star.fill", tint: .burgundy)
+                Badge(text: L("Lv {0} · {1}", lv.n, L(lv.title)), icon: "star.fill", tint: .burgundy)
                 if store.streakDays > 0 {
-                    Badge(text: "\(store.streakDays)-day streak", icon: "flame.fill", tint: .warnOrange)
+                    Badge(text: L("{0}-day streak", store.streakDays), icon: "flame.fill", tint: .warnOrange)
                 }
             }
 
             VStack(spacing: 4) {
                 ProgressBar(value: lv.progress)
-                Text("\(lv.toNext) XP to level \(lv.n + 1) · rescue, cook and freeze food to level up")
+                Text(L("{0} XP to level {1} · rescue, cook and freeze food to level up", lv.toNext, lv.n + 1))
                     .font(.caption2).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
             .padding(.horizontal, 8)
 
             Button { path.append(.edit) } label: {
-                Label("Edit profile", systemImage: "square.and.pencil")
+                Label(L("Edit profile"), systemImage: "square.and.pencil")
             }
             .buttonStyle(SoftButtonStyle())
         }
@@ -198,9 +198,9 @@ struct ProfileView: View {
 
     private var statsRow: some View {
         HStack(spacing: 10) {
-            StatTile(value: "\(store.data.stats.rescued)", label: "products\nsaved", emoji: "🦸")
-            StatTile(value: "\(store.streakDays)", label: "days without\nwaste", emoji: "🌱")
-            StatTile(value: String(format: "$%.0f", store.data.stats.rescuedMoney), label: "money\nsaved", emoji: "💰")
+            StatTile(value: "\(store.data.stats.rescued)", label: L("products\nsaved"), emoji: "🦸")
+            StatTile(value: "\(store.streakDays)", label: L("days without\nwaste"), emoji: "🌱")
+            StatTile(value: String(format: "$%.0f", store.data.stats.rescuedMoney), label: L("money\nsaved"), emoji: "💰")
         }
     }
 
@@ -209,8 +209,8 @@ struct ProfileView: View {
         return Button { path.append(.medals) } label: {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Medals").font(.headline).foregroundStyle(Color.burgundy)
-                    Text("\(got.count) of \(Medal.all.count)").font(.caption).foregroundStyle(.secondary)
+                    Text(L("Medals")).font(.headline).foregroundStyle(Color.burgundy)
+                    Text(L("{0} of {1}", got.count, Medal.all.count)).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 4)
                 HStack(spacing: -8) {
@@ -221,7 +221,7 @@ struct ProfileView: View {
                             .overlay(Circle().strokeBorder(Color.white, lineWidth: 2))
                     }
                     if got.isEmpty {
-                        Text("Earn your first one 🍽️").font(.caption).foregroundStyle(.secondary)
+                        Text(L("Earn your first one 🍽️")).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 Image(systemName: "chevron.right").font(.footnote.bold()).foregroundStyle(.tertiary)
@@ -273,7 +273,7 @@ struct AvatarPicker: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("Choose your avatar").font(.headline).foregroundStyle(Color.burgundy).padding(.top, 20)
+            Text(L("Choose your avatar")).font(.headline).foregroundStyle(Color.burgundy).padding(.top, 20)
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
                     option("") { NutrikView(mood: .happy, size: 56, clumsy: false) }
@@ -311,7 +311,7 @@ struct Badge: View {
     var body: some View {
         Label(text, systemImage: icon)
             .font(.caption.weight(.bold))
-            .lineLimit(1)
+            .lineLimit(1).minimumScaleFactor(0.7)
             .foregroundStyle(tint)
             .padding(.horizontal, 10).padding(.vertical, 6)
             .background(Capsule().fill(tint.opacity(0.1)))
@@ -342,7 +342,7 @@ struct StatTile: View {
             Text(value).font(.system(.title2, design: .rounded).bold()).foregroundStyle(Color.burgundy)
                 .lineLimit(1).minimumScaleFactor(0.6)
             Text(label).font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                .lineLimit(2).minimumScaleFactor(0.8)
+                .lineLimit(2).minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity)
         .glassCard(radius: 20, padding: 12)
@@ -394,7 +394,7 @@ struct SettingsRow: View {
                 SettingsIcon(name: icon, tint: tint)
                 Text(title).foregroundStyle(titleColor).lineLimit(1).minimumScaleFactor(0.8)
                 Spacer(minLength: 6)
-                if let value { Text(value).font(.subheadline).foregroundStyle(valueColor).lineLimit(1) }
+                if let value { Text(value).font(.subheadline).foregroundStyle(valueColor).lineLimit(1).minimumScaleFactor(0.8) }
                 if chevron { Image(systemName: "chevron.right").font(.footnote.bold()).foregroundStyle(.tertiary) }
             }
             .padding(.horizontal, 14).padding(.vertical, 11)
@@ -451,7 +451,7 @@ struct EditProfileView: View {
                     Button { showAvatar = true } label: {
                         VStack(spacing: 6) {
                             AvatarView(size: 84)
-                            Text("Change avatar").font(.footnote.weight(.semibold)).foregroundStyle(Color.burgundy)
+                            Text(L("Change avatar")).font(.footnote.weight(.semibold)).foregroundStyle(Color.burgundy)
                         }
                     }
                     .buttonStyle(.plain)
@@ -460,31 +460,31 @@ struct EditProfileView: View {
                 .listRowBackground(Color.clear)
             }
 
-            Section("Name") {
-                TextField("Your name", text: $store.data.profile.name)
+            Section(L("Name")) {
+                TextField(L("Your name"), text: $store.data.profile.name)
                     .textInputAutocapitalization(.words)
                     .focused($focused)
             }
             .listRowBackground(Color.white.opacity(0.6))
 
-            Section("Body") {
-                Picker("Sex", selection: $store.data.profile.isMan) {
-                    Text("Male").tag(true)
-                    Text("Female").tag(false)
+            Section(L("Body")) {
+                Picker(L("Sex"), selection: $store.data.profile.isMan) {
+                    Text(L("Male")).tag(true)
+                    Text(L("Female")).tag(false)
                 }
                 .pickerStyle(.segmented)
-                Stepper(value: $store.data.profile.age, in: 10...100) { valueRow("Age", "\(store.data.profile.age)") }
-                Stepper(value: $store.data.profile.height, in: 120...220, step: 1) { valueRow("Height", "\(Int(store.data.profile.height)) cm") }
+                Stepper(value: $store.data.profile.age, in: 10...100) { valueRow(L("Age"), "\(store.data.profile.age)") }
+                Stepper(value: $store.data.profile.height, in: 120...220, step: 1) { valueRow(L("Height"), L("{0} cm", Int(store.data.profile.height))) }
             }
             .listRowBackground(Color.white.opacity(0.6))
 
             Section {
-                valueRow("Current", String(format: "%.1f kg", store.data.profile.weight))
+                valueRow(L("Current"), L("{0} kg", String(format: "%.1f", store.data.profile.weight)))
                 HStack {
-                    TextField("New weight, kg", text: $newWeight)
+                    TextField(L("New weight, kg"), text: $newWeight)
                         .keyboardType(.decimalPad)
                         .focused($focused)
-                    Button("Log") { logWeight() }
+                    Button(L("Log")) { logWeight() }
                         .buttonStyle(SoftButtonStyle())
                         .disabled(parsedWeight == nil)
                 }
@@ -492,46 +492,46 @@ struct EditProfileView: View {
                     WeightChart(entries: store.data.weights).padding(.vertical, 4)
                 }
             } header: {
-                Text("Weight")
+                Text(L("Weight"))
             } footer: {
-                Text("Log your weight once a week — Nutrik keeps the history and the trend.")
+                Text(L("Log your weight once a week — Nutrik keeps the history and the trend."))
             }
             .listRowBackground(Color.white.opacity(0.6))
 
             Section {
-                Picker("Activity", selection: $store.data.profile.activity) {
-                    ForEach(0..<Profile.activityTitles.count, id: \.self) { i in Text(Profile.activityTitles[i]).tag(i) }
+                Picker(L("Activity"), selection: $store.data.profile.activity) {
+                    ForEach(0..<Profile.activityTitles.count, id: \.self) { i in Text(L(Profile.activityTitles[i])).tag(i) }
                 }
                 .pickerStyle(.navigationLink)
-                Picker("Goal", selection: $store.data.profile.goal) {
-                    Text("Lose").tag(-1)
-                    Text("Keep").tag(0)
-                    Text("Gain").tag(1)
+                Picker(L("Goal"), selection: $store.data.profile.goal) {
+                    Text(L("Lose")).tag(-1)
+                    Text(L("Keep")).tag(0)
+                    Text(L("Gain")).tag(1)
                 }
                 .pickerStyle(.segmented)
                 HStack {
-                    Text("Daily goal")
+                    Text(L("Daily goal"))
                     Spacer()
-                    Text("\(store.targetCalories) kcal").bold().foregroundStyle(Color.burgundy)
+                    Text(L("{0} kcal", store.targetCalories)).bold().foregroundStyle(Color.burgundy)
                         .contentTransition(.numericText())
                         .animation(.snappy, value: store.targetCalories)
                 }
             } header: {
-                Text("Activity & goal")
+                Text(L("Activity & goal"))
             } footer: {
-                Text("Base metabolism \(store.data.profile.bmr) kcal × activity, ±\u{2009}goal. Losing never goes below your base metabolism.")
+                Text(L("Base metabolism {0} kcal × activity, ± goal. Losing never goes below your base metabolism.", store.data.profile.bmr))
             }
             .listRowBackground(Color.white.opacity(0.6))
         }
         .scrollContentBackground(.hidden)
         .scrollDismissesKeyboard(.immediately)
         .background(Color.cream.ignoresSafeArea())
-        .navigationTitle("Edit profile")
+        .navigationTitle(L("Edit profile"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("Done") { focused = false }
+                Button(L("Done")) { focused = false }
             }
         }
         .sheet(isPresented: $showAvatar) {
@@ -568,7 +568,7 @@ struct MedalsView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
-                Text("\(store.data.unlocked.count) of \(Medal.all.count) unlocked")
+                Text(L("{0} of {1} unlocked", store.data.unlocked.count, Medal.all.count))
                     .font(.subheadline).foregroundStyle(.secondary)
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                     ForEach(Medal.all) { m in
@@ -576,12 +576,12 @@ struct MedalsView: View {
                         VStack(spacing: 6) {
                             Text(m.emoji).font(.system(size: 42))
                                 .grayscale(got ? 0 : 1).opacity(got ? 1 : 0.35)
-                            Text(m.title).font(.subheadline.bold())
+                            Text(L(m.title)).font(.subheadline.bold())
                                 .foregroundStyle(got ? Color.burgundy : Color.secondary)
-                            Text(m.desc).font(.caption).foregroundStyle(.secondary)
+                            Text(L(m.desc)).font(.caption).foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
                             if got {
-                                Label("Unlocked", systemImage: "checkmark.seal.fill").font(.caption2.bold()).foregroundStyle(Color.freshGreen)
+                                Label(L("Unlocked"), systemImage: "checkmark.seal.fill").font(.caption2.bold()).foregroundStyle(Color.freshGreen)
                             }
                         }
                         .frame(maxWidth: .infinity, minHeight: 150)
@@ -593,7 +593,7 @@ struct MedalsView: View {
             .padding(.bottom, 100)
         }
         .background(LiveBackground())
-        .navigationTitle("Medals")
+        .navigationTitle(L("Medals"))
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -605,23 +605,23 @@ struct DislikesView: View {
         List {
             Section {
                 if store.data.dislikes.isEmpty {
-                    Text("Nothing here. Tell Nutrik \"I don't like onion\" in chat and recipes with it go to the end of the list.")
+                    Text(L("Nothing here. Tell Nutrik \"I don't like onion\" in chat and recipes with it go to the end of the list."))
                         .foregroundStyle(.secondary)
                 }
                 ForEach(store.data.dislikes, id: \.self) { d in
-                    Text("\(store.db.byName[d]?.emoji ?? "🙅") \(d)")
+                    Text("\(store.db.byName[d]?.emoji ?? "🙅") \(N(d))")
                         .swipeActions {
-                            Button(role: .destructive) { remove(d) } label: { Label("Remove", systemImage: "trash") }
+                            Button(role: .destructive) { remove(d) } label: { Label(L("Remove"), systemImage: "trash") }
                         }
                 }
             } footer: {
-                if !store.data.dislikes.isEmpty { Text("Swipe left to like a product again.") }
+                if !store.data.dislikes.isEmpty { Text(L("Swipe left to like a product again.")) }
             }
             .listRowBackground(Color.white.opacity(0.6))
         }
         .scrollContentBackground(.hidden)
         .background(Color.cream.ignoresSafeArea())
-        .navigationTitle("Skipped in recipes")
+        .navigationTitle(L("Skipped in recipes"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -644,19 +644,19 @@ struct ShoppingView: View {
             List {
                 Section {
                     HStack {
-                        TextField("Add product…", text: $text).autocorrectionDisabled()
+                        TextField(L("Add product…"), text: $text).autocorrectionDisabled()
                         Button { addTyped() } label: { Image(systemName: "plus.circle.fill").font(.title2) }
                             .disabled(text.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                     ForEach(hints) { f in
                         Button { store.addShopping([f.name]); text = "" } label: {
-                            Text("\(f.emoji) \(f.name)").foregroundStyle(Color.burgundy)
+                            Text("\(f.emoji) \(N(f.name))").foregroundStyle(Color.burgundy)
                         }
                     }
                 }
                 Section {
                     if store.data.shopping.isEmpty {
-                        Text("The list is empty. Add missing ingredients from any recipe 🍲").foregroundStyle(.secondary)
+                        Text(L("The list is empty. Add missing ingredients from any recipe 🍲")).foregroundStyle(.secondary)
                     }
                     ForEach(store.data.shopping, id: \.self) { n in
                         HStack {
@@ -664,21 +664,21 @@ struct ShoppingView: View {
                                 Image(systemName: "circle").font(.title3).foregroundStyle(Color.burgundy)
                             }
                             .buttonStyle(.plain)
-                            Text("\(store.db.byName[n]?.emoji ?? "🛒") \(n)")
+                            Text("\(store.db.byName[n]?.emoji ?? "🛒") \(N(n))")
                             Spacer()
                         }
                         .swipeActions {
-                            Button(role: .destructive) { store.removeShopping(n) } label: { Label("Delete", systemImage: "trash") }
+                            Button(role: .destructive) { store.removeShopping(n) } label: { Label(L("Delete"), systemImage: "trash") }
                         }
                     }
                 } footer: {
-                    Text("Tap the circle when you bought it — it goes straight into your fridge.")
+                    Text(L("Tap the circle when you bought it — it goes straight into your fridge."))
                 }
             }
             .scrollContentBackground(.hidden)
             .background(Color.cream)
-            .navigationTitle("Shopping list")
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .navigationTitle(L("Shopping list"))
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button(L("Done")) { dismiss() } } }
         }
     }
 

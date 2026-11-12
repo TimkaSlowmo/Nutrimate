@@ -29,7 +29,7 @@ struct SearchView: View {
             }
             .scrollDismissesKeyboard(.immediately)
             .background(LiveBackground())
-            .navigationTitle("Search")
+            .navigationTitle(L("Search"))
             .sheet(item: $logFood) { f in LogFoodSheet(food: f) }
             .sheet(item: $addFood) { f in AddFoodSheet(food: f) }
         }
@@ -38,7 +38,7 @@ struct SearchView: View {
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").foregroundStyle(Color.burgundy)
-            TextField("Search \(store.db.foods.count) products…", text: $query)
+            TextField(L("Search {0} products…", store.db.foods.count), text: $query)
                 .focused($focused)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
@@ -54,9 +54,9 @@ struct SearchView: View {
     private var categories: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                Button { pick(nil) } label: { Chip(text: "All", selected: category == nil) }
+                Button { pick(nil) } label: { Chip(text: L("All"), selected: category == nil) }
                 ForEach(store.db.categories, id: \.self) { c in
-                    Button { pick(c) } label: { Chip(text: "\(FoodDB.catEmoji[c] ?? "🍽️") \(c)", selected: category == c) }
+                    Button { pick(c) } label: { Chip(text: "\(FoodDB.catEmoji[c] ?? "🍽️") \(N(c))", selected: category == c) }
                 }
             }
             .buttonStyle(.plain)
@@ -71,17 +71,17 @@ struct SearchView: View {
 
     private var home: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SectionTitle(text: "Popular in Almaty 🇰🇿")
+            SectionTitle(text: L("Popular in Almaty 🇰🇿"))
             FlowChips(items: suggestions.compactMap { store.db.byName[$0] }) { f in
                 store.add(f)
             }
-            SectionTitle(text: "Categories")
+            SectionTitle(text: L("Categories"))
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 10)], spacing: 10) {
                 ForEach(store.db.categories, id: \.self) { c in
                     Button { pick(c) } label: {
                         VStack(spacing: 6) {
                             Text(FoodDB.catEmoji[c] ?? "🍽️").font(.system(size: 34))
-                            Text(c).font(.caption.weight(.semibold)).foregroundStyle(Color.burgundy).lineLimit(1).minimumScaleFactor(0.7)
+                            Text(N(c)).font(.caption.weight(.semibold)).foregroundStyle(Color.burgundy).lineLimit(1).minimumScaleFactor(0.7)
                             Text("\(store.db.foods.filter { $0.category == c }.count)").font(.caption2).foregroundStyle(.secondary)
                         }
                         .glassCard(radius: 18, padding: 12)
@@ -95,15 +95,15 @@ struct SearchView: View {
     private var list: some View {
         let r = results
         return LazyVStack(alignment: .leading, spacing: 8) {
-            Text(r.isEmpty ? "Nothing found 🤔 Try another word." : "\(r.count) found")
+            Text(r.isEmpty ? L("Nothing found 🤔 Try another word.") : L("{0} found", r.count))
                 .font(.caption).foregroundStyle(.secondary)
             ForEach(r.prefix(300)) { f in
                 FoodRow(food: f, inFridge: store.pantryNames.contains(f.name)) { store.add(f) }
                     .onTapGesture { addFood = f }
                     .contextMenu {
-                        Button { store.add(f) } label: { Label("Add to fridge", systemImage: "refrigerator") }
-                        Button { logFood = f } label: { Label("Log as eaten…", systemImage: "fork.knife") }
-                        Button { store.addShopping([f.name]) } label: { Label("Add to shopping list", systemImage: "cart") }
+                        Button { store.add(f) } label: { Label(L("Add to fridge"), systemImage: "refrigerator") }
+                        Button { logFood = f } label: { Label(L("Log as eaten…"), systemImage: "fork.knife") }
+                        Button { store.addShopping([f.name]) } label: { Label(L("Add to shopping list"), systemImage: "cart") }
                     }
             }
         }
@@ -120,8 +120,8 @@ struct FoodRow: View {
         HStack(spacing: 12) {
             EmojiBadge(emoji: food.emoji, size: 42)
             VStack(alignment: .leading, spacing: 2) {
-                Text(food.name).font(.body.weight(.semibold)).foregroundStyle(Color.burgundy)
-                Text("\(food.kcal) kcal · keeps \(shelfText(food.shelf)) · \(FoodDB.defaultStorage(food).emoji)")
+                Text(N(food.name)).font(.body.weight(.semibold)).foregroundStyle(Color.burgundy)
+                Text(L("{0} kcal · keeps {1} · {2}", food.kcal, shelfText(food.shelf), FoodDB.defaultStorage(food).emoji))
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
@@ -141,17 +141,17 @@ struct FoodRow: View {
                     .scaleEffect(pressed ? 0.7 : 1)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Add \(food.name)")
+            .accessibilityLabel(L("Add {0}", N(food.name)))
         }
         .glassCard(radius: 16, padding: 10)
     }
 }
 
 func shelfText(_ d: Int) -> String {
-    if d >= 365 { return "\(d / 365) yr" }
-    if d >= 60 { return "\(d / 30) mo" }
-    if d >= 14 { return "\(d / 7) wk" }
-    return "\(d) d"
+    if d >= 365 { return L("{0} yr", d / 365) }
+    if d >= 60 { return L("{0} mo", d / 30) }
+    if d >= 14 { return L("{0} wk", d / 7) }
+    return L("{0} d", d)
 }
 
 /// Чипсы-подсказки, переносящиеся на новую строку.
@@ -161,7 +161,7 @@ struct FlowChips: View {
     var body: some View {
         FlowLayout(spacing: 8) {
             ForEach(items) { f in
-                Button { onTap(f) } label: { Chip(text: "\(f.emoji) \(f.name)  ＋") }
+                Button { onTap(f) } label: { Chip(text: "\(f.emoji) \(N(f.name))  ＋") }
                     .buttonStyle(.plain)
             }
         }
@@ -214,10 +214,10 @@ struct LogFoodSheet: View {
     var body: some View {
         VStack(spacing: 16) {
             EmojiBadge(emoji: food.emoji, size: 80)
-            Text(food.name).font(.title2.bold()).foregroundStyle(Color.burgundy)
-            Stepper("\(grams) g · \(food.kcal * grams / 100) kcal", value: $grams, in: 10...2000, step: 10)
+            Text(N(food.name)).font(.title2.bold()).foregroundStyle(Color.burgundy)
+            Stepper(L("{0} g · {1} kcal", grams, food.kcal * grams / 100), value: $grams, in: 10...2000, step: 10)
                 .padding(.horizontal)
-            Button("Log as eaten") { store.logFood(food, grams: grams); dismiss() }
+            Button(L("Log as eaten")) { store.logFood(food, grams: grams); dismiss() }
                 .buttonStyle(PrimaryButtonStyle())
                 .padding(.horizontal)
         }
@@ -243,26 +243,26 @@ struct AddFoodSheet: View {
                     HStack(spacing: 14) {
                         EmojiBadge(emoji: food.emoji, size: 64)
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(food.name).font(.title3.bold()).foregroundStyle(Color.burgundy)
-                            Text("\(food.category) · \(food.kcal) kcal / 100 g").font(.caption).foregroundStyle(.secondary)
+                            Text(N(food.name)).font(.title3.bold()).foregroundStyle(Color.burgundy)
+                            Text(L("{0} · {1} kcal / 100 g", N(food.category), food.kcal)).font(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }
-                Section("Where and how long") {
-                    Picker("Stored in", selection: $storage) {
-                        ForEach(StorageKind.allCases) { s in Text("\(s.emoji) \(s.title)").tag(s) }
+                Section(L("Where and how long")) {
+                    Picker(L("Stored in"), selection: $storage) {
+                        ForEach(StorageKind.allCases) { s in Text("\(s.emoji) \(L(s.title))").tag(s) }
                     }
                     .pickerStyle(.segmented)
-                    Stepper("Keeps for \(days) \(days == 1 ? "day" : "days")", value: $days, in: 1...730)
-                    Stepper("Quantity: \(count)", value: $count, in: 1...12)
+                    Stepper(L("Keeps for {0}", Lp(days, "day|days")), value: $days, in: 1...730)
+                    Stepper(L("Quantity: {0}", count), value: $count, in: 1...12)
                 }
                 Section {
-                    Button("Add to \(storage.title.lowercased())") {
+                    Button(storage == .fridge ? L("Add to fridge") : storage == .freezer ? L("Add to freezer") : L("Add to pantry")) {
                         store.add(food, days: days, storage: storage, count: count)
                         dismiss()
                     }
                     .bold()
-                    Button("Add to shopping list") {
+                    Button(L("Add to shopping list")) {
                         store.addShopping([food.name])
                         dismiss()
                     }
@@ -270,9 +270,9 @@ struct AddFoodSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(Color.cream)
-            .navigationTitle("Add product")
+            .navigationTitle(L("Add product"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button(L("Cancel")) { dismiss() } } }
             .onAppear {
                 guard !ready else { return }
                 ready = true

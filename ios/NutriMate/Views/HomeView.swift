@@ -13,19 +13,19 @@ struct HomeView: View {
     @State private var tipIndex: Int?
 
     private static let tips = [
-        "Tip: put older food in front of the fridge, new food at the back 🧊",
-        "Bread going stale? Freeze it in slices — toast straight from the freezer 🍞",
-        "Brown bananas make the sweetest banana bread 🍌",
-        "Wilted greens? 10 minutes in ice water brings them back 🥬",
-        "Leftover rice + egg + veggies = fried rice in 10 minutes 🍳",
-        "Kurt keeps for months — a perfect zero-waste snack 🧀",
-        "Plan 3 dinners before shopping — you'll buy 30% less 🛒",
-        "Stale baursaks? Bake them into a sweet bread pudding 🍮",
-        "Tap me again for another tip! (careful, I trip sometimes 😅)",
+        LK("Tip: put older food in front of the fridge, new food at the back 🧊"),
+        LK("Bread going stale? Freeze it in slices — toast straight from the freezer 🍞"),
+        LK("Brown bananas make the sweetest banana bread 🍌"),
+        LK("Wilted greens? 10 minutes in ice water brings them back 🥬"),
+        LK("Leftover rice + egg + veggies = fried rice in 10 minutes 🍳"),
+        LK("Kurt keeps for months — a perfect zero-waste snack 🧀"),
+        LK("Plan 3 dinners before shopping — you'll buy 30% less 🛒"),
+        LK("Stale baursaks? Bake them into a sweet bread pudding 🍮"),
+        LK("Tap me again for another tip! (careful, I trip sometimes 😅)"),
     ]
 
     private var shownLine: (String, NutrikMood) {
-        if let i = tipIndex { return (Self.tips[i % Self.tips.count], .happy) }
+        if let i = tipIndex { return (L(Self.tips[i % Self.tips.count]), .happy) }
         return nutrikLine
     }
 
@@ -44,19 +44,19 @@ struct HomeView: View {
 
     private var greeting: String {
         let h = Calendar.current.component(.hour, from: Date())
-        return h < 5 ? "Good night" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"
+        return h < 5 ? L("Good night") : h < 12 ? L("Good morning") : h < 18 ? L("Good afternoon") : L("Good evening")
     }
 
     private var nutrikLine: (String, NutrikMood) {
         let rescue = store.toRescue
-        if store.data.pantry.isEmpty { return ("Your fridge is empty! Let's add what you have 🧺", .sad) }
+        if store.data.pantry.isEmpty { return (L("Your fridge is empty! Let's add what you have 🧺"), .sad) }
         if let first = rescue.first {
             return first.daysLeft == 0
-                ? ("Psst! \(first.emoji) \(first.name) needs to be eaten today!", .eating)
-                : ("\(rescue.count) product\(rescue.count == 1 ? "" : "s") will expire soon — let's rescue them 🦸", .happy)
+                ? (L("Psst! {0} {1} needs to be eaten today!", first.emoji, N(first.name)), .eating)
+                : (L("{0} will expire soon — let's rescue them 🦸", Lp(rescue.count, "product|products")), .happy)
         }
-        if !store.expired.isEmpty { return ("Some food has expired 😿 Check your fridge.", .sad) }
-        return ("Everything is fresh! You're a zero-waste star ⭐", .wave)
+        if !store.expired.isEmpty { return (L("Some food has expired 😿 Check your fridge."), .sad) }
+        return (L("Everything is fresh! You're a zero-waste star ⭐"), .wave)
     }
 
     var body: some View {
@@ -64,9 +64,9 @@ struct HomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(Date().formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                        Text(Date().formatted(.dateTime.weekday(.wide).day().month(.wide).locale(AppLang.current.locale)))
                             .font(.subheadline).foregroundStyle(Color.burgundy.opacity(0.65))
-                        Text("\(greeting), \(store.data.profile.name)!")
+                        Text(L("{0}, {1}!", greeting, store.data.profile.name))
                             .font(.largeTitle.bold()).foregroundStyle(Color.burgundy)
                     }
                     .padding(.top, 8)
@@ -83,9 +83,9 @@ struct HomeView: View {
                     statsRow
                     ecoBanner
                     HStack(spacing: 12) {
-                        quick("🛒", "Shopping", "\(store.data.shopping.count) items") { showShopping = true }
-                        quick("📒", "Diary", "\(store.todayLog.count) today") { showDiary = true }
-                        quick("📊", "Week", "score \(WeekStats(store: store).score)") { showWeek = true }
+                        quick("🛒", L("Shopping"), Lp(store.data.shopping.count, "item|items")) { showShopping = true }
+                        quick("📒", L("Diary"), L("{0} today", store.todayLog.count)) { showDiary = true }
+                        quick("📊", L("Week"), L("score {0}", WeekStats(store: store).score)) { showWeek = true }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -115,8 +115,8 @@ struct HomeView: View {
                 }
                 .frame(width: 44, height: 44)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Ask Nutrik").font(.headline).foregroundStyle(Color.burgundy)
-                    Text(store.data.chat.last(where: { !$0.fromUser })?.text ?? "What can I cook? What expires soon? How to store…")
+                    Text(L("Ask Nutrik")).font(.headline).foregroundStyle(Color.burgundy)
+                    Text(store.data.chat.last(where: { !$0.fromUser })?.text ?? L("What can I cook? What expires soon? How to store…"))
                         .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer(minLength: 0)
@@ -142,15 +142,15 @@ struct HomeView: View {
                     .animation(.spring(response: 0.8, dampingFraction: 0.8), value: frac)
                 VStack(spacing: 0) {
                     Text("\(eaten)").font(.title2.bold()).foregroundStyle(Color.burgundy).contentTransition(.numericText())
-                    Text("kcal").font(.caption).foregroundStyle(.secondary)
+                    Text(L("kcal")).font(.caption).foregroundStyle(.secondary)
                 }
             }
             .frame(width: 96, height: 96)
             VStack(alignment: .leading, spacing: 6) {
-                Text("Today").font(.headline).foregroundStyle(Color.burgundy)
-                Text("Goal \(target) kcal").font(.subheadline).foregroundStyle(.secondary)
+                Text(L("Today")).font(.headline).foregroundStyle(Color.burgundy)
+                Text(L("Goal {0} kcal", target)).font(.subheadline).foregroundStyle(.secondary)
                 let left = target - eaten
-                Text(left >= 0 ? "\(left) kcal left" : "\(-left) kcal over")
+                Text(left >= 0 ? L("{0} kcal left", left) : L("{0} kcal over", -left))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(left >= 0 ? Color.freshGreen : Color.warnOrange)
             }
@@ -163,21 +163,21 @@ struct HomeView: View {
         let list = store.expiringSoon
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                SectionTitle(text: "Use these first")
+                SectionTitle(text: L("Use these first"))
                 Spacer()
                 if store.moneyAtRisk > 0 {
-                    Text("$\(store.moneyAtRisk, specifier: "%.1f") at risk").font(.caption.bold()).foregroundStyle(Color.warnOrange)
+                    Text(L("{0} at risk", String(format: "$%.1f", store.moneyAtRisk))).font(.caption.bold()).foregroundStyle(Color.warnOrange)
                 }
             }
             if list.isEmpty {
-                Text("Nothing is about to expire. 🎉").foregroundStyle(.secondary)
+                Text(L("Nothing is about to expire. 🎉")).foregroundStyle(.secondary)
             } else {
                 ForEach(list.prefix(5)) { p in
                     Button { openItem = p } label: { PantryRow(item: p) }
                         .buttonStyle(.plain)
                 }
                 if list.count > 5 {
-                    Button("See all \(list.count) in Fridge") { withAnimation { tab = .fridge } }
+                    Button(L("See all {0} in Fridge", list.count)) { withAnimation { tab = .fridge } }
                         .buttonStyle(SoftButtonStyle())
                 }
             }
@@ -194,10 +194,10 @@ struct HomeView: View {
                     Text(r.emoji).font(.system(size: 40)).frame(width: 62, height: 62)
                         .background(Circle().fill(Color.white.opacity(0.65)))
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(rescues.isEmpty ? "RECIPE OF THE DAY" : "RESCUE RECIPE OF THE DAY")
+                        Text(rescues.isEmpty ? L("RECIPE OF THE DAY") : L("RESCUE RECIPE OF THE DAY"))
                             .font(.caption2.weight(.heavy)).foregroundStyle(rescues.isEmpty ? Color.burgundy.opacity(0.6) : Color.warnOrange)
-                        Text(r.name).font(.headline).foregroundStyle(Color.burgundy).lineLimit(2)
-                        Text(rescues.isEmpty ? "⏱ \(r.time) · \(r.kcal) kcal/serving" : "Uses \(rescues.prefix(3).joined(separator: ", ")) before it spoils")
+                        Text(N(r.name)).font(.headline).foregroundStyle(Color.burgundy).lineLimit(2)
+                        Text(rescues.isEmpty ? L("⏱ {0} · {1} kcal/serving", r.time, r.kcal) : L("Uses {0} before it spoils", rescues.prefix(3).map { N($0) }.joined(separator: ", ")))
                             .font(.caption).foregroundStyle(.secondary).lineLimit(2)
                     }
                     Spacer(minLength: 0)
@@ -211,10 +211,10 @@ struct HomeView: View {
 
     private var statsRow: some View {
         HStack(spacing: 10) {
-            stat("🧊", "\(store.unitCount)", "in fridge")
-            stat("🦸", "\(store.data.stats.rescued)", "rescued")
-            stat("💰", String(format: "$%.0f", store.data.stats.rescuedMoney), "saved")
-            stat("🌍", "\(store.ecoScore)", "eco score")
+            stat("🧊", "\(store.unitCount)", L("in fridge"))
+            stat("🦸", "\(store.data.stats.rescued)", L("rescued"))
+            stat("💰", String(format: "$%.0f", store.data.stats.rescuedMoney), L("saved"))
+            stat("🌍", "\(store.ecoScore)", L("eco score"))
         }
     }
 
@@ -223,8 +223,8 @@ struct HomeView: View {
             HStack(spacing: 12) {
                 Text("🌍").font(.system(size: 34))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Eco Impact").font(.headline).foregroundStyle(Color.burgundy)
-                    Text(String(format: "%.1f kg food · %.1f kg CO₂ · $%.0f saved", store.rescuedKg, store.co2, store.data.stats.rescuedMoney))
+                    Text(L("Eco Impact")).font(.headline).foregroundStyle(Color.burgundy)
+                    Text(L("{0} kg food · {1} kg CO₂ · {2} saved", String(format: "%.1f", store.rescuedKg), String(format: "%.1f", store.co2), String(format: "$%.0f", store.data.stats.rescuedMoney)))
                         .font(.caption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
                 }
                 Spacer(minLength: 0)
@@ -239,7 +239,7 @@ struct HomeView: View {
         VStack(spacing: 2) {
             Text(e).font(.title3)
             Text(v).font(.headline).foregroundStyle(Color.burgundy).lineLimit(1).minimumScaleFactor(0.6)
-            Text(l).font(.caption2).foregroundStyle(.secondary)
+            Text(l).font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity)
         .glassCard(radius: 18, padding: 10)
@@ -249,7 +249,7 @@ struct HomeView: View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(e).font(.title2)
-                Text(title).font(.headline).foregroundStyle(Color.burgundy).lineLimit(1)
+                Text(title).font(.headline).foregroundStyle(Color.burgundy).lineLimit(1).minimumScaleFactor(0.75)
                 Text(sub).font(.caption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
             }
             .glassCard(radius: 18, padding: 12)
@@ -266,7 +266,7 @@ struct PantryRow: View {
             EmojiBadge(emoji: item.emoji)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(item.name).font(.body.weight(.semibold)).foregroundStyle(Color.burgundy).lineLimit(1)
+                    Text(N(item.name)).font(.body.weight(.semibold)).foregroundStyle(Color.burgundy).lineLimit(1)
                     if item.qty > 1 {
                         Text("×\(item.qty)")
                             .font(.caption.weight(.bold).monospacedDigit())
@@ -280,7 +280,7 @@ struct PantryRow: View {
                 HStack(spacing: 6) {
                     Text(item.status).font(.caption.weight(.semibold)).foregroundStyle(Color.freshness(item.daysLeft))
                     if item.batches.count > 1 {
-                        Text("· \(item.batches.count) batches").font(.caption).foregroundStyle(.secondary)
+                        Text("· " + Lp(item.batches.count, "batch|batches")).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 FreshBar(fresh: item.fresh, color: Color.freshness(item.daysLeft))
@@ -304,20 +304,20 @@ struct DiaryView: View {
                     WeekCaloriesChart()
                         .padding(.vertical, 4)
                     Button { showWeek = true } label: {
-                        Label("Open weekly report", systemImage: "chart.bar.doc.horizontal")
+                        Label(L("Open weekly report"), systemImage: "chart.bar.doc.horizontal")
                             .font(.subheadline.bold()).foregroundStyle(Color.burgundy)
                     }
                 }
                 Section {
                     HStack {
-                        Text("Eaten today")
+                        Text(L("Eaten today"))
                         Spacer()
-                        Text("\(store.eatenToday) / \(store.targetCalories) kcal").bold().foregroundStyle(Color.burgundy)
+                        Text(L("{0} / {1} kcal", store.eatenToday, store.targetCalories)).bold().foregroundStyle(Color.burgundy)
                     }
                 }
-                Section("Log") {
+                Section(L("Food log")) {
                     if store.todayLog.isEmpty {
-                        Text("Nothing yet. Eat something from your fridge or log food in Search (long-press a product).")
+                        Text(L("Nothing yet. Eat something from your fridge or log food in Search (long-press a product)."))
                             .foregroundStyle(.secondary)
                     }
                     ForEach(Array(store.todayLog.reversed())) { e in
@@ -325,19 +325,19 @@ struct DiaryView: View {
                             Text(e.emoji)
                             Text(e.name)
                             Spacer()
-                            Text("\(e.kcal) kcal").foregroundStyle(.secondary)
+                            Text(L("{0} kcal", e.kcal)).foregroundStyle(.secondary)
                         }
                         .swipeActions {
-                            Button(role: .destructive) { store.removeLog(e.id) } label: { Label("Delete", systemImage: "trash") }
+                            Button(role: .destructive) { store.removeLog(e.id) } label: { Label(L("Delete"), systemImage: "trash") }
                         }
                     }
                 }
             }
             .scrollContentBackground(.hidden)
             .background(Color.cream)
-            .navigationTitle("Food diary")
+            .navigationTitle(L("Food diary"))
             .sheet(isPresented: $showWeek) { WeekReportView() }
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button(L("Done")) { dismiss() } } }
         }
     }
 }

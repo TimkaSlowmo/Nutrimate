@@ -80,10 +80,10 @@ struct FoodDB {
     }()
 
     static let catEmoji: [String: String] = [
-        "Vegetables": "🥕", "Fruits": "🍎", "Berries": "🍓", "Dairy": "🧀", "Meat": "🥩", "Seafood": "🐟",
-        "Grains": "🌾", "Bakery": "🍞", "Nuts & Legumes": "🥜", "Pantry": "🫙", "Sweets": "🍫", "Drinks": "🥤",
-        "Frozen": "🧊", "Spices": "🧂", "Canned": "🥫", "Ready Meals": "🍱", "Snacks": "🍿", "Plant-Based": "🌱",
-        "World Foods": "🌏", "Baby Food": "🍼",
+        LK("Vegetables"): "🥕", LK("Fruits"): "🍎", LK("Berries"): "🍓", LK("Dairy"): "🧀", LK("Meat"): "🥩", LK("Seafood"): "🐟",
+        LK("Grains"): "🌾", LK("Bakery"): "🍞", LK("Nuts & Legumes"): "🥜", LK("Pantry"): "🫙", LK("Sweets"): "🍫", LK("Drinks"): "🥤",
+        LK("Frozen"): "🧊", LK("Spices"): "🧂", LK("Canned"): "🥫", LK("Ready Meals"): "🍱", LK("Snacks"): "🍿", LK("Plant-Based"): "🌱",
+        LK("World Foods"): "🌏", LK("Baby Food"): "🍼",
     ]
 
     static let price: [String: Double] = [
@@ -126,13 +126,15 @@ struct FoodDB {
 enum StorageKind: String, Codable, CaseIterable, Identifiable {
     case fridge, freezer, pantry
     var id: String { rawValue }
-    var title: String {
+    /// Английский ключ (для чата на другом языке); на экране — title
+    var key: String {
         switch self {
-        case .fridge: return "Fridge"
-        case .freezer: return "Freezer"
-        case .pantry: return "Pantry"
+        case .fridge: return LK("Fridge")
+        case .freezer: return LK("Freezer")
+        case .pantry: return LK("Pantry")
         }
     }
+    var title: String { L(key) }
     var emoji: String {
         switch self {
         case .fridge: return "🧊"
@@ -147,11 +149,11 @@ enum WasteReason: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .expired: return "⏰ It expired"
-        case .forgot: return "🙈 Forgot about it"
-        case .tooMuch: return "🛒 Bought too much"
-        case .spoiled: return "🦠 Went bad early"
-        case .disliked: return "😖 Did not like it"
+        case .expired: return L("⏰ It expired")
+        case .forgot: return L("🙈 Forgot about it")
+        case .tooMuch: return L("🛒 Bought too much")
+        case .spoiled: return L("🦠 Went bad early")
+        case .disliked: return L("😖 Did not like it")
         }
     }
 }
@@ -178,10 +180,10 @@ struct PantryItem: Codable, Identifiable, Hashable {
     var shelf: Int { max(1, daysBetween(added, expiry)) }
     var fresh: Double { min(1, max(0, Double(daysLeft) / Double(shelf))) }
     var status: String {
-        if daysLeft < 0 { return "Expired \(-daysLeft) \(daysLeft == -1 ? "day" : "days") ago" }
-        if daysLeft == 0 { return "Use today!" }
-        if daysLeft == 1 { return "Expires tomorrow" }
-        return "\(daysLeft) days left"
+        if daysLeft < 0 { return L("Expired {0} ago", Lp(-daysLeft, "day|days")) }
+        if daysLeft == 0 { return L("Use today!") }
+        if daysLeft == 1 { return L("Expires tomorrow") }
+        return L("{0} left", Lp(daysLeft, "day|days"))
     }
 }
 
@@ -220,7 +222,7 @@ struct PantryGroup: Identifiable, Hashable {
     var daysLeft: Int { first.daysLeft }
     var fresh: Double { first.fresh }
     var status: String { first.status }
-    var title: String { qty > 1 ? "\(name) ×\(qty)" : name }
+    var title: String { qty > 1 ? "\(N(name)) ×\(qty)" : N(name) }
 
     static func make(_ items: [PantryItem]) -> [PantryGroup] {
         var order: [String] = []
@@ -332,10 +334,11 @@ struct Profile: Codable {
         goal = min(1, max(-1, (try? c.decodeIfPresent(Int.self, forKey: .goal)) ?? d.goal))
     }
 
-    static let activityTitles = ["🛋️ Sitting most of the day", "🚶 Light (walks, 1–2 workouts/week)", "🏃 Moderate (3–5 workouts/week)", "🏋️ Active (6–7 workouts/week)", "⚡ Very active (sport + physical job)"]
-    static let activityShort = ["Sitting", "Light", "Moderate", "Active", "Very active"]
+    // Ключи переводов (LK); на экране показывать через L(x)
+    static let activityTitles = [LK("🛋️ Sitting most of the day"), LK("🚶 Light (walks, 1–2 workouts/week)"), LK("🏃 Moderate (3–5 workouts/week)"), LK("🏋️ Active (6–7 workouts/week)"), LK("⚡ Very active (sport + physical job)")]
+    static let activityShort = [LK("Sitting"), LK("Light"), LK("Moderate"), LK("Active"), LK("Very active")]
     static let activityFactor = [1.2, 1.375, 1.55, 1.725, 1.9]
-    static let goalTitles = [-1: "Lose", 0: "Keep", 1: "Gain"]
+    static let goalTitles = [-1: LK("Lose"), 0: LK("Keep"), 1: LK("Gain")]
 
     /// Обмен веществ в покое — формула Миффлина — Сан-Жеора
     var bmr: Int {
@@ -363,14 +366,15 @@ enum BMICategory: String {
     init(_ bmi: Double) {
         self = bmi < 18.5 ? .under : bmi < 25 ? .normal : bmi < 30 ? .over : .obese
     }
-    var title: String {
+    var key: String {
         switch self {
-        case .under: return "Underweight"
-        case .normal: return "Healthy weight"
-        case .over: return "Overweight"
-        case .obese: return "Obesity"
+        case .under: return LK("Underweight")
+        case .normal: return LK("Healthy weight")
+        case .over: return LK("Overweight")
+        case .obese: return LK("Obesity")
         }
     }
+    var title: String { L(key) }
     var emoji: String {
         switch self {
         case .under: return "🪶"
@@ -455,17 +459,17 @@ struct Medal: Identifiable {
     let desc: String
 
     static let all: [Medal] = [
-        Medal(id: "first", emoji: "🍽️", title: "First Bite", desc: "Eat or cook your first product"),
-        Medal(id: "rescue", emoji: "🦸", title: "Rescuer", desc: "Save 3 products that were about to expire"),
-        Medal(id: "chef", emoji: "👨‍🍳", title: "Home Chef", desc: "Cook 3 recipes"),
-        Medal(id: "fridge", emoji: "🧊", title: "Fridge Master", desc: "Have 10 products in your fridge"),
-        Medal(id: "streak", emoji: "🌱", title: "Zero Waste Week", desc: "7 days without throwing food away"),
-        Medal(id: "shop", emoji: "🛒", title: "Smart Shopper", desc: "Buy a product from your shopping list"),
-        Medal(id: "weight", emoji: "⚖️", title: "Weigh-in", desc: "Log your weight 3 times"),
-        Medal(id: "planet", emoji: "🌍", title: "Planet Hero", desc: "Avoid 2 kg of CO₂ by rescuing food"),
-        Medal(id: "freezer", emoji: "❄️", title: "Ice Saver", desc: "Freeze 3 products before they spoil"),
-        Medal(id: "share", emoji: "🤝", title: "Good Neighbor", desc: "Share food with someone instead of binning it"),
-        Medal(id: "cleanfridge", emoji: "✨", title: "Clean Fridge", desc: "5+ products and nothing expired"),
-        Medal(id: "chatty", emoji: "💬", title: "Chatterbox", desc: "Ask Nutrik 5 questions"),
+        Medal(id: "first", emoji: "🍽️", title: LK("First Bite"), desc: LK("Eat or cook your first product")),
+        Medal(id: "rescue", emoji: "🦸", title: LK("Rescuer"), desc: LK("Save 3 products that were about to expire")),
+        Medal(id: "chef", emoji: "👨‍🍳", title: LK("Home Chef"), desc: LK("Cook 3 recipes")),
+        Medal(id: "fridge", emoji: "🧊", title: LK("Fridge Master"), desc: LK("Have 10 products in your fridge")),
+        Medal(id: "streak", emoji: "🌱", title: LK("Zero Waste Week"), desc: LK("7 days without throwing food away")),
+        Medal(id: "shop", emoji: "🛒", title: LK("Smart Shopper"), desc: LK("Buy a product from your shopping list")),
+        Medal(id: "weight", emoji: "⚖️", title: LK("Weigh-in"), desc: LK("Log your weight 3 times")),
+        Medal(id: "planet", emoji: "🌍", title: LK("Planet Hero"), desc: LK("Avoid 2 kg of CO₂ by rescuing food")),
+        Medal(id: "freezer", emoji: "❄️", title: LK("Ice Saver"), desc: LK("Freeze 3 products before they spoil")),
+        Medal(id: "share", emoji: "🤝", title: LK("Good Neighbor"), desc: LK("Share food with someone instead of binning it")),
+        Medal(id: "cleanfridge", emoji: "✨", title: LK("Clean Fridge"), desc: LK("5+ products and nothing expired")),
+        Medal(id: "chatty", emoji: "💬", title: LK("Chatterbox"), desc: LK("Ask Nutrik 5 questions")),
     ]
 }

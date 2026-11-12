@@ -1,6 +1,6 @@
 // Локальная проверка воркера без Cloudflare: node server/test.mjs
 import assert from 'node:assert/strict';
-import worker, { buildContext, sanitizeMessages, claimsAction, detectLang, HONEST_REPLY, extractActions } from './src/index.js';
+import worker, { buildContext, sanitizeMessages, claimsAction, detectLang, langInstruction, HONEST_REPLY, extractActions } from './src/index.js';
 
 let calls = 0;
 const env = {
@@ -58,6 +58,10 @@ assert.equal(detectLang('добавь 2 яйца в холодильник'), 'r
 assert.equal(detectLang('тоңазытқышқа 2 жұмыртқа қос'), 'kk');
 assert.equal(detectLang('add 2 eggs'), 'en');
 assert.equal(detectLang('hi', 'ru'), 'ru');
+// язык приложения: правило в промпте
+assert.match(langInstruction('ru'), /Answer in Russian — the app language — unless the user clearly writes in another language/);
+assert.match(langInstruction('kk'), /Answer in Kazakh.*Cyrillic.*the app language — unless the user clearly writes in another language/);
+assert.equal(detectLang('what can I cook?', 'kk'), 'kk');
 const liar = { AI: { async run(model, input) {
   const last = input.messages[input.messages.length - 1].content;
   assert.match(input.messages[0].content, /CANNOT change anything/);

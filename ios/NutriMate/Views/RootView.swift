@@ -5,11 +5,11 @@ enum AppTab: Int, CaseIterable, Identifiable {
     var id: Int { rawValue }
     var title: String {
         switch self {
-        case .home: return "Home"
-        case .fridge: return "Fridge"
-        case .search: return "Search"
-        case .recipes: return "Recipes"
-        case .profile: return "Profile"
+        case .home: return L("Home")
+        case .fridge: return L("Fridge")
+        case .search: return L("Search")
+        case .recipes: return L("Recipes")
+        case .profile: return L("Profile")
         }
     }
     var icon: String {
@@ -117,14 +117,14 @@ struct MedalUnlockedView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            Text("New medal!").font(.title2.bold()).foregroundStyle(Color.burgundy)
+            Text(L("New medal!")).font(.title2.bold()).foregroundStyle(Color.burgundy)
             Text(medal.emoji)
                 .font(.system(size: 84))
                 .scaleEffect(pop ? 1 : 0.3)
                 .rotationEffect(.degrees(pop ? 0 : -25))
-            Text(medal.title).font(.title3.bold())
-            Text(medal.desc).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            Button("Yay! 🎉") { dismiss() }.buttonStyle(PrimaryButtonStyle()).padding(.top, 6)
+            Text(L(medal.title)).font(.title3.bold())
+            Text(L(medal.desc)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Button(L("Yay! 🎉")) { dismiss() }.buttonStyle(PrimaryButtonStyle()).padding(.top, 6)
         }
         .padding(24)
         .onAppear { withAnimation(.spring(response: 0.5, dampingFraction: 0.45)) { pop = true } }

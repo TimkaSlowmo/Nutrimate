@@ -73,17 +73,17 @@ struct WeekStats {
 
     var verdict: (String, NutrikMood) {
         if loggedDays == 0 && saved == 0 && wasted == 0 {
-            return ("A quiet week! Log what you eat and rescue some food — next week's report will shine ✨", .sleepy)
+            return (L("A quiet week! Log what you eat and rescue some food — next week's report will shine ✨"), .sleepy)
         }
-        if wasted == 0 && saved > 0 { return ("Zero food in the bin this week! You saved \(saved) product\(saved == 1 ? "" : "s") — I'm so proud 🥹", .cheer) }
-        if score >= 70 { return ("What a week! Calories on track and food rescued. Keep it up 💪", .cheer) }
-        if wasted > saved { return ("Oops, more food in the bin than rescued 😿 Check \"Use these first\" every morning — I'll help!", .sad) }
+        if wasted == 0 && saved > 0 { return (L("Zero food in the bin this week! You saved {0} — I'm so proud 🥹", Lp(saved, "product|products")), .cheer) }
+        if score >= 70 { return (L("What a week! Calories on track and food rescued. Keep it up 💪"), .cheer) }
+        if wasted > saved { return (L("Oops, more food in the bin than rescued 😿 Check \"Use these first\" every morning — I'll help!"), .sad) }
         if onTarget < 3 && loggedDays >= 3 {
             return avg < target
-                ? ("You often ate less than your goal. Add a snack — your body needs fuel ⛽", .happy)
-                : ("Some days were a bit over the goal. Smaller portions, same tasty food 🍽️", .happy)
+                ? (L("You often ate less than your goal. Add a snack — your body needs fuel ⛽"), .happy)
+                : (L("Some days were a bit over the goal. Smaller portions, same tasty food 🍽️"), .happy)
         }
-        return ("Good week! A little better every week is the Nutrik way 🐾", .happy)
+        return (L("Good week! A little better every week is the Nutrik way 🐾"), .happy)
     }
 }
 
@@ -100,15 +100,15 @@ struct WeekReportView: View {
                     header(s)
                     NutrikSays(text: s.verdict.0, mood: s.verdict.1)
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                        tile("🔥", s.avg > 0 ? "\(s.avg)" : "—", "avg kcal / day", "goal \(s.target)", delta: s.prevAvg > 0 && s.avg > 0 ? s.avg - s.prevAvg : nil, goodWhenUp: nil)
-                        tile("🎯", "\(s.onTarget)/7", "days on target", "80–110% of goal", delta: nil, goodWhenUp: nil)
-                        tile("🦸", "\(s.saved)", "products saved", String(format: "$%.2f kept", s.savedMoney), delta: s.saved - s.prevSaved, goodWhenUp: true)
-                        tile("🗑️", "\(s.wasted)", "thrown away", s.wasted == 0 ? "perfect!" : "let's do better", delta: s.wasted - s.prevWasted, goodWhenUp: false)
+                        tile("🔥", s.avg > 0 ? "\(s.avg)" : "—", L("avg kcal / day"), L("goal {0}", s.target), delta: s.prevAvg > 0 && s.avg > 0 ? s.avg - s.prevAvg : nil, goodWhenUp: nil)
+                        tile("🎯", "\(s.onTarget)/7", L("days on target"), L("80–110% of goal"), delta: nil, goodWhenUp: nil)
+                        tile("🦸", "\(s.saved)", L("products saved"), L("{0} kept", String(format: "$%.2f", s.savedMoney)), delta: s.saved - s.prevSaved, goodWhenUp: true)
+                        tile("🗑️", "\(s.wasted)", L("thrown away"), s.wasted == 0 ? L("perfect!") : L("let's do better"), delta: s.wasted - s.prevWasted, goodWhenUp: false)
                     }
                     WeekCaloriesChart().glassCard()
                     if !s.topFoods.isEmpty { favorites(s) }
                     if let d = s.weightDelta { weight(d) }
-                    Text("Compared with the 7 days before. Tip: log meals by long-pressing a product in Search.")
+                    Text(L("Compared with the 7 days before. Tip: log meals by long-pressing a product in Search."))
                         .font(.caption).foregroundStyle(.secondary)
                         .padding(.horizontal, 4)
                 }
@@ -116,16 +116,16 @@ struct WeekReportView: View {
             }
             .pausesNutrikWhileScrolling()
             .background(LiveBackground())
-            .navigationTitle("Your week")
+            .navigationTitle(L("Your week"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button(L("Done")) { dismiss() } } }
             .onAppear { withAnimation(.spring(response: 0.9, dampingFraction: 0.75).delay(0.15)) { appear = true } }
         }
     }
 
     private func header(_ s: WeekStats) -> some View {
         let first = s.days.first?.day ?? Date()
-        let range = "\(first.formatted(.dateTime.day().month(.abbreviated))) – \(Date().formatted(.dateTime.day().month(.abbreviated)))"
+        let range = "\(first.formatted(.dateTime.day().month(.abbreviated).locale(AppLang.current.locale))) – \(Date().formatted(.dateTime.day().month(.abbreviated).locale(AppLang.current.locale)))"
         return HStack(spacing: 16) {
             ZStack {
                 Circle().stroke(Color.cream.opacity(0.25), lineWidth: 10)
@@ -135,14 +135,14 @@ struct WeekReportView: View {
                     .rotationEffect(.degrees(-90))
                 VStack(spacing: 0) {
                     Text("\(s.score)").font(.system(size: 28, weight: .bold, design: .rounded)).foregroundStyle(Color.cream)
-                    Text("score").font(.caption2).foregroundStyle(Color.cream.opacity(0.7))
+                    Text(L("score")).font(.caption2).foregroundStyle(Color.cream.opacity(0.7))
                 }
             }
             .frame(width: 92, height: 92)
             VStack(alignment: .leading, spacing: 4) {
-                Text("WEEKLY REPORT").font(.caption.bold()).tracking(1.2).foregroundStyle(Color.cream.opacity(0.7))
+                Text(L("WEEKLY REPORT")).font(.caption.bold()).tracking(1.2).foregroundStyle(Color.cream.opacity(0.7))
                 Text(range).font(.title3.bold()).foregroundStyle(Color.cream)
-                Text("\(s.loggedDays) day\(s.loggedDays == 1 ? "" : "s") logged · \(s.saved) saved · \(s.wasted) wasted")
+                Text(L("{0} logged · {1} saved · {2} wasted", Lp(s.loggedDays, "day|days"), s.saved, s.wasted))
                     .font(.caption).foregroundStyle(Color.cream.opacity(0.85))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -173,7 +173,7 @@ struct WeekReportView: View {
             }
             Text(value).font(.system(size: 26, weight: .bold, design: .rounded)).foregroundStyle(Color.burgundy)
                 .minimumScaleFactor(0.6).lineLimit(1)
-            Text(title).font(.caption.bold()).foregroundStyle(Color.burgundy.opacity(0.8))
+            Text(title).font(.caption.bold()).foregroundStyle(Color.burgundy.opacity(0.8)).lineLimit(1).minimumScaleFactor(0.75)
             Text(sub).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
         }
         .glassCard(radius: 18, padding: 14)
@@ -181,12 +181,12 @@ struct WeekReportView: View {
 
     private func favorites(_ s: WeekStats) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Most eaten").font(.headline).foregroundStyle(Color.burgundy)
+            Text(L("Most eaten")).font(.headline).foregroundStyle(Color.burgundy)
             ForEach(Array(s.topFoods.enumerated()), id: \.offset) { i, f in
                 HStack(spacing: 10) {
                     Text(["🥇", "🥈", "🥉"][min(i, 2)])
                     Text(f.0).font(.title3)
-                    Text(f.1).foregroundStyle(Color.burgundy).lineLimit(1)
+                    Text(N(f.1)).foregroundStyle(Color.burgundy).lineLimit(1)
                     Spacer()
                     Text("×\(f.2)").font(.subheadline.bold()).foregroundStyle(.secondary)
                 }
@@ -199,8 +199,8 @@ struct WeekReportView: View {
         HStack(spacing: 12) {
             Text("⚖️").font(.title2)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Weight this week").font(.headline).foregroundStyle(Color.burgundy)
-                Text(abs(d) < 0.05 ? "Stable — no change" : String(format: "%@%.1f kg", d > 0 ? "+" : "−", abs(d)))
+                Text(L("Weight this week")).font(.headline).foregroundStyle(Color.burgundy)
+                Text(abs(d) < 0.05 ? L("Stable — no change") : L("{0} kg", String(format: "%@%.1f", d > 0 ? "+" : "−", abs(d))))
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()

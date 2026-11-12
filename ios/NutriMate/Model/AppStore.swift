@@ -181,7 +181,9 @@ final class AppStore: ObservableObject {
         if !quiet {
             haptic()
             let total = data.pantry.filter { $0.name == f.name && $0.storage == place }.reduce(0) { $0 + $1.qty }
-            say("\(f.emoji) \(n > 1 ? "\(n)× " : "")\(f.name) added to your \(place.title.lowercased())\(total > n ? " · now ×\(total)" : "")")
+            let what = n > 1 ? "\(n)× \(N(f.name))" : N(f.name)
+            let msg = L("{0} {1} added to your {2}", f.emoji, what, place.title.lowercased())
+            say(total > n ? msg + L(" · now ×{0}", total) : msg)
         }
         checkMedals()
     }
@@ -294,16 +296,16 @@ final class AppStore: ObservableObject {
             use(p)
             takeOne(p.id)
         }
-        data.log.append(LogEntry(emoji: p.emoji, name: "\(p.name) · \(grams) g", kcal: Int((Double(p.kcal) * Double(grams) / 100).rounded())))
+        data.log.append(LogEntry(emoji: p.emoji, name: "\(N(p.name)) · \(grams) \(L("g"))", kcal: Int((Double(p.kcal) * Double(grams) / 100).rounded())))
         haptic(.medium)
-        react(.eat, finished && p.daysLeft >= 0 && p.daysLeft <= 2 ? "Rescued & yummy! \(p.name) logged 🦸" : "Yum! \(p.name) logged", emoji: p.emoji)
+        react(.eat, finished && p.daysLeft >= 0 && p.daysLeft <= 2 ? L("Rescued & yummy! {0} logged 🦸", N(p.name)) : L("Yum! {0} logged", N(p.name)), emoji: p.emoji)
         checkMedals()
     }
 
     func logFood(_ f: Food, grams: Int) {
-        data.log.append(LogEntry(emoji: f.emoji, name: "\(f.name) · \(grams) g", kcal: Int((Double(f.kcal) * Double(grams) / 100).rounded())))
+        data.log.append(LogEntry(emoji: f.emoji, name: "\(N(f.name)) · \(grams) \(L("g"))", kcal: Int((Double(f.kcal) * Double(grams) / 100).rounded())))
         haptic()
-        say("\(f.emoji) +\(Int((Double(f.kcal) * Double(grams) / 100).rounded())) kcal")
+        say(L("{0} +{1} kcal", f.emoji, Int((Double(f.kcal) * Double(grams) / 100).rounded())))
         checkMedals()
     }
 
@@ -319,7 +321,7 @@ final class AppStore: ObservableObject {
         data.events.append(EcoEvent(kind: .wasted, money: price(p.category)))
         if reason == .disliked && !data.dislikes.contains(p.name.lowercased()) { data.dislikes.append(p.name.lowercased()) }
         haptic(.rigid)
-        react(.sad, "Oops… \(p.emoji) went to the bin 😿 Next time we'll save it!")
+        react(.sad, L("Oops… {0} went to the bin 😿 Next time we'll save it!", p.emoji))
     }
 
     /// Заморозить всю строку (все партии этого продукта из холодильника/шкафа); статистика — по штукам.
@@ -346,7 +348,7 @@ final class AppStore: ObservableObject {
         }
         data.pantry = AppStore.normalized(pantry)
         haptic()
-        react(.cheer, "❄️ \(units > 1 ? "\(units)× \(p.name) frozen" : "Frozen") — good for 3 more months!")
+        react(.cheer, units > 1 ? L("❄️ {0}× {1} frozen — good for 3 more months!", units, N(p.name)) : L("❄️ Frozen — good for 3 more months!"))
         checkMedals()
     }
 
@@ -359,7 +361,7 @@ final class AppStore: ObservableObject {
         data.stats.rescuedMoney += price(p.category)
         data.events.append(EcoEvent(kind: .shared, money: price(p.category)))
         haptic(.medium)
-        react(.cheer, "🤝 Shared! That's real zero waste")
+        react(.cheer, L("🤝 Shared! That's real zero waste"))
         checkMedals()
     }
 
@@ -390,10 +392,10 @@ final class AppStore: ObservableObject {
                 takeOne(first.id)
             }
         }
-        data.log.append(LogEntry(emoji: r.emoji, name: "\(r.name) ×\(portions)", kcal: r.kcal * portions))
+        data.log.append(LogEntry(emoji: r.emoji, name: "\(N(r.name)) ×\(portions)", kcal: r.kcal * portions))
         data.stats.cooked += 1
         haptic(.medium)
-        react(.eat, "Bon appétit! \(r.name) cooked 👩‍🍳", emoji: r.emoji)
+        react(.eat, L("Bon appétit! {0} cooked 👩‍🍳", N(r.name)), emoji: r.emoji)
         checkMedals()
     }
 
@@ -403,7 +405,7 @@ final class AppStore: ObservableObject {
             data.shopping.append(n)
             added += 1
         }
-        if added > 0 { say("🛒 \(added) added to shopping list") }
+        if added > 0 { say(L("🛒 {0} added to shopping list", added)) }
     }
 
     func removeShopping(_ n: String) { data.shopping.removeAll { $0 == n } }
@@ -450,7 +452,7 @@ final class AppStore: ObservableObject {
         for (n, d) in demo {
             if let f = db.byName[n] { add(f, days: d, quiet: true) }
         }
-        say("🧺 Demo products added")
+        say(L("🧺 Demo products added"))
     }
 
     /// Дата начала: сохранённая или самая ранняя запись (мягкая миграция старых сохранений)
@@ -472,12 +474,14 @@ final class AppStore: ObservableObject {
         var n = 1
         while 50 * n * n <= xp { n += 1 }
         let lo = 50 * (n - 1) * (n - 1), hi = 50 * n * n
-        let titles = ["Sprout", "Saver", "Rescuer", "Eco Hero", "Zero-Waste Pro", "Planet Keeper", "Legend"]
-        return (n, titles[min(n - 1, titles.count - 1)], Double(xp - lo) / Double(hi - lo), hi - xp)
+        let titles = [LK("Sprout"), LK("Saver"), LK("Rescuer"), LK("Eco Hero"), LK("Zero-Waste Pro"), LK("Planet Keeper"), LK("Legend")]
+        return (n, L(titles[min(n - 1, titles.count - 1)]), Double(xp - lo) / Double(hi - lo), hi - xp)
     }
 
     func eraseAll() {
+        let lang = data.language
         data = AppData()
+        data.language = lang   // язык интерфейса после сброса не меняем
         saveNow()
         Reminders.clear()
     }
@@ -503,9 +507,9 @@ final class AppStore: ObservableObject {
             self.data.notifications = granted
             if granted {
                 Reminders.reschedule(self.data)
-                self.say("🔔 Nutrik will remind you at 9:00")
+                self.say(L("🔔 Nutrik will remind you at 9:00"))
             } else {
-                self.say("Notifications are off in iPhone Settings")
+                self.say(L("Notifications are off in iPhone Settings"))
             }
         }
     }

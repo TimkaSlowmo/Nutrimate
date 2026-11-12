@@ -11,23 +11,23 @@ struct TutorialStep {
 
 enum Tutorial {
     static let steps: [TutorialStep] = [
-        TutorialStep(tab: .home, title: "Home",
-                     text: "Hi again! This is Home. I show what to eat first, your calories today and the money at risk. Tap \"Ask Nutrik\" to chat with me!",
+        TutorialStep(tab: .home, title: LK("Home"),
+                     text: LK("Hi again! This is Home. I show what to eat first, your calories today and the money at risk. Tap \"Ask Nutrik\" to chat with me!"),
                      mood: .wave),
-        TutorialStep(tab: .fridge, title: "Fridge",
-                     text: "Your fridge! Every product has a freshness bar. Swipe right if you ate it, left to freeze, share or bin it.",
+        TutorialStep(tab: .fridge, title: LK("Fridge"),
+                     text: LK("Your fridge! Every product has a freshness bar. Swipe right if you ate it, left to freeze, share or bin it."),
                      mood: .happy),
-        TutorialStep(tab: .search, title: "Search",
-                     text: "\(FoodDB.shared.foods.count) foods from all over the world. Tap ＋ to put one in the fridge, long-press to log what you ate.",
+        TutorialStep(tab: .search, title: LK("Search"),
+                     text: LK("{0} foods from all over the world. Tap ＋ to put one in the fridge, long-press to log what you ate."),
                      mood: .eating),
-        TutorialStep(tab: .recipes, title: "Recipes",
-                     text: "Recipes made from what you already have — food that expires soonest goes on top. Missing items go to the shopping list.",
+        TutorialStep(tab: .recipes, title: LK("Recipes"),
+                     text: LK("Recipes made from what you already have — food that expires soonest goes on top. Missing items go to the shopping list."),
                      mood: .happy),
-        TutorialStep(tab: .profile, title: "Profile",
-                     text: "Your weight, daily goal, Eco Impact and medals live here. I can also remind you at 9:00 what to eat first!",
+        TutorialStep(tab: .profile, title: LK("Profile"),
+                     text: LK("Your weight, daily goal, Eco Impact and medals live here. I can also remind you at 9:00 what to eat first!"),
                      mood: .wave),
-        TutorialStep(tab: .home, title: "Ready!",
-                     text: "That's all! Let's eat well and waste nothing together 🌱",
+        TutorialStep(tab: .home, title: LK("Ready!"),
+                     text: LK("That's all! Let's eat well and waste nothing together 🌱"),
                      mood: .happy),
     ]
 }
@@ -87,15 +87,15 @@ struct TutorialOverlay: View {
                     .id(step)
                     .transition(.asymmetric(insertion: .move(edge: .leading).combined(with: .opacity), removal: .opacity))
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(current.title).font(.title3.bold()).foregroundStyle(Color.burgundy)
-                    Text(current.text).font(.callout).foregroundStyle(Color.burgundy.opacity(0.9))
+                    Text(L(current.title)).font(.title3.bold()).foregroundStyle(Color.burgundy)
+                    Text(L(current.text, FoodDB.shared.foods.count)).font(.callout).foregroundStyle(Color.burgundy.opacity(0.9))
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .id("t\(step)")
                 .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .leading)))
             }
             if current.tab == .profile && !store.data.notifications {
-                Button("🔔 Turn on reminders") { store.setNotifications(true) }
+                Button(L("🔔 Turn on reminders")) { store.setNotifications(true) }
                     .buttonStyle(SoftButtonStyle())
             }
             HStack {
@@ -108,13 +108,14 @@ struct TutorialOverlay: View {
                 }
                 Spacer()
                 if !isLast {
-                    Button("Skip") { finish() }
+                    Button(L("Skip")) { finish() }
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.burgundy.opacity(0.6))
                         .padding(.trailing, 8)
                 }
-                Button(isLast ? "Let's go! 🌱" : "Next") { next() }
+                Button(isLast ? L("Let's go! 🌱") : L("Next")) { next() }
                     .font(.headline)
+                    .lineLimit(1).minimumScaleFactor(0.75)
                     .foregroundStyle(Color.cream)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)

@@ -10,7 +10,7 @@ struct ChatView: View {
     @FocusState private var focused: Bool
 
     private var greeting: ChatMessage {
-        ChatMessage(text: "Hi, \(store.data.profile.name)! I'm Nutrik 🐾 Ask me what to cook, what expires soon, how to store food — or tell me what you don't like.", fromUser: false)
+        ChatMessage(text: L("Hi, {0}! I'm Nutrik 🐾 Ask me what to cook, what expires soon, how to store food — or tell me what you don't like.", store.data.profile.name), fromUser: false)
     }
 
     var body: some View {
@@ -42,17 +42,17 @@ struct ChatView: View {
                 inputBar
             }
             .background(LiveBackground())
-            .navigationTitle("Chat with Nutrik")
+            .navigationTitle(L("Chat with Nutrik"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }.fontWeight(.semibold)
+                    Button(L("Done")) { dismiss() }.fontWeight(.semibold)
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
                         Button(role: .destructive) {
                             withAnimation { store.data.chat.removeAll() }
-                        } label: { Label("Clear chat", systemImage: "trash") }
+                        } label: { Label(L("Clear chat"), systemImage: "trash") }
                     } label: { Image(systemName: "ellipsis.circle") }
                 }
             }
@@ -62,14 +62,14 @@ struct ChatView: View {
     }
 
     private var aiOn: Bool { store.data.smartNutrik && NutrikAI.isConfigured }
-    private var statusLine: String { aiOn ? "Smart AI · online ✨" : "Your zero-waste buddy · works offline" }
+    private var statusLine: String { aiOn ? L("Smart AI · online ✨") : L("Your zero-waste buddy · works offline") }
 
     private var header: some View {
         HStack(spacing: 12) {
             NutrikView(mood: typing ? .talk : mood, size: 58)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Nutrik").font(.headline).foregroundStyle(Color.burgundy)
-                Text(typing ? "typing…" : statusLine)
+                Text(L("Nutrik")).font(.headline).foregroundStyle(Color.burgundy)
+                Text(typing ? L("typing…") : statusLine)
                     .font(.caption).foregroundStyle(.secondary)
                     .contentTransition(.opacity)
             }
@@ -90,13 +90,13 @@ struct ChatView: View {
                     .foregroundStyle(m.fromUser ? Color.cream : Color.burgundy)
                     .fixedSize(horizontal: false, vertical: true)
                 if m.ai == true {
-                    Text("✨ AI · can be wrong")
+                    Text(L("✨ AI · can be wrong"))
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(Color.burgundy.opacity(0.45))
                 }
                 if let name = m.recipe, let r = store.db.recipes.first(where: { $0.name == name }) {
                     NavigationLink(value: r) {
-                        Label("Open recipe", systemImage: "book.fill")
+                        Label(L("Open recipe"), systemImage: "book.fill")
                             .font(.caption.weight(.bold))
                             .padding(.horizontal, 10).padding(.vertical, 6)
                             .background(Capsule().fill(Color.burgundy.opacity(0.1)))
@@ -123,7 +123,7 @@ struct ChatView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(NutrikBrain.suggestions, id: \.self) { s in
-                    Button { send(s) } label: { Chip(text: s) }.buttonStyle(.plain)
+                    Button { send(L(s)) } label: { Chip(text: L(s)) }.buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 14)
@@ -134,7 +134,7 @@ struct ChatView: View {
 
     private var inputBar: some View {
         HStack(spacing: 10) {
-            TextField("Ask Nutrik…", text: $input, axis: .vertical)
+            TextField(L("Ask Nutrik…"), text: $input, axis: .vertical)
                 .lineLimit(1...4)
                 .focused($focused)
                 .submitLabel(.send)

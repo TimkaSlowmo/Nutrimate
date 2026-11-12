@@ -42,14 +42,14 @@ enum Reminders {
 
                 let content = UNMutableNotificationContent()
                 if !todayItems.isEmpty {
-                    content.title = "Eat today: \(list(todayItems))"
-                    let idea = recipe(for: todayItems).map { "Try \($0.emoji) \($0.name)" } ?? "Nutrik found a recipe for it"
+                    content.title = L("Eat today: {0}", list(todayItems))
+                    let idea = recipe(for: todayItems).map { L("Try {0} {1}", $0.emoji, N($0.name)) } ?? L("Nutrik found a recipe for it")
                     content.body = tomorrowItems.isEmpty
-                        ? "\(idea) — open NutriMate and rescue your food 🦸"
-                        : "Tomorrow: \(list(tomorrowItems)). \(idea) 🍲"
+                        ? L("{0} — open NutriMate and rescue your food 🦸", idea)
+                        : L("Tomorrow: {0}. {1} 🍲", list(tomorrowItems), idea)
                 } else {
-                    content.title = "Expires tomorrow: \(list(tomorrowItems))"
-                    content.body = "Plan it for dinner or freeze it tonight ❄️ — Nutrik"
+                    content.title = L("Expires tomorrow: {0}", list(tomorrowItems))
+                    content.body = L("Plan it for dinner or freeze it tonight ❄️ — Nutrik")
                 }
                 content.sound = .default
                 let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: fire)
@@ -71,7 +71,7 @@ enum Reminders {
 
     private static func list(_ items: [PantryItem]) -> String {
         var names: [String] = []
-        for i in items where !names.contains("\(i.emoji) \(i.name)") { names.append("\(i.emoji) \(i.name)") }
+        for i in items where !names.contains("\(i.emoji) \(N(i.name))") { names.append("\(i.emoji) \(N(i.name))") }
         if names.count <= 2 { return names.joined(separator: ", ") }
         return names.prefix(2).joined(separator: ", ") + " +\(names.count - 2)"
     }
