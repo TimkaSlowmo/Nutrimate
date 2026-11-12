@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'dart:ui' show ImageFilter;
+import 'dart:ui' show ImageFilter, PlatformDispatcher;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'food_icons.dart';
+import 'l10n.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +18,7 @@ Future<void> main() async {
 }
 
 // Номер версии: ночной агент увеличивает его на 1 при каждом обновлении.
-const appVersion = 20;
+const appVersion = 21;
 
 const burgundy = Color(0xFF6A041C);
 const cream = Color(0xFFF5F1E5);
@@ -40,7 +41,8 @@ class FoodItem {
 
 enum Storage { fridge, freezer, pantry }
 
-const storageLabel = {Storage.fridge: '🧊 Fridge', Storage.freezer: '❄️ Freezer', Storage.pantry: '🫙 Pantry'};
+const _storageLabel = {Storage.fridge: '🧊 Fridge', Storage.freezer: '❄️ Freezer', Storage.pantry: '🫙 Pantry'};
+Map<Storage, String> get storageLabel => {for (final e in _storageLabel.entries) e.key: tr(e.value)};
 const _shelfStable = {'Grains', 'Pantry', 'Spices', 'Canned', 'Nuts & Legumes', 'Snacks', 'Sweets', 'Drinks', 'World Foods', 'Plant-Based', 'Baby Food'};
 const _freezable = {'Meat', 'Seafood', 'Bakery', 'Fruits', 'Berries', 'Vegetables', 'Ready Meals', 'Dairy', 'Plant-Based'};
 
@@ -67,12 +69,12 @@ class PantryItem {
   int get shelf => max(1, DateTime.utc(expiry.year, expiry.month, expiry.day).difference(DateTime.utc(added.year, added.month, added.day)).inDays);
   double get fresh => (daysLeft / shelf).clamp(0.0, 1.0).toDouble();
   String get status => daysLeft < 0
-      ? 'Expired ${-daysLeft} ${daysLeft == -1 ? 'day' : 'days'} ago'
+      ? tr('Expired {0} ago', [trp(-daysLeft, 'day|days')])
       : daysLeft == 0
-      ? 'Use today!'
+      ? tr('Use today!')
       : daysLeft == 1
-      ? 'Expires tomorrow'
-      : '$daysLeft days left';
+      ? tr('Expires tomorrow')
+      : tr('{0} left', [trp(daysLeft, 'day|days')]);
   Color get color => daysLeft < 0
       ? Colors.red.shade800
       : daysLeft <= 2
@@ -1923,6 +1925,17 @@ class AppState extends ChangeNotifier {
   double weight = 70, height = 175;
   int age = 22;
 
+  /// Язык интерфейса (en / ru / kk). По умолчанию — язык браузера, если ru/kk.
+  String get language => appLang;
+  void setLanguage(String l) {
+    if (!appLangs.contains(l) || l == appLang) return;
+    appLang = l;
+    if (chat.length == 1 && !chat.first.isUser) chat[0] = ChatMessage(_greeting(), isUser: false);
+    notifyListeners();
+  }
+
+  String _greeting() => tr('Hi! I\'m your AI Chef 👩‍🍳 Ask me what to cook, what expires soon, how to store food — or tell me what you don\'t like.');
+
   // BMR (Миффлин — Сан-Жеор) × 1.375 (лёгкая активность) = калории, чтобы держать вес. Раньше показывался только BMR — цель была занижена.
   int get targetCalories => (((10 * weight) + (6.25 * height) - (5 * age) + (isMan ? 5 : -161)) * 1.375).round();
   int kcalOn(int day) => log.where((e) => e.day == day).fold<int>(0, (s, e) => s + e.kcal);
@@ -2256,6 +2269,7 @@ class AppState extends ChangeNotifier {
 
   Map<String, dynamic> toJson() => {
     'registered': registered,
+    'language': appLang,
     'name': name,
     'email': email,
     'isMan': isMan,
@@ -2286,9 +2300,16 @@ class AppState extends ChangeNotifier {
   Future<void> load() async {
     try {
       _prefs = await SharedPreferences.getInstance();
+      appLang = systemLang(PlatformDispatcher.instance.locale.languageCode);
       final raw = _prefs!.getString(_key);
-      if (raw == null) return;
+      if (raw == null) {
+        chat[0] = ChatMessage(_greeting(), isUser: false);
+        return;
+      }
       final j = jsonDecode(raw) as Map<String, dynamic>;
+      // мягко: старые сохранения без языка — язык браузера
+      if (appLangs.contains(j['language'])) appLang = j['language'] as String;
+      if (chat.length == 1) chat[0] = ChatMessage(_greeting(), isUser: false);
       DateTime d(dynamic ms) => DateTime.fromMillisecondsSinceEpoch((ms as num).toInt());
       registered = j['registered'] == true;
       name = j['name'] ?? name;
@@ -2429,6 +2450,7 @@ class SmartAiService implements AiService {
     final fridge = [...s.pantry]..sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
     return {
       'name': s.name,
+      'language': appLang,
       'fridge': fridge.take(40).map((p) => {'name': p.food.name, 'daysLeft': p.daysLeft}).toList(),
       'kcalToday': s.eatenCalories,
       'kcalGoal': s.targetCalories,
@@ -3627,10 +3649,10 @@ class _RoamerState extends State<NutrikRoamer> with SingleTickerProviderStateMix
     final s = widget.state;
     final exp = s?.toRescue ?? [];
     final dead = s?.expired ?? [];
-    if (dead.isNotEmpty && _r.nextBool()) return '${dead.first.food.emoji} ${dead.first.food.name} smells funny... 👃';
+    if (dead.isNotEmpty && _r.nextBool()) return tr('{0} smells funny... 👃', ['${dead.first.food.emoji} ${tn(dead.first.food.name)}']);
     if (exp.isNotEmpty && _r.nextBool()) {
       final p = exp.first;
-      return p.daysLeft == 0 ? 'Eat the ${p.food.name} today, please! 🥺' : '${p.food.name} spoils in ${p.daysLeft} d!';
+      return p.daysLeft == 0 ? tr('Eat the {0} today, please! 🥺', [tn(p.food.name)]) : tr('⏳ {0} spoils in {1} d!', [tn(p.food.name), p.daysLeft]);
     }
     return ['Is it snack time yet?', 'Don\'t waste food, nya!', 'Did you check the fridge?', 'Old food goes to the front!', 'Leftovers = free lunch 😋', 'I love a clean fridge ✨'][_r.nextInt(6)];
   }
@@ -3710,7 +3732,7 @@ class _RoamerState extends State<NutrikRoamer> with SingleTickerProviderStateMix
       _quip('Boing!', 900);
     } else if (roll < 93) {
       final line = _idleLine();
-      await _do(line.contains('smells') || line.contains('spoils') ? NutrikMode.sad : NutrikMode.idle, 2400, g, line: line);
+      await _do(line.contains('👃') || line.contains('🥺') || line.contains('⏳') ? NutrikMode.sad : NutrikMode.idle, 2400, g, line: line);
     } else {
       await _do(NutrikMode.cheer, 1800, g, line: ['You\'re doing great! ✨', 'Go, food saver! 💪'][_r.nextInt(2)]);
     }
@@ -3856,7 +3878,7 @@ class _RoamerState extends State<NutrikRoamer> with SingleTickerProviderStateMix
                           boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
                         ),
                         child: Text(
-                          say!,
+                          tr(say!),
                           textAlign: TextAlign.center,
                           style: const TextStyle(fontSize: 11, color: Colors.black87),
                         ),
@@ -4080,12 +4102,12 @@ class _TutorialState extends State<TutorialOverlay> with TickerProviderStateMixi
       ? FilledButton(
           style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: burgundy, padding: const EdgeInsets.symmetric(horizontal: 18)),
           onPressed: f,
-          child: Text(t, style: const TextStyle(fontWeight: FontWeight.bold)),
+          child: Text(tr(t), style: const TextStyle(fontWeight: FontWeight.bold)),
         )
       : TextButton(
           style: TextButton.styleFrom(foregroundColor: Colors.white),
           onPressed: f,
-          child: Text(t),
+          child: Text(tr(t)),
         );
 
   Widget _controls() {
@@ -4120,14 +4142,14 @@ class _TutorialState extends State<TutorialOverlay> with TickerProviderStateMixi
           animation: pulse,
           builder: (_, _) => Opacity(
             opacity: 0.55 + 0.45 * sin(pulse.value * 2 * pi).abs(),
-            child: const Text(
-              '👆 Tap the glowing button',
+            child: Text(
+              tr('👆 Tap the glowing button'),
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ),
         ),
       ],
-      TourKind.drag => [if (dragDone) _btn('Next', () => _go(step + 1)) else const Text('Drag her! 👆', style: TextStyle(color: Colors.white70))],
+      TourKind.drag => [if (dragDone) _btn('Next', () => _go(step + 1)) else Text(tr('Drag her! 👆'), style: const TextStyle(color: Colors.white70))],
       TourKind.finish => [_btn('Let\'s go! 🚀', _finish)],
       TourKind.info => [if (step > 0) _btn('Back', () => _go(step - 1), filled: false), _btn(step == 0 ? 'Show me around' : 'Next', () => _go(step + 1))],
     };
@@ -4247,12 +4269,12 @@ class _TutorialState extends State<TutorialOverlay> with TickerProviderStateMixi
                               border: Border.all(color: burgundy, width: 1.5),
                             ),
                             child: Text(
-                              dragDone && s.kind == TourKind.drag ? 'Wheee! You got it! 😸 I don\'t always enjoy it though...' : s.text,
+                              dragDone && s.kind == TourKind.drag ? tr('Wheee! You got it! 😸 I don\'t always enjoy it though...') : tr(s.text),
                               style: const TextStyle(fontSize: 15, color: Colors.black87),
                             ),
                           )
                         else
-                          NutrikSays(text: s.text, point: ang, size: 92, mode: s.kind == TourKind.tap ? NutrikMode.cheer : NutrikMode.idle),
+                          NutrikSays(text: tr(s.text), point: ang, size: 92, mode: s.kind == TourKind.tap ? NutrikMode.cheer : NutrikMode.idle),
                         const SizedBox(height: 10),
                         _controls(),
                       ],
@@ -4267,7 +4289,7 @@ class _TutorialState extends State<TutorialOverlay> with TickerProviderStateMixi
                 style: TextButton.styleFrom(backgroundColor: Colors.white24, foregroundColor: Colors.white),
                 onPressed: widget.onDone,
                 icon: const Icon(Icons.close, size: 18),
-                label: const Text('Skip'),
+                label: Text(tr('Skip')),
               ),
             ),
           ],
@@ -4293,7 +4315,49 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _age = TextEditingController(text: '22'), _weight = TextEditingController(text: '70'), _height = TextEditingController(text: '175');
   bool isMan = true, hide = true, busy = false, arrived = false;
   int step = 0; // 0 знакомство, 1 аккаунт, 2 параметры
-  String say = 'Hi! I\'m Nutrik 🐾 I help people stop wasting food. Nice to meet you!';
+  String say = tr('Hi! I\'m Nutrik 🐾 I help people stop wasting food. Nice to meet you!');
+
+  /// Шаг 0 — выбор языка: Нутрик сразу здоровается на выбранном.
+  void _pickLang(String l) {
+    widget.state.setLanguage(l);
+    setState(() => say = '${langHello[l]} ${tr('I help people stop wasting food. Nice to meet you!')}');
+  }
+
+  Widget _langCards() => Row(
+    children: [
+      for (final l in appLangs)
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: GestureDetector(
+              onTap: () => _pickLang(l),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: appLang == l ? burgundy : sand,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: appLang == l ? [BoxShadow(color: burgundy.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))] : null,
+                ),
+                child: Column(
+                  children: [
+                    Text(langFlag[l]!, style: const TextStyle(fontSize: 28)),
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      child: Text(
+                        langNative[l]!,
+                        style: TextStyle(fontWeight: FontWeight.bold, color: appLang == l ? Colors.white : Colors.black87),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+    ],
+  );
 
   @override
   void dispose() {
@@ -4314,7 +4378,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String? _num(String? v, int lo, int hi) {
     final n = double.tryParse((v ?? '').replaceAll(',', '.'));
-    return (n == null || n < lo || n > hi) ? 'Enter $lo–$hi' : null;
+    return (n == null || n < lo || n > hi) ? tr('Enter {0}–{1}', [lo, hi]) : null;
   }
 
   void _go(int s, String text) => setState(() {
@@ -4325,15 +4389,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void _next() {
     if (step == 1) {
       if (_k1.currentState!.validate()) {
-        _go(2, 'Now your body stats! I\'ll use them to work out your daily calorie goal. 🔢');
+        _go(2, tr('Now your body stats! I\'ll use them to work out your daily calorie goal. 🔢'));
       } else {
-        setState(() => say = 'Hmm, please check the fields in red!');
+        setState(() => say = tr('Hmm, please check the fields in red!'));
       }
     } else if (step == 2) {
       if (_k2.currentState!.validate()) {
         _submit();
       } else {
-        setState(() => say = 'Those numbers look a bit odd... try again?');
+        setState(() => say = tr('Those numbers look a bit odd... try again?'));
       }
     }
   }
@@ -4341,7 +4405,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _submit({bool guest = false}) async {
     setState(() {
       busy = true;
-      say = 'Yay! Preparing your fridge...';
+      say = tr('Yay! Preparing your fridge...');
     });
     await Future.delayed(const Duration(milliseconds: 1300));
     if (!mounted) return;
@@ -4390,13 +4454,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
-          'ZERO-WASTE KITCHEN',
+        Text(
+          tr('ZERO-WASTE KITCHEN'),
           style: TextStyle(color: burgundy, fontSize: 12, letterSpacing: 3, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 10),
         Text(
-          'Save food. Save money. Save the planet.',
+          tr('Save food. Save money. Save the planet.'),
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.grey.shade700),
         ),
@@ -4406,7 +4470,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final f in const ['🗑️ 1/3 of food is wasted', '💰 ≈\$1,500 per family / year', '🌍 8–10% of CO₂'])
+            for (final f in [tr('🗑️ 1/3 of food is wasted'), tr('💰 ≈\$1,500 per family / year'), tr('🌍 8–10% of CO₂')])
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(color: sand, borderRadius: BorderRadius.circular(20)),
@@ -4414,7 +4478,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
+        _langCards(),
+        const SizedBox(height: 16),
         SizedBox(
           height: 130,
           child: arrived
@@ -4447,13 +4513,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 height: 56,
                 child: FilledButton(
                   style: FilledButton.styleFrom(backgroundColor: burgundy),
-                  onPressed: arrived ? () => _go(1, 'Let\'s create your account! What\'s your name? (It\'s just a test account — I won\'t tell anyone 🤫)') : null,
-                  child: const Text('Create account', style: TextStyle(fontWeight: FontWeight.bold)),
+                  onPressed: arrived ? () => _go(1, tr('Let\'s create your account! What\'s your name? (It\'s just a test account — I won\'t tell anyone 🤫)')) : null,
+                  child: Text(tr('Create account'), style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
               TextButton(
                 onPressed: arrived ? () => _submit(guest: true) : null,
-                child: const Text('Continue as guest', style: TextStyle(color: burgundy)),
+                child: Text(tr('Continue as guest'), style: const TextStyle(color: burgundy)),
               ),
             ],
           ),
@@ -4478,7 +4544,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 children: [
                   Appear(
                     index: 0,
-                    child: TextFormField(controller: _name, decoration: _dec('Name', Icons.person_outline), validator: (v) => (v ?? '').trim().isEmpty ? 'Enter your name' : null),
+                    child: TextFormField(controller: _name, decoration: _dec(tr('Name'), Icons.person_outline), validator: (v) => (v ?? '').trim().isEmpty ? tr('Enter your name') : null),
                   ),
                   const SizedBox(height: 12),
                   Appear(
@@ -4486,8 +4552,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     child: TextFormField(
                       controller: _email,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: _dec('Email', Icons.mail_outline),
-                      validator: (v) => (v ?? '').contains('@') ? null : 'Enter a valid email',
+                      decoration: _dec(tr('Email'), Icons.mail_outline),
+                      validator: (v) => (v ?? '').contains('@') ? null : tr('Enter a valid email'),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -4497,11 +4563,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       controller: _pass,
                       obscureText: hide,
                       decoration: _dec(
-                        'Password',
+                        tr('Password'),
                         Icons.lock_outline,
                         suffix: IconButton(icon: Icon(hide ? Icons.visibility_off : Icons.visibility), onPressed: () => setState(() => hide = !hide)),
                       ),
-                      validator: (v) => (v ?? '').length < 4 ? 'At least 4 characters' : null,
+                      validator: (v) => (v ?? '').length < 4 ? tr('At least 4 characters') : null,
                     ),
                   ),
                 ],
@@ -4512,22 +4578,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
               key: _k2,
               child: Column(
                 children: [
-                  Appear(index: 0, child: Row(children: [_gender('Man', true), const SizedBox(width: 12), _gender('Woman', false)])),
+                  Appear(index: 0, child: Row(children: [_gender(tr('Man'), true), const SizedBox(width: 12), _gender(tr('Woman'), false)])),
                   const SizedBox(height: 12),
                   Appear(
                     index: 1,
                     child: Row(
                       children: [
                         Expanded(
-                          child: TextFormField(controller: _age, keyboardType: TextInputType.number, decoration: _dec('Age', Icons.cake_outlined), validator: (v) => _num(v, 14, 90)),
+                          child: TextFormField(controller: _age, keyboardType: TextInputType.number, decoration: _dec(tr('Age'), Icons.cake_outlined), validator: (v) => _num(v, 14, 90)),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: TextFormField(controller: _weight, keyboardType: TextInputType.number, decoration: _dec('kg', Icons.monitor_weight_outlined), validator: (v) => _num(v, 40, 150)),
+                          child: TextFormField(controller: _weight, keyboardType: TextInputType.number, decoration: _dec(tr('kg'), Icons.monitor_weight_outlined), validator: (v) => _num(v, 40, 150)),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: TextFormField(controller: _height, keyboardType: TextInputType.number, decoration: _dec('cm', Icons.height), validator: (v) => _num(v, 120, 220)),
+                          child: TextFormField(controller: _height, keyboardType: TextInputType.number, decoration: _dec(tr('cm'), Icons.height), validator: (v) => _num(v, 120, 220)),
                         ),
                       ],
                     ),
@@ -4540,8 +4606,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             children: [
               if (!busy)
                 TextButton(
-                  onPressed: () => _go(step - 1, step == 1 ? 'Back so soon? OK!' : 'Let\'s fix your account info!'),
-                  child: const Text('Back', style: TextStyle(color: burgundy)),
+                  onPressed: () => _go(step - 1, step == 1 ? tr('Back so soon? OK!') : tr('Let\'s fix your account info!')),
+                  child: Text(tr('Back'), style: const TextStyle(color: burgundy)),
                 ),
               const Spacer(),
               SizedBox(
@@ -4559,7 +4625,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
                         : Text(
-                            step == 1 ? 'Next' : 'Finish',
+                            step == 1 ? tr('Next') : tr('Finish'),
                             key: ValueKey('t$step'),
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
@@ -4709,7 +4775,7 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
           ),
         ),
         Text(
-          labels[i],
+          tr(labels[i]),
           style: TextStyle(fontSize: 10, color: col, fontWeight: on ? FontWeight.bold : FontWeight.w500),
         ),
       ],
@@ -5019,7 +5085,7 @@ class GlassPage extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: cream,
     appBar: AppBar(
-      title: Text(title, style: headStyle),
+      title: Text(tr(title), style: headStyle),
       backgroundColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -5095,8 +5161,10 @@ class _ConfettiState extends State<Confetti> with SingleTickerProviderStateMixin
 }
 
 class Medal {
-  final String id, emoji, title, desc;
-  const Medal(this.id, this.emoji, this.title, this.desc);
+  final String id, emoji, _title, _desc;
+  const Medal(this.id, this.emoji, this._title, this._desc);
+  String get title => tr(_title);
+  String get desc => tr(_desc);
 }
 
 const medals = [
@@ -5179,7 +5247,7 @@ class _BadgePopupState extends State<BadgePopup> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Achievement unlocked!', style: TextStyle(fontSize: 12, color: burgundy)),
+                      Text(tr('Achievement unlocked!'), style: TextStyle(fontSize: 12, color: burgundy)),
                       Text(
                         widget.m.title,
                         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
@@ -5254,7 +5322,7 @@ class ImpactPage extends StatelessWidget {
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: burgundy),
             ),
           ),
-          Text(label, style: const TextStyle(color: Colors.black54, fontSize: 12)),
+          Text(tr(label), style: const TextStyle(color: Colors.black54, fontSize: 12)),
         ],
       ),
     ),
@@ -5278,7 +5346,7 @@ class ImpactPage extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text('${reasonInfo[e.key]!.$1}  ${reasonInfo[e.key]!.$2}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text('${reasonInfo[e.key]!.$1}  ${tr(reasonInfo[e.key]!.$2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       const Spacer(),
                       Text('${e.value}', style: const TextStyle(color: Colors.black54)),
                     ],
@@ -5297,9 +5365,9 @@ class ImpactPage extends StatelessWidget {
               ),
             ),
           const Divider(),
-          Text('${catEmoji[cat.key] ?? '🍽️'} You waste ${cat.key} most often (${cat.value}×).', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text('${catEmoji[cat.key] ?? '🍽️'} ${tr('You waste {0} most often ({1}×).', [tn(cat.key), cat.value])}', style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Text('💡 ${reasonInfo[top]!.$3}', style: const TextStyle(color: Colors.black87)),
+          Text('💡 ${tr(reasonInfo[top]!.$3)}', style: const TextStyle(color: Colors.black87)),
         ],
       ),
     );
@@ -5320,10 +5388,10 @@ class ImpactPage extends StatelessWidget {
               ? Colors.orange.shade800
               : Colors.red.shade700;
           final mood = score >= 80
-              ? 'You\'re a food-saving superstar! Keep it up! ⭐'
+              ? tr('You\'re a food-saving superstar! Keep it up! ⭐')
               : score >= 50
-              ? 'Not bad! Use the expiring products first.'
-              : 'Oh no... let\'s waste less. Check Recipes for ideas!';
+              ? tr('Not bad! Use the expiring products first.')
+              : tr('Oh no... let\'s waste less. Check Recipes for ideas!');
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -5355,10 +5423,10 @@ class ImpactPage extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Eco score', style: titleStyle),
+                            Text(tr('Eco score'), style: titleStyle),
                             const SizedBox(height: 4),
                             Text(
-                              s.consumed + s.wasted == 0 ? 'Eat and cook your food to build your score!' : '${s.consumed} products used, ${s.wasted} thrown away.',
+                              s.consumed + s.wasted == 0 ? tr('Eat and cook your food to build your score!') : tr('{0} products used, {1} thrown away.', [s.consumed, s.wasted]),
                               style: const TextStyle(color: Colors.black54),
                             ),
                           ],
@@ -5380,7 +5448,7 @@ class ImpactPage extends StatelessWidget {
                   children: [
                     _tile('🦸', 'Rescued items', s.rescued.toDouble(), 0),
                     const SizedBox(width: 12),
-                    _tile('⚖️', 'Food saved', s.rescued * 0.3, 1, suffix: ' kg'),
+                    _tile('⚖️', 'Food saved', s.rescued * 0.3, 1, suffix: ' ${tr('kg')}'),
                   ],
                 ),
               ),
@@ -5391,7 +5459,7 @@ class ImpactPage extends StatelessWidget {
                   children: [
                     _tile('💰', 'Money saved', s.rescuedMoney, 2, prefix: '\$'),
                     const SizedBox(width: 12),
-                    _tile('🌍', 'CO₂ avoided', s.co2, 1, suffix: ' kg'),
+                    _tile('🌍', 'CO₂ avoided', s.co2, 1, suffix: ' ${tr('kg')}'),
                   ],
                 ),
               ),
@@ -5405,7 +5473,7 @@ class ImpactPage extends StatelessWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          '${s.streakDays} days without waste',
+                          tr('{0} without waste', [trp(s.streakDays, 'day|days')]),
                           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black87),
                         ),
                       ),
@@ -5424,7 +5492,7 @@ class ImpactPage extends StatelessWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Wasted: ${s.wasted} ${s.wasted == 1 ? 'item' : 'items'} · about \$${s.wastedMoney.toStringAsFixed(2)}',
+                          tr('Wasted: {0} · about {1}', [trp(s.wasted, 'item|items'), '\$${s.wastedMoney.toStringAsFixed(2)}']),
                           style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
                         ),
                       ),
@@ -5436,12 +5504,12 @@ class ImpactPage extends StatelessWidget {
               Appear(index: 6, child: Row(children: [_tile('❄️', 'Frozen in time', s.frozen.toDouble(), 0), const SizedBox(width: 12), _tile('🤝', 'Shared', s.shared.toDouble(), 0)])),
               if (s.wasteLog.isNotEmpty) ...[
                 const SizedBox(height: 18),
-                const Text('Why food ends up in your bin', style: headStyle),
+                Text(tr('Why food ends up in your bin'), style: headStyle),
                 const SizedBox(height: 8),
                 Appear(index: 7, child: _whyWaste(s)),
               ],
               const SizedBox(height: 18),
-              const Text('Did you know?', style: headStyle),
+              Text(tr('Did you know?'), style: headStyle),
               const SizedBox(height: 8),
               for (final f in const [
                 ('🗑️', 'About 1/3 of all food produced in the world is lost or wasted.'),
@@ -5457,16 +5525,16 @@ class ImpactPage extends StatelessWidget {
                         Text(f.$1, style: const TextStyle(fontSize: 24)),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Text(f.$2, style: const TextStyle(color: Colors.black87)),
+                          child: Text(tr(f.$2), style: const TextStyle(color: Colors.black87)),
                         ),
                       ],
                     ),
                   ),
                 ),
               const SizedBox(height: 4),
-              const Text(
-                'Estimates: about 300 g per product, average prices, about 2.5 kg of CO₂ per kg of food. Sources: UNEP Food Waste Index, FAO.',
-                style: TextStyle(color: Colors.black45, fontSize: 11),
+              Text(
+                tr('Estimates: about 300 g per product, average prices, about 2.5 kg of CO₂ per kg of food. Sources: UNEP Food Waste Index, FAO.'),
+                style: const TextStyle(color: Colors.black45, fontSize: 11),
               ),
             ],
           );
@@ -5558,8 +5626,8 @@ void weightSheet(BuildContext ctx, AppState s) {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Log your weight', style: titleStyle),
-            Slider(value: v, min: 30, max: 200, divisions: 1700, label: '${v.toStringAsFixed(1)} kg', onChanged: (x) => set(() => v = x)),
+            Text(tr('Log your weight'), style: titleStyle),
+            Slider(value: v, min: 30, max: 200, divisions: 1700, label: '${v.toStringAsFixed(1)} ${tr('kg')}', onChanged: (x) => set(() => v = x)),
             Text(
               '${v.toStringAsFixed(1)} kg',
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: burgundy),
@@ -5573,7 +5641,7 @@ void weightSheet(BuildContext ctx, AppState s) {
                   s.addWeight(double.parse(v.toStringAsFixed(1)));
                   Navigator.pop(c);
                 },
-                child: const Text('Save'),
+                child: Text(tr('Save')),
               ),
             ),
           ],
@@ -5599,12 +5667,12 @@ class WeightPage extends StatelessWidget {
           final s = state;
           final bmi = s.weight / pow(s.height / 100, 2);
           final cat = bmi < 18.5
-              ? 'Underweight'
+              ? tr('Underweight')
               : bmi < 25
-              ? 'Normal'
+              ? tr('Normal')
               : bmi < 30
-              ? 'Overweight'
-              : 'Obese';
+              ? tr('Overweight')
+              : tr('Obese');
           final list = s.weights.reversed.toList();
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -5634,10 +5702,10 @@ class WeightPage extends StatelessWidget {
                         child: Column(
                           children: [
                             Text(
-                              '${s.weight.toStringAsFixed(1)} kg',
+                              '${s.weight.toStringAsFixed(1)} ${tr('kg')}',
                               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: burgundy),
                             ),
-                            const Text('Current', style: TextStyle(color: Colors.black54, fontSize: 12)),
+                            Text(tr('Current'), style: TextStyle(color: Colors.black54, fontSize: 12)),
                           ],
                         ),
                       ),
@@ -5651,7 +5719,7 @@ class WeightPage extends StatelessWidget {
                               bmi.toStringAsFixed(1),
                               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: burgundy),
                             ),
-                            Text('BMI · $cat', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                            Text('${tr('BMI')} · $cat', style: const TextStyle(color: Colors.black54, fontSize: 12)),
                           ],
                         ),
                       ),
@@ -5665,7 +5733,7 @@ class WeightPage extends StatelessWidget {
                               '${s.targetCalories}',
                               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: burgundy),
                             ),
-                            const Text('kcal goal', style: TextStyle(color: Colors.black54, fontSize: 12)),
+                            Text(tr('kcal goal'), style: TextStyle(color: Colors.black54, fontSize: 12)),
                           ],
                         ),
                       ),
@@ -5682,12 +5750,12 @@ class WeightPage extends StatelessWidget {
                     style: FilledButton.styleFrom(backgroundColor: burgundy),
                     onPressed: () => weightSheet(context, s),
                     icon: const Icon(Icons.add),
-                    label: const Text('Log weight'),
+                    label: Text(tr('Log weight')),
                   ),
                 ),
               ),
               const SizedBox(height: 8),
-              const Text('BMI is only a rough guide, not a diagnosis.', style: TextStyle(color: Colors.black45, fontSize: 11)),
+              Text(tr('BMI is only a rough guide, not a diagnosis.'), style: TextStyle(color: Colors.black45, fontSize: 11)),
               const SizedBox(height: 8),
               for (var i = 0; i < list.length; i++)
                 Appear(
@@ -5706,7 +5774,7 @@ class WeightPage extends StatelessWidget {
                               '${list[i].kg - list[i + 1].kg >= 0 ? '+' : ''}${(list[i].kg - list[i + 1].kg).toStringAsFixed(1)}  ',
                               style: TextStyle(color: list[i].kg - list[i + 1].kg > 0 ? Colors.orange.shade800 : Colors.green.shade800, fontSize: 12),
                             ),
-                          Text('${list[i].kg.toStringAsFixed(1)} kg', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          Text('${list[i].kg.toStringAsFixed(1)} ${tr('kg')}', style: const TextStyle(fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -5743,11 +5811,11 @@ class _ShoppingPageState extends State<ShoppingPage> {
           padding: const EdgeInsets.all(16),
           children: [
             Autocomplete<FoodItem>(
-              displayStringForOption: (f) => f.name,
+              displayStringForOption: (f) => tn(f.name),
               optionsBuilder: (v) {
                 final q = v.text.trim().toLowerCase();
                 if (q.isEmpty) return const Iterable<FoodItem>.empty();
-                return foodDatabase.where((f) => f.name.toLowerCase().contains(q)).take(8);
+                return foodDatabase.where((f) => searchKey(f.name).contains(q)).take(8);
               },
               onSelected: (f) {
                 s.addShopping([f.name]);
@@ -5759,7 +5827,7 @@ class _ShoppingPageState extends State<ShoppingPage> {
                   controller: ctrl,
                   focusNode: node,
                   decoration: InputDecoration(
-                    hintText: 'Add to shopping list...',
+                    hintText: tr('Add to shopping list...'),
                     prefixIcon: const Icon(Icons.add_shopping_cart, color: burgundy),
                     filled: true,
                     fillColor: Colors.white70,
@@ -5770,9 +5838,9 @@ class _ShoppingPageState extends State<ShoppingPage> {
             ),
             const SizedBox(height: 12),
             if (s.shopping.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(top: 12),
-                child: NutrikSays(text: 'Your list is empty! Add items here, or open a recipe and tap "Add missing to shopping list".', size: 90),
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: NutrikSays(text: tr('Your list is empty! Add items here, or open a recipe and tap "Add missing to shopping list".'), size: 90),
               ),
             for (var i = 0; i < s.shopping.length; i++)
               Appear(
@@ -5795,15 +5863,15 @@ class _ShoppingPageState extends State<ShoppingPage> {
                       child: ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: Emo(foodByName[s.shopping[i]]?.emoji ?? '🛒', food: s.shopping[i], size: 32),
-                        title: Text(s.shopping[i], style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: const Text('Tap ✓ when you buy it — it goes straight to your fridge'),
+                        title: Text(tn(s.shopping[i]), style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(tr('Tap ✓ when you buy it — it goes straight to your fridge')),
                         trailing: IconButton(
                           icon: const Icon(Icons.check_circle_outline, color: burgundy, size: 30),
                           onPressed: () {
                             final n = s.shopping[i];
                             s.buy(n);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: burgundy, duration: const Duration(milliseconds: 1400), content: Text('$n is in your fridge 🧊')),
+                              SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: burgundy, duration: const Duration(milliseconds: 1400), content: Text(tr('{0} is in your fridge 🧊', [tn(n)]))),
                             );
                           },
                         ),
@@ -5841,7 +5909,7 @@ class MedalsPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('$n / ${medals.length} unlocked', style: titleStyle),
+                      Text(tr('{0} / {1} unlocked', [n, medals.length]), style: titleStyle),
                       const SizedBox(height: 10),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
@@ -5963,7 +6031,7 @@ class _QuickTileState extends State<QuickTile> {
                     child: Emo(widget.emoji, size: 30),
                   ),
                   const SizedBox(height: 4),
-                  Text(widget.label, style: const TextStyle(fontSize: 11, color: Colors.black87)),
+                  Text(tr(widget.label), style: const TextStyle(fontSize: 11, color: Colors.black87)),
                 ],
               ),
             ),
@@ -6093,7 +6161,7 @@ class _LiquidGaugeState extends State<LiquidGauge> with SingleTickerProviderStat
                   ),
                 ),
               ),
-              Text(widget.label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+              Text(tr(widget.label), style: const TextStyle(color: Colors.white70, fontSize: 11)),
             ],
           ),
         ],
@@ -6162,17 +6230,17 @@ class _HomePageState extends State<HomePage> {
     final empty = state.pantry.isEmpty;
     final score = state.ecoScore;
     final line = empty
-        ? '"Empty fridge = zero waste... but I\'m hungry!"'
+        ? tr('"Empty fridge = zero waste... but I\'m hungry!"')
         : save.isNotEmpty
-        ? '"Eat these first! I found recipes for them."'
+        ? tr('"Eat these first! I found recipes for them."')
         : dead > 0
-        ? '"Something smells funny in there... 👃"'
-        : '"Everything is fresh. You\'re a legend!"';
+        ? tr('"Something smells funny in there... 👃"')
+        : tr('"Everything is fresh. You\'re a legend!"');
     final cta = empty
-        ? 'Stock your fridge'
+        ? tr('Stock your fridge')
         : save.isNotEmpty
-        ? 'Cook with them'
-        : 'Open fridge';
+        ? tr('Cook with them')
+        : tr('Open fridge');
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -6196,26 +6264,26 @@ class _HomePageState extends State<HomePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('RESCUE MISSION', style: TextStyle(color: Colors.white60, fontSize: 11, letterSpacing: 2)),
+                        Text(tr('RESCUE MISSION'), style: TextStyle(color: Colors.white60, fontSize: 11, letterSpacing: 2)),
                         const SizedBox(height: 4),
                         Text(
                           empty
-                              ? 'Fridge is empty'
+                              ? tr('Fridge is empty')
                               : save.isEmpty
-                              ? 'Nothing to rescue'
-                              : '${save.length} ${save.length == 1 ? 'item' : 'items'} to save',
+                              ? tr('Nothing to rescue')
+                              : tr('{0} to save', [trp(save.length, 'item|items')]),
                           style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.bold),
                         ),
                         Text(
                           save.isNotEmpty
-                              ? '≈ \$${state.moneyAtRisk.toStringAsFixed(2)} at risk'
+                              ? tr('≈ {0} at risk', ['\$${state.moneyAtRisk.toStringAsFixed(2)}'])
                               : dead > 0
-                              ? '$dead expired in the fridge'
-                              : 'all products are fresh',
+                              ? tr('{0} expired in the fridge', [dead])
+                              : tr('all products are fresh'),
                           style: TextStyle(color: dead > 0 && save.isEmpty ? const Color(0xFFFFB4B4) : Colors.white60, fontSize: 12),
                         ),
                         const SizedBox(height: 10),
-                        Wrap(spacing: 6, runSpacing: 6, children: [_pill('🦸 ${state.rescued} rescued'), _pill('💰 \$${state.rescuedMoney.toStringAsFixed(0)} saved')]),
+                        Wrap(spacing: 6, runSpacing: 6, children: [_pill('🦸 ${tr('{0} rescued', [state.rescued])}'), _pill('💰 ${tr('{0} saved', ['\$${state.rescuedMoney.toStringAsFixed(0)}'])}')]),
                       ],
                     ),
                   ),
@@ -6291,8 +6359,8 @@ class _HomePageState extends State<HomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Calories today', style: headStyle),
-                    Text('$total of $goal kcal · ${left >= 0 ? '$left left' : '${-left} over'}', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                    Text(tr('Calories today'), style: headStyle),
+                    Text(tr('{0} of {1} kcal · {2}', [total, goal, left >= 0 ? tr('{0} left', [left]) : tr('{0} over', [-left])]), style: const TextStyle(color: Colors.black54, fontSize: 12)),
                   ],
                 ),
               ),
@@ -6336,7 +6404,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'MTWTFSS'[now().subtract(Duration(days: 6 - k)).weekday - 1],
+                              tr('MTWTFSS')[now().subtract(Duration(days: 6 - k)).weekday - 1],
                               style: TextStyle(fontSize: 10, fontWeight: k == 6 ? FontWeight.bold : FontWeight.normal, color: k == 6 ? burgundy : Colors.black54),
                             ),
                           ],
@@ -6363,9 +6431,9 @@ class _HomePageState extends State<HomePage> {
           children: [
             Row(
               children: [
-                const Text('Fridge health', style: headStyle),
+                Text(tr('Fridge health'), style: headStyle),
                 const Spacer(),
-                Text('${p.length} items  ›', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                Text('${trp(p.length, 'item|items')}  ›', style: const TextStyle(color: Colors.black54, fontSize: 12)),
               ],
             ),
             const SizedBox(height: 10),
@@ -6406,7 +6474,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const SizedBox(height: 8),
-            Wrap(spacing: 14, children: [_dot(Colors.green.shade600, '$ok fresh'), _dot(Colors.orange.shade700, '$soon use soon'), _dot(Colors.red.shade700, '$bad expired')]),
+            Wrap(spacing: 14, children: [_dot(Colors.green.shade600, tr('{0} fresh', [ok])), _dot(Colors.orange.shade700, tr('{0} use soon', [soon])), _dot(Colors.red.shade700, tr('{0} expired', [bad]))]),
           ],
         ),
       ),
@@ -6429,7 +6497,7 @@ class _HomePageState extends State<HomePage> {
   Widget _emptyFridge() => Glass(
     child: Column(
       children: [
-        const NutrikSays(text: 'Your fridge is empty! Add what you bought — or load a demo fridge to see how food rescue works.', size: 78),
+        NutrikSays(text: tr('Your fridge is empty! Add what you bought — or load a demo fridge to see how food rescue works.'), size: 78),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -6438,7 +6506,7 @@ class _HomePageState extends State<HomePage> {
                 style: FilledButton.styleFrom(backgroundColor: burgundy, minimumSize: const Size(0, 46)),
                 onPressed: state.loadDemo,
                 icon: const Icon(Icons.auto_awesome, size: 18),
-                label: const Text('Demo fridge'),
+                label: Text(tr('Demo fridge')),
               ),
             ),
             const SizedBox(width: 8),
@@ -6451,7 +6519,7 @@ class _HomePageState extends State<HomePage> {
                 ),
                 onPressed: () => widget.onTab(1),
                 icon: const Icon(Icons.search, size: 18),
-                label: const Text('Add products'),
+                label: Text(tr('Add products')),
               ),
             ),
           ],
@@ -6489,7 +6557,7 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 8),
               Text(
-                it.food.name,
+                tn(it.food.name),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.bold),
@@ -6514,7 +6582,7 @@ class _HomePageState extends State<HomePage> {
   );
 
   Widget _mini(IconData i, Color c, String tip, VoidCallback f) => IconButton(
-    tooltip: tip,
+    tooltip: tr(tip),
     visualDensity: VisualDensity.compact,
     padding: EdgeInsets.zero,
     constraints: const BoxConstraints(minWidth: 38, minHeight: 32),
@@ -6526,12 +6594,12 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final hr = now().hour;
     final greet = hr < 5
-        ? 'Hello, night owl'
+        ? tr('Hello, night owl')
         : hr < 12
-        ? 'Good morning'
+        ? tr('Good morning')
         : hr < 18
-        ? 'Good afternoon'
-        : 'Good evening';
+        ? tr('Good afternoon')
+        : tr('Good evening');
     final exp = state.expiringSoon;
     final today = state.log.where((e) => e.day == todayNum()).toList();
     return Stack(
@@ -6555,7 +6623,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     Tooltip(
-                      message: 'Days without throwing food away',
+                      message: tr('Days without throwing food away'),
                       child: Glass(
                         radius: 20,
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -6563,7 +6631,7 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             Pulse(child: const Text('🔥', style: TextStyle(fontSize: 18))),
                             const SizedBox(width: 4),
-                            Text('${state.streakDays}d', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text(tr('{0}d', [state.streakDays]), style: const TextStyle(fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
@@ -6600,9 +6668,9 @@ class _HomePageState extends State<HomePage> {
                   index: 2,
                   child: Row(
                     children: [
-                      const Text('Use these first ⚠️', style: headStyle),
+                      Text(tr('Use these first ⚠️'), style: headStyle),
                       const Spacer(),
-                      Text('tap for options', style: TextStyle(color: Colors.black.withValues(alpha: 0.4), fontSize: 12)),
+                      Text(tr('tap for options'), style: TextStyle(color: Colors.black.withValues(alpha: 0.4), fontSize: 12)),
                     ],
                   ),
                 ),
@@ -6664,7 +6732,7 @@ class _HomePageState extends State<HomePage> {
                           child: AnimatedSwitcher(
                             duration: const Duration(milliseconds: 400),
                             child: Text(
-                              tips[state.tipIndex % tips.length],
+                              tr(tips[state.tipIndex % tips.length]),
                               key: ValueKey(state.tipIndex),
                               style: const TextStyle(color: Colors.black87),
                             ),
@@ -6679,13 +6747,13 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 12),
               Appear(index: 6, child: _calories()),
               const SizedBox(height: 16),
-              const Text('Eaten today', style: headStyle),
+              Text(tr('Eaten today'), style: headStyle),
               const SizedBox(height: 8),
               if (today.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(16),
+                Padding(
+                  padding: const EdgeInsets.all(16),
                   child: Center(
-                    child: Text('Nothing eaten yet. Tap a product, then Eat.', style: TextStyle(color: Colors.black45)),
+                    child: Text(tr('Nothing eaten yet. Tap a product, then Eat.'), style: const TextStyle(color: Colors.black45)),
                   ),
                 ),
               for (final e in today)
@@ -6706,7 +6774,7 @@ class _HomePageState extends State<HomePage> {
                       child: ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: Emo(e.emoji, food: e.name.split(' · ').first, size: 30),
-                        title: Text(e.name),
+                        title: Text(e.name.split(' · ').map(tn).join(' · ')),
                         trailing: Text(
                           '${e.kcal} kcal',
                           style: const TextStyle(fontWeight: FontWeight.bold, color: burgundy),
@@ -6725,8 +6793,6 @@ class _HomePageState extends State<HomePage> {
 
 // ───────────────────────── ДЕЙСТВИЯ С ПРОДУКТОМ (шторки) ─────────────────────────
 
-const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-String fmtDate(DateTime d) => '${d.day} ${_months[d.month - 1]}';
 
 void _snack(ScaffoldMessengerState m, String text, {Color color = burgundy}) => m
   ..hideCurrentSnackBar()
@@ -6734,7 +6800,7 @@ void _snack(ScaffoldMessengerState m, String text, {Color color = burgundy}) => 
 
 void freezeWithSnack(BuildContext ctx, AppState s, PantryItem p) {
   s.freeze(p);
-  _snack(ScaffoldMessenger.of(ctx), '❄️ ${p.food.name} frozen — good until ${fmtDate(p.expiry)}', color: Colors.blue.shade800);
+  _snack(ScaffoldMessenger.of(ctx), tr('❄️ {0} frozen — good until {1}', [tn(p.food.name), fmtDate(p.expiry)]), color: Colors.blue.shade800);
 }
 
 void eatSheet(BuildContext ctx, AppState s, PantryItem p) {
@@ -6754,14 +6820,14 @@ void eatSheet(BuildContext ctx, AppState s, PantryItem p) {
                 children: [
                   FoodIcon(p.food, size: 34),
                   const SizedBox(width: 8),
-                  Flexible(child: Text(p.food.name, style: titleStyle)),
+                  Flexible(child: Text(tn(p.food.name), style: titleStyle)),
                 ],
               ),
               const SizedBox(height: 4),
-              const Text('How much did you eat?'),
-              Slider(value: g, min: 10, max: 500, divisions: 49, label: '${g.round()} g', onChanged: (v) => set(() => g = v)),
+              Text(tr('How much did you eat?')),
+              Slider(value: g, min: 10, max: 500, divisions: 49, label: '${g.round()} ${tr('g')}', onChanged: (v) => set(() => g = v)),
               Text(
-                '${g.round()} g · ${(p.food.kcal * g / 100).round()} kcal',
+                '${g.round()} ${tr('g')} · ${(p.food.kcal * g / 100).round()} ${tr('kcal')}',
                 style: const TextStyle(fontWeight: FontWeight.bold, color: burgundy),
               ),
               const SizedBox(height: 14),
@@ -6774,7 +6840,7 @@ void eatSheet(BuildContext ctx, AppState s, PantryItem p) {
                     s.eat(p, g.round());
                     Navigator.pop(c);
                   },
-                  child: const Text('Finished it 🎉'),
+                  child: Text(tr('Finished it 🎉')),
                 ),
               ),
               const SizedBox(height: 8),
@@ -6790,7 +6856,7 @@ void eatSheet(BuildContext ctx, AppState s, PantryItem p) {
                     s.eat(p, g.round(), finished: false);
                     Navigator.pop(c);
                   },
-                  child: const Text('Ate some — keep the rest'),
+                  child: Text(tr('Ate some — keep the rest')),
                 ),
               ),
             ],
@@ -6820,11 +6886,11 @@ void throwSheet(BuildContext ctx, AppState s, PantryItem p) {
               children: [
                 FoodIcon(p.food, size: 26),
                 const SizedBox(width: 8),
-                Flexible(child: Text('Why does ${p.food.name} go to the bin?', style: headStyle)),
+                Flexible(child: Text(tr('Why does {0} go to the bin?', [tn(p.food.name)]), style: headStyle)),
               ],
             ),
             const SizedBox(height: 4),
-            const Text('An honest answer helps Nutrik give you better tips 💛', style: TextStyle(color: Colors.black54, fontSize: 12)),
+            Text(tr('An honest answer helps Nutrik give you better tips 💛'), style: TextStyle(color: Colors.black54, fontSize: 12)),
             const SizedBox(height: 12),
             for (final r in WasteReason.values)
               Padding(
@@ -6837,7 +6903,7 @@ void throwSheet(BuildContext ctx, AppState s, PantryItem p) {
                     onTap: () {
                       Navigator.pop(c);
                       s.throwAway(p, r);
-                      _snack(m, '💡 ${reasonInfo[r]!.$3}', color: Colors.red.shade900);
+                      _snack(m, '💡 ${tr(reasonInfo[r]!.$3)}', color: Colors.red.shade900);
                     },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -6846,7 +6912,7 @@ void throwSheet(BuildContext ctx, AppState s, PantryItem p) {
                           Text(reasonInfo[r]!.$1, style: const TextStyle(fontSize: 22)),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text(reasonInfo[r]!.$2, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            child: Text(tr(reasonInfo[r]!.$2), style: const TextStyle(fontWeight: FontWeight.bold)),
                           ),
                           const Icon(Icons.chevron_right, color: Colors.black38),
                         ],
@@ -6862,10 +6928,10 @@ void throwSheet(BuildContext ctx, AppState s, PantryItem p) {
                   onPressed: () {
                     Navigator.pop(c);
                     s.freeze(p);
-                    _snack(m, '❄️ Saved! ${p.food.name} is in the freezer until ${fmtDate(p.expiry)}', color: Colors.blue.shade800);
+                    _snack(m, tr('❄️ Saved! {0} is in the freezer until {1}', [tn(p.food.name), fmtDate(p.expiry)]), color: Colors.blue.shade800);
                   },
                   icon: const Icon(Icons.ac_unit),
-                  label: const Text('Wait! Freeze it instead (+90 days)'),
+                  label: Text(tr('Wait! Freeze it instead (+90 days)')),
                 ),
               ),
           ],
@@ -6907,7 +6973,7 @@ void itemSheet(BuildContext ctx, AppState s, PantryItem p) {
                   children: [
                     Text(emoji, style: const TextStyle(fontSize: 22)),
                     const SizedBox(height: 2),
-                    Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    Text(tr(label), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -6930,8 +6996,8 @@ void itemSheet(BuildContext ctx, AppState s, PantryItem p) {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(p.food.name, style: titleStyle),
-                        Text('${storageLabel[p.storage]} · ${p.food.kcal} kcal/100 g', style: const TextStyle(color: Colors.black54)),
+                        Text(tn(p.food.name), style: titleStyle),
+                        Text('${storageLabel[p.storage]} · ${p.food.kcal} ${tr('kcal/100 g')}', style: const TextStyle(color: Colors.black54)),
                       ],
                     ),
                   ),
@@ -6951,14 +7017,14 @@ void itemSheet(BuildContext ctx, AppState s, PantryItem p) {
                 child: LinearProgressIndicator(value: p.fresh, minHeight: 8, color: p.color, backgroundColor: Colors.black12),
               ),
               const SizedBox(height: 6),
-              Text('Added ${fmtDate(p.added)} · good until ${fmtDate(p.expiry)}', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+              Text(tr('Added {0} · good until {1}', [fmtDate(p.added), fmtDate(p.expiry)]), style: const TextStyle(color: Colors.black54, fontSize: 12)),
               if (tip != null) ...[
                 const SizedBox(height: 12),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(color: sand, borderRadius: BorderRadius.circular(14)),
-                  child: Text('💡 Storage: $tip', style: const TextStyle(fontSize: 13)),
+                  child: Text('💡 ${tr('Storage: {0}', [tr(tip)])}', style: const TextStyle(fontSize: 13)),
                 ),
               ],
               const SizedBox(height: 14),
@@ -6970,7 +7036,7 @@ void itemSheet(BuildContext ctx, AppState s, PantryItem p) {
                   const SizedBox(width: 8),
                   act('🤝', 'Share', () {
                     s.share(p);
-                    _snack(m, '🤝 ${p.food.name} shared — food rescued, neighbor happy!');
+                    _snack(m, tr('🤝 {0} shared — food rescued, neighbor happy!', [tn(p.food.name)]));
                   }, color: const Color(0xFFE8EFE0)),
                 ],
               ),
@@ -6983,7 +7049,7 @@ void itemSheet(BuildContext ctx, AppState s, PantryItem p) {
                       initialDate: p.expiry,
                       firstDate: now().subtract(const Duration(days: 60)),
                       lastDate: now().add(const Duration(days: 730)),
-                      helpText: 'Date on the package',
+                      helpText: tr('Date on the package'),
                     );
                     if (d != null) s.setExpiry(p, d);
                   }),
@@ -6999,7 +7065,7 @@ void itemSheet(BuildContext ctx, AppState s, PantryItem p) {
               ),
               if (recs.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                const Text('Cook it into...', style: headStyle),
+                Text(tr('Cook it into...'), style: headStyle),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -7008,7 +7074,7 @@ void itemSheet(BuildContext ctx, AppState s, PantryItem p) {
                     for (final r in recs)
                       ActionChip(
                         avatar: Emo(r.emoji, size: 20),
-                        label: Text(r.name),
+                        label: Text(tn(r.name)),
                         onPressed: () {
                           Navigator.pop(c);
                           Navigator.push(ctx, fadeSlide(RecipePage(state: s, recipe: r)));
@@ -7036,7 +7102,7 @@ class PantryTile extends StatelessWidget {
     width: 30,
     height: 30,
     child: IconButton(
-      tooltip: tip,
+      tooltip: tr(tip),
       padding: EdgeInsets.zero,
       iconSize: 18,
       style: IconButton.styleFrom(backgroundColor: burgundy.withValues(alpha: 0.08)),
@@ -7058,7 +7124,7 @@ class PantryTile extends StatelessWidget {
           Icon(i, color: Colors.white),
           const SizedBox(width: 6),
           Text(
-            t,
+            tr(t),
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
         ],
@@ -7106,7 +7172,7 @@ class PantryTile extends StatelessWidget {
                         children: [
                           Flexible(
                             child: Text(
-                              item.food.name,
+                              tn(item.food.name),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
@@ -7130,7 +7196,7 @@ class PantryTile extends StatelessWidget {
                           ),
                           Flexible(
                             child: Text(
-                              '  ·  ${batches > 1 ? '$batches batches' : storageLabel[item.storage]}',
+                              '  ·  ${batches > 1 ? trp(batches, 'batch|batches') : storageLabel[item.storage]}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(color: Colors.black45, fontSize: 12),
@@ -7148,7 +7214,7 @@ class PantryTile extends StatelessWidget {
                 ),
                 _step(Icons.add, 'One more', () => state.addMore(item)),
                 IconButton(
-                  tooltip: 'Eat',
+                  tooltip: tr('Eat'),
                   icon: const Icon(Icons.restaurant, color: burgundy),
                   onPressed: () => eatSheet(context, state, item),
                 ),
@@ -7182,7 +7248,9 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   int _score(FoodItem f, String qq) {
-    final n = f.name.toLowerCase();
+    // ищет по английскому, русскому и казахскому названию
+    final n = searchKey(f.name);
+    if (tn(f.name).toLowerCase().startsWith(qq)) return 0;
     if (n.startsWith(qq)) return 0;
     if (n.split(' ').any((w) => w.startsWith(qq))) return 1;
     if (n.contains(qq)) return 2;
@@ -7192,7 +7260,7 @@ class _SearchPageState extends State<SearchPage> {
   List<FoodItem> get results {
     final qq = q.trim().toLowerCase();
     final list = foodDatabase.where((f) => (cat == null || f.category == cat) && (qq.isEmpty || _score(f, qq) < 3)).toList();
-    list.sort((a, b) => _score(a, qq) != _score(b, qq) ? _score(a, qq).compareTo(_score(b, qq)) : a.name.compareTo(b.name));
+    list.sort((a, b) => _score(a, qq) != _score(b, qq) ? _score(a, qq).compareTo(_score(b, qq)) : tn(a.name).compareTo(tn(b.name)));
     return list;
   }
 
@@ -7205,7 +7273,7 @@ class _SearchPageState extends State<SearchPage> {
           behavior: SnackBarBehavior.floating,
           backgroundColor: burgundy,
           duration: const Duration(milliseconds: 1500),
-          content: Text('${f.emoji} ${f.name} added · stays fresh for ${f.shelf} ${f.shelf == 1 ? 'day' : 'days'}'),
+          content: Text(tr('{0} added · stays fresh for {1}', ['${f.emoji} ${tn(f.name)}', trp(f.shelf, 'day|days')])),
         ),
       );
   }
@@ -7213,7 +7281,7 @@ class _SearchPageState extends State<SearchPage> {
   Widget _chip(String label, String? value) => Padding(
     padding: const EdgeInsets.only(right: 8),
     child: ChoiceChip(
-      label: Text(value == null ? label : '${catEmoji[value]} $label'),
+      label: Text(value == null ? tr(label) : '${catEmoji[value]} ${tn(label)}'),
       selected: cat == value,
       selectedColor: burgundy,
       labelStyle: TextStyle(color: cat == value ? Colors.white : Colors.black87),
@@ -7251,12 +7319,12 @@ class _SearchPageState extends State<SearchPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            categories[i],
+                            tn(categories[i]),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          Text('${foodDatabase.where((f) => f.category == categories[i]).length} products', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          Text(trp(foodDatabase.where((f) => f.category == categories[i]).length, 'product|products'), style: const TextStyle(color: Colors.grey, fontSize: 12)),
                         ],
                       ),
                     ),
@@ -7273,7 +7341,7 @@ class _SearchPageState extends State<SearchPage> {
     if (res.isEmpty)
       return Center(
         key: const ValueKey('none'),
-        child: Text('Nothing found for "$q"', style: const TextStyle(color: Colors.grey)),
+        child: Text(tr('Nothing found for "{0}"', [q]), style: const TextStyle(color: Colors.grey)),
       );
     final count = <String, int>{};
     for (final p in widget.state.pantry) {
@@ -7293,7 +7361,7 @@ class _SearchPageState extends State<SearchPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('You may also like', style: headStyle),
+                Text(tr('You may also like'), style: headStyle),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -7302,11 +7370,11 @@ class _SearchPageState extends State<SearchPage> {
                     for (final f in related)
                       ActionChip(
                         avatar: FoodIcon(f, size: 20),
-                        label: Text(f.name),
+                        label: Text(tn(f.name)),
                         onPressed: () => setState(() {
-                          _c.text = f.name;
-                          _c.selection = TextSelection.collapsed(offset: f.name.length);
-                          q = f.name;
+                          _c.text = tn(f.name);
+                          _c.selection = TextSelection.collapsed(offset: _c.text.length);
+                          q = _c.text;
                         }),
                       ),
                   ],
@@ -7323,8 +7391,8 @@ class _SearchPageState extends State<SearchPage> {
           margin: const EdgeInsets.only(bottom: 8),
           child: ListTile(
             leading: FoodIcon(f, size: 34),
-            title: Text(f.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('${f.kcal} kcal/100 g · keeps ${f.shelf} d · ${storageLabel[defaultStorage(f)]}${n > 0 ? '\n✓ in fridge ×$n' : ''}', style: const TextStyle(fontSize: 12)),
+            title: Text(tn(f.name), style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('${f.kcal} ${tr('kcal/100 g')} · ${tr('keeps {0} d', [f.shelf])} · ${storageLabel[defaultStorage(f)]}${n > 0 ? '\n${tr('✓ in fridge ×{0}', [n])}' : ''}', style: const TextStyle(fontSize: 12)),
             trailing: IconButton(
               icon: const Icon(Icons.add_circle, color: burgundy, size: 30),
               onPressed: () => _add(f),
@@ -7344,13 +7412,13 @@ class _SearchPageState extends State<SearchPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Search products', style: titleStyle),
+            Text(tr('Search products'), style: titleStyle),
             const SizedBox(height: 12),
             TextField(
               controller: _c,
               onChanged: (v) => setState(() => q = v),
               decoration: InputDecoration(
-                hintText: 'Try "cheese", "potato", "kefir"...',
+                hintText: tr('Try "cheese", "potato", "kefir"...'),
                 prefixIcon: const Icon(Icons.search, color: burgundy),
                 suffixIcon: q.isEmpty
                     ? null
@@ -7398,7 +7466,7 @@ class _PantryPageState extends State<PantryPage> {
   Widget _chip(String label, Storage? v, int n) => Padding(
     padding: const EdgeInsets.only(right: 8),
     child: ChoiceChip(
-      label: Text('$label  $n'),
+      label: Text('${tr(label)}  $n'),
       selected: place == v,
       selectedColor: burgundy,
       labelStyle: TextStyle(color: place == v ? Colors.white : Colors.black87),
@@ -7437,12 +7505,12 @@ class _PantryPageState extends State<PantryPage> {
           children: [
             Row(
               children: [
-                const Expanded(child: Text('Your fridge', style: titleStyle)),
-                if (all.isNotEmpty) IconButton.filledTonal(tooltip: 'Add products', onPressed: widget.onSearch, icon: const Icon(Icons.add)),
+                Expanded(child: Text(tr('Your fridge'), style: titleStyle)),
+                if (all.isNotEmpty) IconButton.filledTonal(tooltip: tr('Add products'), onPressed: widget.onSearch, icon: const Icon(Icons.add)),
               ],
             ),
             const SizedBox(height: 2),
-            Text('${all.length} products · swipe → eat, ← throw away · tap for more', style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
+            Text('${trp(all.length, 'product|products')} · ${tr('swipe → eat, ← throw away · tap for more')}', style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
             const SizedBox(height: 10),
             if (all.isNotEmpty)
               SizedBox(
@@ -7462,25 +7530,25 @@ class _PantryPageState extends State<PantryPage> {
                         children: [
                           const Text('🧊', style: TextStyle(fontSize: 56)),
                           const SizedBox(height: 8),
-                          const Text('Fridge is empty', style: TextStyle(color: Colors.grey)),
+                          Text(tr('Fridge is empty'), style: TextStyle(color: Colors.grey)),
                           const SizedBox(height: 12),
                           FilledButton.icon(
                             style: FilledButton.styleFrom(backgroundColor: burgundy),
                             onPressed: widget.onSearch,
                             icon: const Icon(Icons.search),
-                            label: const Text('Find products'),
+                            label: Text(tr('Find products')),
                           ),
                           TextButton.icon(
                             onPressed: s.loadDemo,
                             icon: const Icon(Icons.auto_awesome, color: burgundy),
-                            label: const Text('Load demo fridge', style: TextStyle(color: burgundy)),
+                            label: Text(tr('Load demo fridge'), style: TextStyle(color: burgundy)),
                           ),
                         ],
                       ),
                     )
                   : items.isEmpty
-                  ? const Center(
-                      child: Text('Nothing stored here yet', style: TextStyle(color: Colors.grey)),
+                  ? Center(
+                      child: Text(tr('Nothing stored here yet'), style: const TextStyle(color: Colors.grey)),
                     )
                   : ListView(
                       padding: const EdgeInsets.only(bottom: 120),
@@ -7491,7 +7559,7 @@ class _PantryPageState extends State<PantryPage> {
                               padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
                               child: Row(
                                 children: [
-                                  Text('${g.$1}  ${g.$2}', style: headStyle),
+                                  Text('${g.$1}  ${tr(g.$2)}', style: headStyle),
                                   const Spacer(),
                                   Text(
                                     '${g.$3.fold<int>(0, (a, p) => a + (count[key(p)] ?? 1))}',
@@ -7552,10 +7620,10 @@ class _RecipesPageState extends State<RecipesPage> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
         children: [
-          const Text('Recipes', style: titleStyle),
+          Text(tr('Recipes'), style: titleStyle),
           const SizedBox(height: 2),
           Text(
-            state.pantry.isEmpty ? 'Your fridge is empty — add products to see what you can cook.' : 'Sorted so the food that spoils first gets used first.',
+            state.pantry.isEmpty ? tr('Your fridge is empty — add products to see what you can cook.') : tr('Sorted so the food that spoils first gets used first.'),
             style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
           ),
           const SizedBox(height: 10),
@@ -7569,7 +7637,7 @@ class _RecipesPageState extends State<RecipesPage> {
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ChoiceChip(
-                      label: Text(_filters[k]),
+                      label: Text(tr(_filters[k])),
                       selected: filter == k,
                       selectedColor: burgundy,
                       labelStyle: TextStyle(color: filter == k ? Colors.white : Colors.black87),
@@ -7586,7 +7654,7 @@ class _RecipesPageState extends State<RecipesPage> {
               padding: const EdgeInsets.only(top: 24),
               child: NutrikSays(
                 key: ValueKey(filter),
-                text: filter == 1 ? 'Nothing is about to spoil — nothing to rescue right now! 🎉' : 'No recipes here yet. Add more products to your fridge!',
+                text: filter == 1 ? tr('Nothing is about to spoil — nothing to rescue right now! 🎉') : tr('No recipes here yet. Add more products to your fridge!'),
                 size: 84,
               ),
             ),
@@ -7595,7 +7663,7 @@ class _RecipesPageState extends State<RecipesPage> {
             Padding(
               padding: const EdgeInsets.all(12),
               child: Center(
-                child: Text('Add more products to unlock $hidden more recipes', style: const TextStyle(color: Colors.grey)),
+                child: Text(tr('Add more products to unlock {0} more recipes', [hidden]), style: const TextStyle(color: Colors.grey)),
               ),
             ),
         ],
@@ -7645,9 +7713,9 @@ class _RecipesPageState extends State<RecipesPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(r.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          Text(tn(r.name), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 2),
-                          Text('${r.kcal} kcal · ${r.time} · ${r.servings} serv.', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                          Text('${r.kcal} ${tr('kcal')} · ${trTime(r.time)} · ${tr('{0} serv.', [r.servings])}', style: const TextStyle(color: Colors.black54, fontSize: 12)),
                           const SizedBox(height: 8),
                           ClipRRect(
                             borderRadius: BorderRadius.circular(4),
@@ -7668,23 +7736,23 @@ class _RecipesPageState extends State<RecipesPage> {
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    _tag(can ? 'Ready to cook' : '$have/${r.ingredients.length} in fridge', can ? Colors.green.shade800 : Colors.orange.shade800),
-                    if (r.zeroWaste) _tag('🌱 Zero-waste', const Color(0xFF3C6E71)),
-                    if (saves.isNotEmpty) _tag('♻️ Saves ${saves.length}', burgundy),
+                    _tag(can ? tr('Ready to cook') : tr('{0} in fridge', ['$have/${r.ingredients.length}']), can ? Colors.green.shade800 : Colors.orange.shade800),
+                    if (r.zeroWaste) _tag(tr('🌱 Zero-waste'), const Color(0xFF3C6E71)),
+                    if (saves.isNotEmpty) _tag(tr('♻️ Saves {0}', [saves.length]), burgundy),
                   ],
                 ),
                 if (saves.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      'Rescues: ${saves.join(", ")}',
+                      tr('Rescues: {0}', [saves.map(tn).join(', ')]),
                       style: TextStyle(color: Colors.green.shade900, fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                   ),
                 if (missing.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text('Need: ${missing.join(", ")}', style: TextStyle(color: Colors.red.shade900, fontSize: 13)),
+                    child: Text(tr('Need: {0}', [missing.map(tn).join(', ')]), style: TextStyle(color: Colors.red.shade900, fontSize: 13)),
                   ),
               ],
             ),
@@ -7715,7 +7783,7 @@ class _RecipePageState extends State<RecipePage> {
     final missing = r.missing(s.pantryNames);
 
     return Scaffold(
-      appBar: AppBar(title: Text(r.name, style: headStyle)),
+      appBar: AppBar(title: Text(tn(r.name), style: headStyle)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
         children: [
@@ -7728,8 +7796,8 @@ class _RecipePageState extends State<RecipePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${r.kcal * portions} kcal total', style: titleStyle),
-                      Text('${r.kcal} kcal per serving · ${r.time}', style: const TextStyle(color: Colors.grey)),
+                      Text(tr('{0} kcal total', [r.kcal * portions]), style: titleStyle),
+                      Text('${tr('{0} kcal per serving', [r.kcal])} · ${trTime(r.time)}', style: const TextStyle(color: Colors.grey)),
                     ],
                   ),
                 ),
@@ -7741,7 +7809,7 @@ class _RecipePageState extends State<RecipePage> {
             index: 1,
             child: Row(
               children: [
-                const Text('Servings', style: headStyle),
+                Text(tr('Servings'), style: headStyle),
                 const Spacer(),
                 IconButton.filledTonal(onPressed: portions > 1 ? () => setState(() => portions--) : null, icon: const Icon(Icons.remove)),
                 SizedBox(
@@ -7762,7 +7830,7 @@ class _RecipePageState extends State<RecipePage> {
             ),
           ),
           const SizedBox(height: 10),
-          const Text('Ingredients', style: headStyle),
+          Text(tr('Ingredients'), style: headStyle),
           const SizedBox(height: 6),
           for (final e in r.ingredients.asMap().entries)
             Appear(
@@ -7775,22 +7843,22 @@ class _RecipePageState extends State<RecipePage> {
                   children: [
                     FoodIcon(foodByName[e.value.name]!, size: 24),
                     const SizedBox(width: 8),
-                    Flexible(child: Text(e.value.name)),
+                    Flexible(child: Text(tn(e.value.name))),
                   ],
                 ),
-                subtitle: Text(inFridge.containsKey(e.value.name) ? 'in fridge · ${inFridge[e.value.name]!.status}' : 'not in your fridge — add it in Search'),
-                trailing: Text('${(e.value.g * portions / r.servings).round()} g', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                subtitle: Text(inFridge.containsKey(e.value.name) ? '${tr('in fridge')} · ${inFridge[e.value.name]!.status}' : tr('not in your fridge — add it in Search')),
+                trailing: Text('${(e.value.g * portions / r.servings).round()} ${tr('g')}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ),
             ),
           if (r.staples.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Text('Also needed: ${r.staples}', style: const TextStyle(color: Colors.grey)),
+              child: Text(tr('Also needed: {0}', [trStaples(r.staples)]), style: const TextStyle(color: Colors.grey)),
             ),
           const SizedBox(height: 18),
-          const Text('Instructions', style: headStyle),
+          Text(tr('Instructions'), style: headStyle),
           const SizedBox(height: 8),
-          for (final e in r.steps.asMap().entries)
+          for (final e in trSteps(r.name, r.steps).asMap().entries)
             Appear(
               index: e.key + 4,
               child: Padding(
@@ -7823,7 +7891,7 @@ class _RecipePageState extends State<RecipePage> {
                       s.cook(r, portions);
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: burgundy, content: Text('Bon appétit! ${r.kcal * portions} kcal logged, ingredients used up.')));
+                          .showSnackBar(SnackBar(behavior: SnackBarBehavior.floating, backgroundColor: burgundy, content: Text(tr('Bon appétit! {0} kcal logged, ingredients used up.', [r.kcal * portions]))));
                     }
                   : () {
                       s.addShopping(missing);
@@ -7831,11 +7899,11 @@ class _RecipePageState extends State<RecipePage> {
                         SnackBar(
                           behavior: SnackBarBehavior.floating,
                           backgroundColor: burgundy,
-                          content: Text('${missing.length} ${missing.length == 1 ? 'item' : 'items'} added to your shopping list 🛒'),
+                          content: Text(tr('{0} added to your shopping list 🛒', [trp(missing.length, 'item|items')])),
                         ),
                       );
                     },
-              child: Text(missing.isEmpty ? 'I cooked it · log ${r.kcal * portions} kcal' : 'Add missing to shopping list (${missing.length})'),
+              child: Text(missing.isEmpty ? tr('I cooked it · log {0} kcal', [r.kcal * portions]) : tr('Add missing to shopping list ({0})', [missing.length])),
             ),
           ),
         ),
@@ -7885,7 +7953,7 @@ class _ChatPageState extends State<ChatPage> {
     try {
       answer = await widget.ai.reply(text, s);
     } catch (e) {
-      answer = 'Sorry, something went wrong. Try again.';
+      answer = tr('Sorry, something went wrong. Try again.');
     }
     if (!mounted) return;
     s.chat.add(ChatMessage(answer, isUser: false));
@@ -7899,7 +7967,7 @@ class _ChatPageState extends State<ChatPage> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('NutriMate AI', style: titleStyle),
+        title: Text(tr('NutriMate AI'), style: titleStyle),
         backgroundColor: Colors.transparent,
       ),
       body: Column(
@@ -7940,7 +8008,7 @@ class _ChatPageState extends State<ChatPage> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: [
-                for (final q in ['What can I cook?', 'What expires soon?', 'How to store tomatoes?', 'Can I freeze bread?', 'Another idea', 'Is it still good?', 'Do I have milk?'])
+                for (final q in [tr('What can I cook?'), tr('What expires soon?'), tr('How to store tomatoes?'), tr('Can I freeze bread?'), tr('Another idea'), tr('Is it still good?'), tr('Do I have milk?')])
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ActionChip(label: Text(q), onPressed: () => _send(q)),
@@ -7960,7 +8028,7 @@ class _ChatPageState extends State<ChatPage> {
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => _send(),
                     decoration: InputDecoration(
-                      hintText: 'Ask anything...',
+                      hintText: tr('Ask anything...'),
                       filled: true,
                       fillColor: sand,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
@@ -7993,7 +8061,7 @@ class ProfilePage extends StatelessWidget {
     return ListenableBuilder(
       listenable: state,
       builder: (context, _) => Scaffold(
-        appBar: AppBar(title: const Text('Profile', style: headStyle)),
+        appBar: AppBar(title: Text(tr('Profile'), style: headStyle)),
         body: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           children: [
@@ -8004,41 +8072,63 @@ class ProfilePage extends StatelessWidget {
                   child: Text(state.name.isEmpty ? '?' : state.name[0].toUpperCase(), style: const TextStyle(color: Colors.white)),
                 ),
                 title: Text(state.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(state.email.isEmpty ? 'Guest account' : state.email),
+                subtitle: Text(state.email.isEmpty ? tr('Guest account') : state.email),
               ),
             ),
             ListTile(
-              title: Text('Goal: ${state.targetCalories} kcal/day'),
+              title: Text(tr('Goal: {0} kcal/day', [state.targetCalories])),
               leading: const Icon(Icons.track_changes, color: burgundy),
             ),
+            ListTile(
+              leading: const Icon(Icons.translate, color: burgundy),
+              title: Text(tr('Language')),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final l in appLangs)
+                      ChoiceChip(
+                        label: Text('${langFlag[l]} ${langNative[l]}'),
+                        selected: appLang == l,
+                        selectedColor: burgundy,
+                        labelStyle: TextStyle(color: appLang == l ? Colors.white : Colors.black87, fontWeight: FontWeight.bold),
+                        showCheckmark: false,
+                        onSelected: (_) => state.setLanguage(l),
+                      ),
+                  ],
+                ),
+              ),
+            ),
             SwitchListTile(
-              title: const Text('Male'),
+              title: Text(tr('Male')),
               value: state.isMan,
               onChanged: (v) => state.updateProfile(isMan: v),
             ),
-            _slider('Weight', '${state.weight.round()} kg', state.weight, 40, 150, (v) => state.updateProfile(weight: v)),
-            _slider('Height', '${state.height.round()} cm', state.height, 120, 220, (v) => state.updateProfile(height: v)),
-            _slider('Age', '${state.age} y', state.age.toDouble(), 14, 90, (v) => state.updateProfile(age: v.round())),
+            _slider('Weight', '${state.weight.round()} ${tr('kg')}', state.weight, 40, 150, (v) => state.updateProfile(weight: v)),
+            _slider('Height', '${state.height.round()} ${tr('cm')}', state.height, 120, 220, (v) => state.updateProfile(height: v)),
+            _slider('Age', tr('{0} y', [state.age]), state.age.toDouble(), 14, 90, (v) => state.updateProfile(age: v.round())),
             const Divider(height: 32),
-            const Text('Demo tools', style: headStyle),
+            Text(tr('Demo tools'), style: headStyle),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               children: [
-                FilledButton.tonalIcon(onPressed: () => state.nextDay(1), icon: const Icon(Icons.skip_next), label: Text('+1 day (now +$dayShift)')),
-                OutlinedButton(onPressed: () => state.nextDay(0), child: const Text('Reset time')),
+                FilledButton.tonalIcon(onPressed: () => state.nextDay(1), icon: const Icon(Icons.skip_next), label: Text(tr('+1 day (now +{0})', [dayShift]))),
+                OutlinedButton(onPressed: () => state.nextDay(0), child: Text(tr('Reset time'))),
                 OutlinedButton.icon(
                   onPressed: () {
                     Navigator.pop(context);
                     state.startTutorial();
                   },
                   icon: const Icon(Icons.school_outlined),
-                  label: const Text('Replay tutorial'),
+                  label: Text(tr('Replay tutorial')),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            Text('Tap "+1 day" to watch freshness bars drop and products expire.', style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
+            Text(tr('Tap "+1 day" to watch freshness bars drop and products expire.'), style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
             const SizedBox(height: 16),
             TextButton.icon(
               onPressed: () {
@@ -8046,18 +8136,18 @@ class ProfilePage extends StatelessWidget {
                 Navigator.pushAndRemoveUntil(context, fadeSlide(RegisterScreen(state: state, ai: ai)), (_) => false);
               },
               icon: const Icon(Icons.logout, color: burgundy),
-              label: const Text('Log out', style: TextStyle(color: burgundy)),
+              label: Text(tr('Log out'), style: TextStyle(color: burgundy)),
             ),
             TextButton.icon(
               onPressed: () async {
                 final ok = await showDialog<bool>(
                   context: context,
                   builder: (c) => AlertDialog(
-                    title: const Text('Erase all data?'),
-                    content: const Text('Fridge, diary, weight, shopping list and medals will be deleted. This cannot be undone.'),
+                    title: Text(tr('Erase all data?')),
+                    content: Text(tr('Fridge, diary, weight, shopping list and medals will be deleted. This cannot be undone.')),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-                      FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Erase')),
+                      TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('Cancel'))),
+                      FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(tr('Erase'))),
                     ],
                   ),
                 );
@@ -8067,7 +8157,7 @@ class ProfilePage extends StatelessWidget {
                 Navigator.pushAndRemoveUntil(context, fadeSlide(RegisterScreen(state: state, ai: ai)), (_) => false);
               },
               icon: Icon(Icons.delete_forever_outlined, color: Colors.red.shade800),
-              label: Text('Erase all data', style: TextStyle(color: Colors.red.shade800)),
+              label: Text(tr('Erase all data'), style: TextStyle(color: Colors.red.shade800)),
             ),
             Center(child: Text('NutriMate Pro v$appVersion', style: TextStyle(color: Colors.grey.shade600, fontSize: 12))),
             const SizedBox(height: 24),
@@ -8083,7 +8173,7 @@ class ProfilePage extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 16, top: 8),
-          child: Text('$title: $valueText', style: const TextStyle(fontWeight: FontWeight.bold)),
+          child: Text('${tr(title)}: $valueText', style: const TextStyle(fontWeight: FontWeight.bold)),
         ),
         Slider(value: value, min: min, max: max, onChanged: onChanged),
       ],
