@@ -79,7 +79,7 @@ jobs:
           curl -sS "$URL/health"; echo
           for i in 1 2 3; do
             CODE=$(curl -sS -o reply.json -w '%{http_code}' -X POST "$URL/chat" \
-              -H 'content-type: application/json' -H 'x-nutrimate-client: ci' \
+              -H 'content-type: application/json' -H 'x-nutrimate-client: ios-ci' \
               -d '{"deviceId":"ci-smoke-test-'"$GITHUB_RUN_ID"'","messages":[{"role":"user","content":"What can I cook with a banana and eggs?"}],"context":{"name":"CI","fridge":[{"name":"Banana","daysLeft":0},{"name":"Eggs","daysLeft":9}],"kcalToday":500,"kcalGoal":2100}}' || echo 000)
             echo "HTTP $CODE"; cat reply.json; echo
             [ "$CODE" = "200" ] && break
@@ -101,7 +101,9 @@ jobs:
           git config user.email "github-actions@users.noreply.github.com"
           git add "$F"
           git commit -m "server: connect iOS app to Nutrik AI ($URL)"
+          git stash -u -q || true
           git pull --rebase -q origin main
+          git stash drop -q || true
           git push -q origin HEAD:main
           # push от GITHUB_TOKEN не запускает другие workflow — запускаем сборки вручную
           gh workflow run ios.yml --ref main || true

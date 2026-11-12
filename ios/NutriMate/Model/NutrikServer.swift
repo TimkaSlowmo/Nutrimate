@@ -4,5 +4,5 @@ import Foundation
 /// Пусто, пока воркер не задеплоен: тогда чат работает офлайн (NutrikBrain).
 /// Workflow «Nutrik AI server» вписывает сюда адрес сам после первого успешного деплоя.
 enum NutrikServer {
-    static let url = ""
+    static let url = "https://nutrimate-nutrik.temirlanzaks.workers.dev"
 }
