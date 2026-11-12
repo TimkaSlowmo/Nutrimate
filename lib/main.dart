@@ -5,6 +5,7 @@ import 'dart:ui' show ImageFilter, PlatformDispatcher;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,7 +19,7 @@ Future<void> main() async {
 }
 
 // Номер версии: ночной агент увеличивает его на 1 при каждом обновлении.
-const appVersion = 23;
+const appVersion = 24;
 
 const burgundy = Color(0xFF6A041C);
 const cream = Color(0xFFF5F1E5);
@@ -3013,6 +3014,10 @@ class CalorieApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      // системные тексты Flutter (календарь, «Отмена»/«OK») — на языке приложения; смена языка — через locale: у пикеров
+      locale: Locale(appLang),
+      supportedLocales: const [Locale('en'), Locale('ru'), Locale('kk')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'serif',
@@ -7199,6 +7204,7 @@ void itemSheet(BuildContext ctx, AppState s, PantryItem p) {
                       firstDate: now().subtract(const Duration(days: 60)),
                       lastDate: now().add(const Duration(days: 730)),
                       helpText: tr('Date on the package'),
+                      locale: Locale(appLang),
                     );
                     if (d != null) s.setExpiry(p, d);
                   }),
