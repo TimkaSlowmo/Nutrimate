@@ -421,7 +421,7 @@ final class AppStore: ObservableObject {
     @discardableResult
     func open(_ id: UUID) -> Int? {
         guard let p = oldest(id), p.opened == nil, p.storage != .freezer, !p.leftover,
-              let days = FoodDB.openedDays(p.food) else { return nil }
+              let days = FoodDB.openedDays(p.food, daysLeft: p.daysLeft) else { return nil }
         remember("lock.open", L("Opened: {0}", "\(p.emoji) \(N(p.name))"))
         takeOne(p.id)
         let now = Date()

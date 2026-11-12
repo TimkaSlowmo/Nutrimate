@@ -54,7 +54,8 @@ Storage defaultStorage(FoodItem f) => f.category == 'Frozen'
     : Storage.fridge;
 /// Сколько дней продукт хранится ПОСЛЕ вскрытия (те же правила, что FoodDB.openedDays в iOS).
 /// null — вскрытие на срок не влияет (овощи, крупы, шоколад) или срок и так короче.
-int? openedDays(FoodItem f) {
+/// `daysLeft` — дата на этой упаковке: молоко с датой через 10 дней можно «открыть» (открытое ~5).
+int? openedDays(FoodItem f, [int daysLeft = -1]) {
   final n = f.name.toLowerCase(), c = f.category;
   bool has(List<String> k) => k.any(n.contains);
   final words = n.split(' ').toSet();
@@ -123,7 +124,7 @@ int? openedDays(FoodItem f) {
   } else if (c == 'Dairy' && f.shelf <= 30) {
     d = 5;
   }
-  return d != null && d < f.shelf ? d : null;
+  return d != null && d < max(f.shelf, daysLeft + 1) ? d : null;
 }
 
 bool canFreeze(FoodItem f) => _freezable.contains(f.category) && !{'Eggs', 'Lettuce', 'Cucumber', 'Salad Mix', 'Yogurt', 'Sour Cream', 'Mayonnaise'}.contains(f.name);
@@ -2869,7 +2870,7 @@ class AppState extends ChangeNotifier {
   /// «Я открыл(а)»: срок сокращается до «после вскрытия»; из шкафа — в холодильник (кроме чипсов и хлеба).
   /// Возвращает true, если упаковка переехала в холодильник.
   bool openItem(PantryItem p) {
-    final days = openedDays(p.food);
+    final days = openedDays(p.food, p.daysLeft);
     if (days == null || p.opened != null || p.storage == Storage.freezer) return false;
     rememberUndo();
     final n = now();
@@ -7709,7 +7710,7 @@ void itemSheet(BuildContext ctx, AppState s, PantryItem p) {
   final recs = recipes.where((r) => r.ingredients.any((i) => i.name == p.food.name)).take(4).toList();
   final tip = storageTips[p.food.name] ?? storageTips[p.food.category];
   final freezable = p.daysLeft >= 0 && canFreeze(p.food) && p.storage != Storage.freezer;
-  final openDays = openedDays(p.food);
+  final openDays = openedDays(p.food, p.opened != null ? 1 << 20 : p.daysLeft);
   showModalBottomSheet(
     context: ctx,
     backgroundColor: cream,

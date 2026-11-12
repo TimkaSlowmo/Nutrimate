@@ -190,19 +190,20 @@ struct ItemSheet: View {
                         }
                         .glassCard()
 
+                        // равные плитки «иконка над подписью»: длинные русские/казахские слова не рвутся посередине
                         HStack(spacing: 10) {
                             if g.storage != .freezer && FoodDB.canFreeze(g.food) {
-                                Button { store.freeze(id); dismiss() } label: { Label(g.qty > 1 ? L("Freeze all") : L("Freeze"), systemImage: "snowflake") }
-                                    .buttonStyle(SoftButtonStyle())
+                                Button { store.freeze(id); dismiss() } label: { tile(g.qty > 1 ? L("Freeze all") : L("Freeze"), "snowflake") }
+                                    .buttonStyle(TileButtonStyle())
                             }
                             Button {
                                 let last = g.qty <= 1
                                 store.share(id)
                                 if last { dismiss() }
-                            } label: { Label(g.qty > 1 ? L("Share 1") : L("Share"), systemImage: "hand.raised.fill") }
-                                .buttonStyle(SoftButtonStyle())
-                            Button { askReason = true } label: { Label(g.qty > 1 ? L("Bin 1") : L("Bin"), systemImage: "trash") }
-                                .buttonStyle(SoftButtonStyle())
+                            } label: { tile(g.qty > 1 ? L("Share 1") : L("Share"), "hand.raised.fill") }
+                                .buttonStyle(TileButtonStyle())
+                            Button { askReason = true } label: { tile(g.qty > 1 ? L("Bin 1") : L("Bin"), "trash") }
+                                .buttonStyle(TileButtonStyle())
                         }
                         Button(L("Remove without counting"), role: .destructive) { store.delete(id); dismiss() }
                             .font(.footnote)
@@ -237,11 +238,11 @@ struct ItemSheet: View {
                 Text(ago <= 0 ? L("Opened today") : L("Opened {0} ago", Lp(ago, "day|days")))
                     .font(.subheadline.weight(.semibold))
                 Spacer(minLength: 0)
-                if let d = FoodDB.openedDays(g.food) {
+                if let d = FoodDB.openedRule(g.food) {
                     Text(L("keeps ~{0} once open", Lp(d, "day|days"))).font(.caption).foregroundStyle(.secondary)
                 }
             }
-        } else if g.storage != .freezer, !g.isLeftover, let d = FoodDB.openedDays(g.food) {
+        } else if g.storage != .freezer, !g.isLeftover, let d = FoodDB.openedDays(g.food, daysLeft: g.daysLeft) {
             Button {
                 store.open(g.first.id)
                 dismiss() // открытая штука стала своей строкой со своим сроком
@@ -264,6 +265,21 @@ struct ItemSheet: View {
         }
     }
 
+    private func tile(_ title: String, _ icon: String) -> some View {
+        VStack(spacing: 5) {
+            Image(systemName: icon).font(.headline)
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.85)
+        }
+        .foregroundStyle(Color.burgundy)
+        .frame(maxWidth: .infinity, minHeight: 62)
+        .padding(.horizontal, 6)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.burgundy.opacity(0.09)))
+    }
+
     private func qtyButton(_ icon: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
@@ -274,5 +290,14 @@ struct ItemSheet: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(icon == "plus" ? L("One more") : L("One less"))
+    }
+}
+
+/// Нажатие на плитку действия — лёгкое «вдавливание», как у остальных кнопок.
+struct TileButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .animation(.spring(response: 0.3, dampingFraction: 0.5), value: configuration.isPressed)
     }
 }

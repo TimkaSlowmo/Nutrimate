@@ -168,6 +168,18 @@ struct FoodDB {
     /// (молоко и йогурт ~5 дней, мягкий сыр 4, твёрдый месяц, сок неделя, консервы 3 дня, колбаса 4).
     /// nil — вскрытие на срок не влияет (овощи, крупы, специи, шоколад) или срок и так короче.
     static func openedDays(_ f: Food) -> Int? {
+        guard let d = openedRule(f), d < f.shelf else { return nil }
+        return d
+    }
+
+    /// Можно ли нажать «Я открыл(а)» для этой партии: срок после вскрытия короче обычного срока продукта
+    /// или короче даты на этой упаковке (молоко с датой через 10 дней → открытое ~5).
+    static func openedDays(_ f: Food, daysLeft: Int) -> Int? {
+        guard let d = openedRule(f), d < max(f.shelf, daysLeft + 1) else { return nil }
+        return d
+    }
+
+    static func openedRule(_ f: Food) -> Int? {
         let n = f.name.lowercased(), c = f.category
         func has(_ k: String...) -> Bool { k.contains { n.contains($0) } }
         let words = Set(n.split(separator: " ").map(String.init))
@@ -217,7 +229,6 @@ struct FoodDB {
         else if has("tortilla", "wrappers", "bao bun", "puff pastry", "phyllo", "pizza dough", "kataifi", "tteok") { d = 4 }
         else if c == "Plant-Based" && f.shelf <= 60 { d = 5 }
         else if c == "Dairy" && f.shelf <= 30 { d = 5 }
-        guard let d, d < f.shelf else { return nil }
         return d
     }
 
