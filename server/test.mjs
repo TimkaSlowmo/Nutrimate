@@ -111,6 +111,8 @@ const lr = await (await worker.fetch(req({ deviceId: 'act-liar-1', actions: true
 assert.equal(lr.guarded, true);
 assert.deepEqual(lr.actions, []);
 assert.equal(lr.reply, HONEST_REPLY.ru);
+const promise = { AI: { async run() { return { response: 'Okay, passing it to the app 🐾' }; } } };
+assert.equal((await (await worker.fetch(req({ deviceId: 'act-promise-1', actions: true, messages: [{ role: 'user', content: 'add eggs' }], context: ctx }), promise)).json()).guarded, true);
 // старые клиенты (без actions: true) не получают правила действий
 const old = { AI: { async run(model, input) { assert.doesNotMatch(input.messages[0].content, /ACTIONS: \[/); return { response: 'Hi 🐾' }; } } };
 assert.equal((await worker.fetch(req({ deviceId: 'old-client-1', messages: [{ role: 'user', content: 'hi' }], context: ctx }), old)).status, 200);

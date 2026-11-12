@@ -28,15 +28,28 @@ Rules:
 - Never give medical diagnoses, never encourage strict diets, fasting or eating far below the calorie goal. For health problems, suggest seeing a doctor.
 - If the question is not about food, cooking, groceries, storage, nutrition or the app, gently bring the talk back to food in one sentence.
 - Never invent the user's data: use only the context below. Do not mention that you got "context".
-- You CANNOT change anything in the app: you cannot add, remove, log, freeze or move food, and you cannot edit the shopping list. Never say "I added", "I logged", "done", "добавил", "записал" or similar. The app does these actions itself when the user writes a command like "add 2 eggs to fridge", "I ate a banana", "threw away kefir", "freeze the chicken", "add milk to shopping list". If the user asks for such an action, say you can't do it from the chat and show the exact command to type.`;
+- You CANNOT change anything in the app yourself: you cannot add, remove, log, freeze or move food, and you cannot edit the shopping list. Never say "I added", "I logged", "done", "добавил", "записал" or similar.`;
+
+const NO_ACTIONS_RULE = `
+- The app does these actions itself when the user writes a command like "add 2 eggs to fridge", "I ate a banana", "threw away kefir", "freeze the chicken", "add milk to shopping list". If the user asks for such an action, say you can't do it from the chat and show the exact command to type.`;
 
 export const ACTIONS_RULE = `
-Actions protocol (the app supports it):
-- If, and only if, the user's LAST message clearly asks to change their data (add food to the fridge/freezer, say they ate or threw away food, freeze food, or add to the shopping list), end your answer with ONE extra line exactly like:
+- ACTIONS PROTOCOL. The app can do actions for the user. If the user's LAST message asks to add food to the fridge or freezer, says they ate, bought, threw away or froze food, or asks to add something to the shopping list, you MUST end your answer with one line that starts with ACTIONS: followed by a JSON array. Do not tell the user to type a command — the app does it from your ACTIONS line.
+  Types: add_fridge, add_freezer, add_shopping, eat, discard, freeze. "name" = simple English food name ("Eggs", "Milk", "Chicken Breast", "Banana"), even if the user wrote in Russian or Kazakh. "qty" = whole number, default 1.
+  Your text must NOT say it is done (no "added", "добавил", "қостым") — the app will confirm what really happened. Write one short friendly line instead (a storage tip or "Okay! 🐾").
+  Never output ACTIONS for questions, recipes or advice.
+  Examples:
+  User: add 2 eggs to my fridge → Okay! Eggs keep about 3 weeks in the fridge 🥚
 ACTIONS: [{"type":"add_fridge","name":"Eggs","qty":2}]
-- Allowed types: add_fridge, add_freezer, add_shopping, eat, discard, freeze. "name" is the simple English product name (singular food name like "Eggs", "Milk", "Chicken Breast", "Banana"), "qty" is a whole number (default 1).
-- The app checks the name, does the action itself and tells the user what really happened. So in your text NEVER say it is done (no "added", "logged", "добавил", "қостым"); just write a short friendly line like "Okay, passing it to the app 🐾" or a storage tip.
-- Never output ACTIONS for questions, recipes or advice. Never invent other types.`;
+  User: добавь молоко в список покупок → Хорошо! 🐾
+ACTIONS: [{"type":"add_shopping","name":"Milk","qty":1}]
+  User: тоңазытқышқа 3 алма қос → Жарайды! 🍎
+ACTIONS: [{"type":"add_fridge","name":"Apple","qty":3}]
+  User: я съел банан → Приятного аппетита! 🍌
+ACTIONS: [{"type":"eat","name":"Banana","qty":1}]`;
+
+// В режиме actions обещание «передаю приложению» без ACTIONS — тоже неправда
+const PROMISES_ACTION = /(passing it to the app|i'?ll add|i will add|сейчас добавлю|передаю приложению|okay! 🐾$)/i;
 
 const ACTION_TYPES = new Set(['add_fridge', 'add_freezer', 'add_shopping', 'eat', 'discard', 'freeze']);
 
@@ -229,7 +242,7 @@ export default {
     const lang = detectLang(messages[messages.length - 1].content, clip(body?.context?.language, 4));
     const langRule = `\n- Answer in ${LANG_NAMES[lang]}${lang === 'kk' ? ' (Cyrillic script, simple correct Kazakh)' : ''}.`;
     const canAct = body?.actions === true;
-    const system = `${SYSTEM_PROMPT}${canAct ? ACTIONS_RULE : ''}${langRule}\n\nContext about the user right now:\n${buildContext(body?.context)}`;
+    const system = `${SYSTEM_PROMPT}${canAct ? ACTIONS_RULE : NO_ACTIONS_RULE}${langRule}\n\nContext about the user right now:\n${buildContext(body?.context)}`;
     try {
       const out = await runModel(env, [{ role: 'system', content: system }, ...messages]);
       const { reply, actions } = extractActions(out.reply);
@@ -238,7 +251,7 @@ export default {
         // подтверждение напишет приложение по факту; ложное «добавил» из текста убираем
         return json({ reply: claimsAction(reply) ? '' : reply, actions, model }, 200, cors);
       }
-      if (!reply || claimsAction(reply)) return json({ reply: HONEST_REPLY[lang], model, guarded: true, actions: [] }, 200, cors);
+      if (!reply || claimsAction(reply) || (canAct && PROMISES_ACTION.test(reply))) return json({ reply: HONEST_REPLY[lang], model, guarded: true, actions: [] }, 200, cors);
       return json({ reply, model, actions: [] }, 200, cors);
     } catch (e) {
       return json({ error: 'offline', reason: e?.quota ? 'ai_quota' : 'ai_error' }, e?.quota ? 429 : 503, cors);
