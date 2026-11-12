@@ -30,6 +30,23 @@
 - [x] 11. Тёмная тема (v20) — Profile → Appearance
 - [ ] 12+. Улучшения: полировка
 
+## 2026-11-12 (третий запуск) · v22 — «Поделиться неделей», умный список покупок
+- **Поделиться неделей**: в недельном отчёте кнопка «Share my week» → лист с готовой картинкой 1080×1350 (как пост в Instagram):
+  бордовая карточка с диапазоном дат, кольцом-оценкой, Нутриком и его вердиктом, 4 цифры (спасено, сэкономлено, выброшено,
+  дни в цели), подпись NutriMate. Рисуется один раз (`ImageRenderer`, `WeekShareCard`), цвета фиксированные — одинаково
+  днём и ночью; отправка через системное меню (Instagram, Telegram, Фото). Снимок `-sheet weekcard` → 19-week-share.
+- **Список покупок**: кнопка «Поделиться» (текстом, на языке приложения) и ряд чипов «Часто ешь — а в холодильнике нет»
+  (продукты из дневника за 3 недели, которых нет дома и в списке; понимает названия на ru/kk) — добавление в одно касание.
+- База: **1627 продуктов** (+32: Carrot Tops, Radish/Turnip Greens, Cavolo Nero, Purple Cauliflower, Banana/Cubanelle Peppers,
+  Fresno Chili, Chinese Eggplant, Winged Beans, Green Garlic, Sweet Onion, Honeycrisp/Pink Lady Apple, Ataulfo Mango,
+  Golden Kiwi, Satsuma, Tangelo, Atemoya, Golden/Black Raspberries, Wineberries, Sea Bream, Yellowtail, Cockles, Snow Crab,
+  Razor Clams, Peri-Peri/Buffalo Sauce, Kecap Manis, Pearl Couscous, Ditalini), **143 рецепта** (+5: Tteokbokki, Carrot-Top
+  Pesto Pasta ♻️, Fresh Spring Rolls, Pearl Couscous Leftover-Veg Salad ♻️, Buffalo Cauliflower Bites ♻️); всё ru/kk.
+- 👀 Симулятор (6692e9d): карточка недели en/ru/kk/тёмная — читается, Нутрик и цифры на месте; в ru/kk дата и заголовок
+  в две строки (допустимо); список покупок — чип «Oatmeal ＋» и кнопка «Поделиться». Падений нет.
+  ⚡ fps: Home 59.6, Fridge 59.3, Search 59.7, Recipes 57.5.
+- Бэклог: веб — тёмная тема и «поделиться неделей»; Нутрик во время анимации — упростить кадр.
+
 ## 2026-11-12 (ночь на 13.11, второй запуск) · v21 — данные, разбор Recipes fps
 - База: **1595 продуктов** (+34: Broccoli Rabe, Butter/Little Gem Lettuce, Mache, Yu Choy, Amaranth Leaves, Yacon, Malanga,
   Hedgehog/Lobster/Cauliflower Mushrooms, Vietnamese Coriander, Mitsuba, Borage, Sumo Citrus, Marionberries, Stilton, Havarti,
