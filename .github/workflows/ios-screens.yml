@@ -96,6 +96,7 @@ jobs:
           shot 23-recipe-serves 6 -sheet recipe -serves 3
           shot 24-cook-leftovers 6 -sheet cook -cookPage 99 -serves 4
           shot 25-item-open 5 -sheet item -item Kefir
+          shot 26-plan 6 -sheet plan
           # три языка: ключевые экраны по-русски и по-казахски (ищем обрезанный текст)
           for LG in ru kk; do
             shot $LG-00-onboarding 7 -onboarding -lang $LG
@@ -116,6 +117,7 @@ jobs:
             shot $LG-23-recipe-serves 6 -sheet recipe -serves 3 -lang $LG
             shot $LG-24-cook-leftovers 6 -sheet cook -cookPage 99 -serves 4 -lang $LG
             shot $LG-25-item-open 5 -sheet item -item Kefir -lang $LG
+            shot $LG-26-plan 6 -sheet plan -lang $LG
             shot $LG-19-week-share 6 -sheet weekcard -lang $LG
             shot $LG-20-undo 6 -tab fridge -undo -lang $LG
             shot $LG-21-cook 6 -sheet cook -cookTimer -lang $LG
@@ -138,6 +140,7 @@ jobs:
           shot dark-18-recipe 6 -sheet recipe -dark
           shot dark-19-week-share 6 -sheet weekcard -dark
           shot dark-ru-01-home 6 -tab home -dark -lang ru
+          shot dark-26-plan 6 -sheet plan -dark
           shot dark-20-undo 6 -tab fridge -undo -dark
           shot dark-21-cook 6 -sheet cook -cookTimer -dark
           # замер плавности: приложение само прокручивает экран 6 с и пишет fps в Documents/fps.txt

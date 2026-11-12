@@ -11,7 +11,7 @@ struct NutrikReply {
 enum NutrikBrain {
     /// Подсказки в чате (ключи переводов; показывать и отправлять через L(x) — Нутрик понимает все три языка)
     static let suggestions = [
-        LK("What can I cook?"), LK("What expires soon?"), LK("What's in my fridge?"), LK("How to store tomatoes?"),
+        LK("What can I cook?"), LK("Plan my next 3 days"), LK("What expires soon?"), LK("What's in my fridge?"), LK("How to store tomatoes?"),
         LK("Add 2 eggs to fridge"), LK("Can I freeze bread?"), LK("Calories today"), LK("My eco impact"), LK("Add milk to shopping list"),
         LK("I don't like onion"), LK("Tell me a joke"),
     ]
@@ -237,6 +237,20 @@ enum NutrikBrain {
 
         if has(["still good", "still ok", "safe to eat", "can i eat", "gone bad", "можно ли есть", "можно есть", "не испортил", "жеуге бола"]) {
             return NutrikReply(text: L("Trust your senses for \"best before\" products: look, smell, taste a little. ⚠️ But never risk it with meat, fish or dairy past the \"use by\" date. When in doubt — throw it out (and tell me, I'll learn the reason)."), mood: .happy)
+        }
+
+        if has(["plan my", "meal plan", "use-it-up", "next 3 days", "next days", "план", "на неделю", "ближайшие дни", "жоспар", "3 күн"]) {
+            let plan = UseUpPlan(store: store)
+            if plan.isEmpty { return NutrikReply(text: L("Nothing is expiring soon. Great job! 🎉"), mood: .cheer) }
+            let dayNames = [L("Today"), L("Tomorrow"), L("Day after tomorrow")]
+            var lines = plan.days.map { d in
+                L("{0}: {1} {2} — rescues {3}", dayNames[min(d.id, 2)], d.recipe.emoji, nmS(d.recipe.name),
+                  d.rescues.map { "\($0.emoji) \(nmS($0.name))" }.joined(separator: ", "))
+            }
+            if !plan.freeze.isEmpty { lines.append(L("❄️ Freeze: {0}", plan.freeze.map { "\($0.emoji) \(nmS($0.name))" }.joined(separator: ", "))) }
+            if !plan.eatAsIs.isEmpty { lines.append(L("🍎 Just eat: {0}", plan.eatAsIs.map { "\($0.emoji) \(nmS($0.name))" }.joined(separator: ", "))) }
+            lines.append(L("The full plan is in Recipes → 🗓️ Use-it-up plan."))
+            return NutrikReply(text: lines.joined(separator: "\n"), mood: .eating, recipe: plan.days.first?.recipe.name)
         }
 
         if has(["expire", "waste", "spoil", "soon", "rescue", "go bad", "срок", "испорт", "скоро", "пропад", "бұзыл", "мерзім", "жақында"]) {

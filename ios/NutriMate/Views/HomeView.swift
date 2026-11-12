@@ -9,6 +9,7 @@ struct HomeView: View {
     @State private var showChat = false
     @State private var showBody = false
     @State private var showWeek = false
+    @State private var showPlan = false
     @State private var openItem: PantryGroup?
     @State private var tipIndex: Int?
 
@@ -100,6 +101,7 @@ struct HomeView: View {
             .sheet(isPresented: $showChat) { ChatView() }
             .sheet(isPresented: $showBody) { BodyView() }
             .sheet(isPresented: $showWeek) { WeekReportView() }
+            .sheet(isPresented: $showPlan) { PlanView() }
             .sheet(item: $openItem) { p in ItemSheet(key: p.id) }
             .navigationDestination(for: Recipe.self) { r in RecipeDetail(recipe: r) }
         }
@@ -179,6 +181,10 @@ struct HomeView: View {
                 if list.count > 5 {
                     Button(L("See all {0} in Fridge", list.count)) { withAnimation { tab = .fridge } }
                         .buttonStyle(SoftButtonStyle())
+                }
+                let risk = store.planRiskCount
+                if risk > 0 {
+                    Button { showPlan = true } label: { PlanEntryCard(count: risk) }.buttonStyle(.plain)
                 }
             }
         }

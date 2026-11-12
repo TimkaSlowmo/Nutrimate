@@ -4,6 +4,7 @@ struct RecipesView: View {
     @EnvironmentObject var store: AppStore
     @State private var mode = 0 // 0 все, 1 можно готовить, 2 zero-waste
     @State private var query = ""
+    @State private var showPlan = false
 
     private var list: [Recipe] {
         let have = store.pantryNames
@@ -41,6 +42,9 @@ struct RecipesView: View {
                     .padding(12)
                     .background(Color.glassFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
+                    if mode == 0 && query.isEmpty && store.planRiskCount > 0 {
+                        Button { showPlan = true } label: { PlanEntryCard(count: store.planRiskCount) }.buttonStyle(.plain)
+                    }
                     let items = list
                     let have = store.pantryNames
                     let urgent = Set(store.toRescue.map(\.name))
@@ -53,7 +57,7 @@ struct RecipesView: View {
                         .frame(maxWidth: .infinity).padding(.top, 20)
                     }
                     ForEach(items) { r in
-                        NavigationLink(value: r) { RecipeCard(recipe: r, have: have, urgent: urgent) }
+                        NavigationLink(value: r) { RecipeCard(recipe: r, have: have, urgent: urgent).equatable() }
                             .buttonStyle(.plain)
                     }
                 }
@@ -63,6 +67,7 @@ struct RecipesView: View {
             .scrollDismissesKeyboard(.immediately)
             .background(LiveBackground())
             .navigationTitle(L("Recipes"))
+            .sheet(isPresented: $showPlan) { PlanView() }
             .navigationDestination(for: Recipe.self) { r in RecipeDetail(recipe: r) }
         }
     }

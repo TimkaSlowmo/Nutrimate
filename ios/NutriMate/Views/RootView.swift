@@ -60,6 +60,7 @@ struct RootView: View {
             case "eco": EcoImpactView()
             case "shopping": ShoppingView()
             case "week": WeekReportView()
+            case "plan": PlanView()
             case "weekcard": WeekShareSheet()
             case "item": ItemSheet(key: "\(UIShot.value("-item") ?? "Milk")|fridge")
             case "cook":

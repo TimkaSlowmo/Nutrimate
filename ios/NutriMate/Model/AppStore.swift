@@ -110,6 +110,8 @@ final class AppStore: ObservableObject {
     var unitCount: Int { data.pantry.reduce(0) { $0 + $1.qty } }
     var expiringSoon: [PantryGroup] { sortedPantry.filter { $0.daysLeft <= 2 } }
     var toRescue: [PantryGroup] { expiringSoon.filter { $0.daysLeft >= 0 } }
+    /// Сколько строк холодильника попадёт в план «доедаем всё» (не морозилка, срок 0…4 дня)
+    var planRiskCount: Int { sortedPantry.filter { $0.storage != .freezer && $0.daysLeft >= 0 && $0.daysLeft <= UseUpPlan.window }.count }
     var expired: [PantryGroup] { sortedPantry.filter { $0.daysLeft < 0 } }
     func group(_ key: String) -> PantryGroup? { sortedPantry.first { $0.id == key } }
     var todayLog: [LogEntry] { data.log.filter { Calendar.current.isDateInToday($0.date) } }
