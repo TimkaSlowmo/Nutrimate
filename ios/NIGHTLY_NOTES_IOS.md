@@ -27,7 +27,27 @@
 - [x] 8. Недельный отчёт (v8), плавность 60/120 fps и складывание продуктов (v9)
 - [x] 9. Жалобы 4 (новый профиль) и 5 (structured actions от сервера) — v10
 - [x] 10. Жалоба 3 (три языка) — v17; все жалобы 12.11 закрыты
-- [ ] 7+. Улучшения: полировка, тёмная тема
+- [x] 11. Тёмная тема (v20) — Profile → Appearance
+- [ ] 12+. Улучшения: полировка
+
+## 2026-11-12 (ночь на 13.11) · v20 — тёмная тема
+- **Тёмная тема**: Profile → Оформление → Тема: Day / Night / Auto (как в iPhone). Новое поле `AppData.appearance`
+  (мягко; старые сохранения — светлые, как раньше), смена сразу с анимацией. Цвета стали «динамическими»
+  (`Color.dynamic(light, dark)` в Theme.swift): `burgundy` — текст/иконки (ночью светлый розово-бордовый), `brand` /
+  `brandLight` — заливки под кремовым текстом (кнопки, выбранные чипы, таб-бар, пузыри, бейджи ×N), `appBackground` —
+  фон (крем / тёмный винный #160A0D), `paper` — стекло карточек и обводки (белое / #3A2228), пятна живого фона и цвета
+  свежести ночью светлее. Body dashboard и недельная карточка и так тёмные — не тронуты. Айдентика днём не изменилась.
+- Скриншоты: `-dark` → 16 снимков `dark-*` (в т.ч. dark-ru-01-home).
+- База: **1561 продукт** (+30: Choy Sum, Cardoon, Puntarelle, Agretti, Oca, Hubbard Squash, Snake Gourd, Tindora,
+  Huitlacoche, Scotch Bonnet, Bird's Eye Chili, Canistel, Langsat, Haskap Berries, Berbere, Kamut, Masa Harina, Chana Dal,
+  Urad Dal, Pigeon Peas, Chimichurri, Romesco Sauce, Aioli, XO Sauce, Black Bean Sauce, Mentsuyu, Truffle Oil, Palm Sugar,
+  Hijiki, Dulse), **134 рецепта** (+4: Smashed Potatoes with Aioli, Chana Dal Tadka, Steak with Herb-Stem Chimichurri ♻️,
+  XO Sauce Egg Noodles); все названия и шаги — ru/kk (1683 переведённых названия).
+- 👀 Симулятор (0380768): тёмная тема — все экраны читаются; нашёл тёмно-красный/зелёный мелкий текст свежести
+  («Expired», «3/3 in fridge») — плохо видно ночью → светлее; «Light» темы совпадал с уровнем активности «Лёгкая» →
+  сегменты Day/Night/Auto. Светлая тема — без изменений. ⚡ fps: Home 58.9, Fridge 59.7, Search 59.8, Recipes 55.8.
+- Бэклог: Нутрик без паузы (во время прокрутки) стоит ~22 fps в симуляторе — попробовать упростить кадр
+  (drawingGroup/кэш путей); веб — тёмная тема.
 
 ## 2026-11-12 (поздний вечер) · v19 — данные, мелкие переводы, снимок рецепта
 - База: **1531 продукт** (+25: Burdock Root, Yardlong Beans, Water Spinach, Luffa, Garlic Chives, Lemon Balm, Black Truffle,
