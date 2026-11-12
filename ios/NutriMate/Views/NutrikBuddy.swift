@@ -30,11 +30,16 @@ struct NutrikBuddy: View {
                     .padding(.leading, 30)
                     .transition(.scale(scale: 0.6, anchor: .bottomLeading).combined(with: .opacity))
             }
-            NutrikView(mood: mood, size: 74, food: current?.emoji, clumsy: false)
-                .scaleEffect(x: facingLeft ? -1 : 1, y: 1)
-                .rotationEffect(.degrees(fallen ? -82 : 0), anchor: .bottomLeading)
-                .offset(y: fallen ? 6 : 0)
-                .allowsHitTesting(false)
+            // Пока сценки нет — Нутрик не рисуется вовсе (раньше невидимый анимировался всегда)
+            if current != nil {
+                NutrikView(mood: mood, size: 74, food: current?.emoji, clumsy: false)
+                    .scaleEffect(x: facingLeft ? -1 : 1, y: 1)
+                    .rotationEffect(.degrees(fallen ? -82 : 0), anchor: .bottomLeading)
+                    .offset(y: fallen ? 6 : 0)
+                    .allowsHitTesting(false)
+            } else {
+                Color.clear.frame(width: 74, height: 85)
+            }
         }
         .offset(x: x)
         .padding(.leading, 10)

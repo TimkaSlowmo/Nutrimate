@@ -12,6 +12,7 @@ struct NutriMateApp: App {
                 .fontDesign(.serif)
                 .tint(.burgundy)
                 .preferredColorScheme(.light)
+                .onAppear { FPSProbe.shared.startLater() }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { store.saveNow() } // гарантированно сохраняем при сворачивании

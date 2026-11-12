@@ -160,6 +160,8 @@ struct PantryItem: Codable, Identifiable, Hashable {
     var added: Date
     var expiry: Date
     var storage: StorageKind
+    /// Сколько штук/упаковок в этой партии (v9; в старых сохранениях нет → 1)
+    var qty: Int = 1
 
     var food: Food { FoodDB.shared.byName[name] ?? Food(emoji: emoji, name: name, kcal: kcal, category: category, shelf: 7) }
     var daysLeft: Int { daysBetween(Date(), expiry) }
@@ -170,6 +172,54 @@ struct PantryItem: Codable, Identifiable, Hashable {
         if daysLeft == 0 { return "Use today!" }
         if daysLeft == 1 { return "Expires tomorrow" }
         return "\(daysLeft) days left"
+    }
+}
+
+extension PantryItem {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decodeIfPresent(UUID.self, forKey: .id)) ?? UUID()
+        name = try c.decode(String.self, forKey: .name)
+        emoji = (try? c.decodeIfPresent(String.self, forKey: .emoji)) ?? "🍽️"
+        category = (try? c.decodeIfPresent(String.self, forKey: .category)) ?? "Pantry"
+        kcal = (try? c.decodeIfPresent(Int.self, forKey: .kcal)) ?? 0
+        added = (try? c.decodeIfPresent(Date.self, forKey: .added)) ?? Date()
+        expiry = (try? c.decodeIfPresent(Date.self, forKey: .expiry)) ?? added
+        storage = (try? c.decodeIfPresent(StorageKind.self, forKey: .storage)) ?? .fridge
+        qty = max(1, (try? c.decodeIfPresent(Int.self, forKey: .qty)) ?? 1)
+    }
+
+    /// Ключ строки в холодильнике: одинаковый продукт в одном месте хранения складывается.
+    var groupKey: String { "\(name)|\(storage.rawValue)" }
+}
+
+/// Одна строка холодильника: «🥚 Eggs ×3» — все партии одного продукта в одном месте.
+/// Партии отсортированы от самой старой (ближайший срок) к новой; действия списывают сначала старую.
+struct PantryGroup: Identifiable, Hashable {
+    let batches: [PantryItem]
+    var id: String { first.groupKey }
+    var first: PantryItem { batches[0] }
+    var name: String { first.name }
+    var emoji: String { first.emoji }
+    var category: String { first.category }
+    var kcal: Int { first.kcal }
+    var storage: StorageKind { first.storage }
+    var expiry: Date { first.expiry }
+    var food: Food { first.food }
+    var qty: Int { batches.reduce(0) { $0 + $1.qty } }
+    var daysLeft: Int { first.daysLeft }
+    var fresh: Double { first.fresh }
+    var status: String { first.status }
+    var title: String { qty > 1 ? "\(name) ×\(qty)" : name }
+
+    static func make(_ items: [PantryItem]) -> [PantryGroup] {
+        var order: [String] = []
+        var map: [String: [PantryItem]] = [:]
+        for p in items {
+            if map[p.groupKey] == nil { order.append(p.groupKey) }
+            map[p.groupKey, default: []].append(p)
+        }
+        return order.map { PantryGroup(batches: map[$0]!.sorted { $0.expiry < $1.expiry }) }
     }
 }
 

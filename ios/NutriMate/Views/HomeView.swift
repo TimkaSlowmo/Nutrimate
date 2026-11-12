@@ -9,7 +9,7 @@ struct HomeView: View {
     @State private var showChat = false
     @State private var showBody = false
     @State private var showWeek = false
-    @State private var openItem: PantryItem?
+    @State private var openItem: PantryGroup?
     @State private var tipIndex: Int?
 
     private static let tips = [
@@ -99,7 +99,7 @@ struct HomeView: View {
             .sheet(isPresented: $showChat) { ChatView() }
             .sheet(isPresented: $showBody) { BodyView() }
             .sheet(isPresented: $showWeek) { WeekReportView() }
-            .sheet(item: $openItem) { p in ItemSheet(id: p.id) }
+            .sheet(item: $openItem) { p in ItemSheet(key: p.id) }
             .navigationDestination(for: Recipe.self) { r in RecipeDetail(recipe: r) }
         }
     }
@@ -210,7 +210,7 @@ struct HomeView: View {
 
     private var statsRow: some View {
         HStack(spacing: 10) {
-            stat("🧊", "\(store.data.pantry.count)", "in fridge")
+            stat("🧊", "\(store.unitCount)", "in fridge")
             stat("🦸", "\(store.data.stats.rescued)", "rescued")
             stat("💰", String(format: "$%.0f", store.data.stats.rescuedMoney), "saved")
             stat("🌍", "\(store.ecoScore)", "eco score")
@@ -259,17 +259,29 @@ struct HomeView: View {
 
 /// Строка продукта: эмодзи, название, статус, полоска свежести.
 struct PantryRow: View {
-    let item: PantryItem
+    let item: PantryGroup
     var body: some View {
         HStack(spacing: 12) {
             EmojiBadge(emoji: item.emoji)
             VStack(alignment: .leading, spacing: 4) {
-                HStack {
+                HStack(spacing: 6) {
                     Text(item.name).font(.body.weight(.semibold)).foregroundStyle(Color.burgundy).lineLimit(1)
+                    if item.qty > 1 {
+                        Text("×\(item.qty)")
+                            .font(.caption.weight(.bold).monospacedDigit())
+                            .foregroundStyle(Color.cream)
+                            .padding(.horizontal, 7).padding(.vertical, 2)
+                            .background(Capsule().fill(Color.burgundy))
+                    }
                     Spacer()
                     Text(item.storage.emoji).font(.caption)
                 }
-                Text(item.status).font(.caption.weight(.semibold)).foregroundStyle(Color.freshness(item.daysLeft))
+                HStack(spacing: 6) {
+                    Text(item.status).font(.caption.weight(.semibold)).foregroundStyle(Color.freshness(item.daysLeft))
+                    if item.batches.count > 1 {
+                        Text("· \(item.batches.count) batches").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
                 FreshBar(fresh: item.fresh, color: Color.freshness(item.daysLeft))
             }
         }

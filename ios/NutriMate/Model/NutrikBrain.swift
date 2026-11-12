@@ -11,7 +11,7 @@ struct NutrikReply {
 enum NutrikBrain {
     static let suggestions = [
         "What can I cook?", "What expires soon?", "What's in my fridge?", "How to store tomatoes?",
-        "Can I freeze bread?", "Calories today", "My eco impact", "Add milk to shopping list",
+        "Add 2 eggs to fridge", "Can I freeze bread?", "Calories today", "My eco impact", "Add milk to shopping list",
         "I don't like onion", "Tell me a joke",
     ]
 
@@ -64,8 +64,8 @@ enum NutrikBrain {
         func has(_ words: [String]) -> Bool { words.contains { t.contains($0) } }
         if t.range(of: #"(don't like|dont like|do not like|hate|allergic to|не люблю|без)\s+([^\s,.!?]+)"#, options: .regularExpression) != nil { return true }
         if t.range(of: #"i (like|love) ([^\s,.!?]+) again"#, options: .regularExpression) != nil { return true }
-        if has(["shopping", "to buy", "need to buy", "купить", "add "]) && has(["shopping list", "list", "buy", "купить"]) { return true }
-        return false
+        if has(["shopping", "to buy", "need to buy", "купить", "add ", "добав", "покуп"]) && has(["shopping list", "list", "buy", "купить", "список", "покуп", "тізім"]) { return true }
+        return NutrikActions.isAction(message, db: FoodDB.shared)
     }
 
     static func reply(to message: String, store: AppStore) -> NutrikReply {
@@ -73,7 +73,9 @@ enum NutrikBrain {
         let db = store.db
         let name = store.data.profile.name
         func has(_ words: [String]) -> Bool { words.contains { t.contains($0) } }
-        let foods = mentioned(t, db: db)
+        // Действия (добавить / съел / выбросил / заморозить) — выполняются по-настоящему, ответ по факту
+        if let done = NutrikActions.handle(message, store: store) { return done }
+        let foods = NutrikActions.foods(in: t, db: db)
 
         // «I don't like onion» → больше не предлагать рецепты с этим продуктом
         if let r = t.range(of: #"(don't like|dont like|do not like|hate|allergic to|не люблю|без)\s+([^\s,.!?]+)"#, options: .regularExpression) {
@@ -91,8 +93,8 @@ enum NutrikBrain {
         }
 
         // Список покупок
-        if has(["shopping", "to buy", "need to buy", "купить", "add "]) && (has(["shopping list", "list", "buy", "купить"])) {
-            if !foods.isEmpty && has(["add", "buy", "купить", "need"]) {
+        if has(["shopping", "to buy", "need to buy", "купить", "add ", "добав", "покуп"]) && (has(["shopping list", "list", "buy", "купить", "список", "покуп", "тізім"])) {
+            if !foods.isEmpty && has(["add", "buy", "купить", "need", "добав", "қос"]) {
                 store.addShopping(foods.map(\.name))
                 return NutrikReply(text: "🛒 Added to your shopping list: \(foods.map { "\($0.emoji) \($0.name)" }.joined(separator: ", ")). I'll put them in the fridge when you tap them in the list!", mood: .cheer)
             }
@@ -103,7 +105,7 @@ enum NutrikBrain {
         }
 
         if t.range(of: #"\b(hi|hello|hey|yo|hiya|sup)\b"#, options: .regularExpression) != nil || has(["привет", "салем", "сәлем"]) {
-            let n = store.data.pantry.count
+            let n = store.unitCount
             let plural = n == 1 ? "" : "s"
             let rescue = store.toRescue.isEmpty ? "" : " and \(store.toRescue.count) need rescuing soon"
             return NutrikReply(text: "Hi, \(name)! 👋 You have \(n) product\(plural) at home\(rescue). Ask me what to cook!", mood: .wave)
@@ -114,7 +116,7 @@ enum NutrikBrain {
             return NutrikReply(text: "I'm Nutrik! A small, slightly messy food buddy with very short legs 🐾 I watch your fridge, cook ideas from leftovers and cheer every time you save food from the bin.", mood: .wave)
         }
         if has(["help", "what can you do", "помощь", "помоги"]) {
-            return NutrikReply(text: "I can:\n• suggest recipes from your fridge (\"what can I cook?\", \"another\")\n• tell what expires soon\n• explain how to store or freeze food\n• count calories (\"calories in banana\")\n• check your fridge (\"do I have milk?\")\n• add to the shopping list\n• show your eco impact and weight\n• remember what you don't like", mood: .happy)
+            return NutrikReply(text: "I can:\n• suggest recipes from your fridge (\"what can I cook?\", \"another\")\n• tell what expires soon\n• explain how to store or freeze food\n• count calories (\"calories in banana\")\n• check your fridge (\"do I have milk?\")\n• really add, eat, bin or freeze food: "add 2 eggs to fridge", "I ate a banana"\n• add to the shopping list\n• show your eco impact and weight\n• remember what you don't like", mood: .happy)
         }
 
         if has(["calorie", "kcal", "калор"]) {
@@ -155,14 +157,15 @@ enum NutrikBrain {
         if has(["do i have", "have i got", "is there", "есть ли", "got any"]) && !foods.isEmpty {
             return NutrikReply(text: foods.map { f in
                 let m = store.data.pantry.filter { $0.name == f.name }.sorted { $0.daysLeft < $1.daysLeft }
-                return m.isEmpty ? "\(f.emoji) No \(f.name) at home." : "\(f.emoji) \(f.name): \(m.count) pcs in the \(m[0].storage.title.lowercased()), soonest — \(m[0].status.lowercased())."
+                let pcs = m.reduce(0) { $0 + $1.qty }
+                return m.isEmpty ? "\(f.emoji) No \(f.name) at home." : "\(f.emoji) \(f.name): ×\(pcs) in the \(m[0].storage.title.lowercased()), soonest — \(m[0].status.lowercased())."
             }.joined(separator: "\n"), mood: .happy)
         }
 
         if has(["in my fridge", "what do i have", "my fridge", "what's in", "whats in", "в холодильнике"]) {
             let p = store.sortedPantry
             if p.isEmpty { return NutrikReply(text: "Your fridge is empty 😿 Add products in the Search tab!", mood: .sad) }
-            let shown = p.prefix(15).map { "\($0.emoji) \($0.name)" }.joined(separator: ", ")
+            let shown = p.prefix(15).map { "\($0.emoji) \($0.title)" }.joined(separator: ", ")
             return NutrikReply(text: "You have \(p.count) product\(p.count == 1 ? "" : "s"): \(shown)\(p.count > 15 ? "…" : ""). Freshest go last, soonest first!", mood: .happy)
         }
 

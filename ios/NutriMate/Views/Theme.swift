@@ -22,21 +22,33 @@ extension Color {
     }
 }
 
-/// Стеклянная карточка: материал + светлая обводка-блик + мягкая тень.
+/// Стеклянная карточка. Раньше — .ultraThinMaterial + тень на всём содержимом: материал пересчитывает
+/// размытие фона под каждой карточкой каждый кадр (а фон живой), из-за этого был ~20 fps.
+/// Теперь — полупрозрачная кремово-белая заливка с бликом-обводкой и тенью только у формы:
+/// визуально то же «стекло» на мягком фоне, но GPU почти ничего не стоит.
 struct GlassCard: ViewModifier {
     var radius: CGFloat = 22
     var padding: CGFloat = 16
     func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .background {
+                shape
+                    .fill(LinearGradient(colors: [Color.white.opacity(0.72), Color(hex: 0xFBF8F1, opacity: 0.58)],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .shadow(color: Color.burgundy.opacity(0.07), radius: 10, x: 0, y: 5)
+            }
             .overlay(
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(LinearGradient(colors: [.white.opacity(0.85), .white.opacity(0.15)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
+                shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.9), .white.opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
             )
-            .shadow(color: Color.burgundy.opacity(0.08), radius: 14, x: 0, y: 6)
     }
+}
+
+/// Дешёвая «стеклянная» заливка для строк списков и чипов (вместо Material).
+extension Color {
+    static let glassFill = Color.white.opacity(0.62)
 }
 
 extension View {
@@ -45,31 +57,45 @@ extension View {
     }
 }
 
-/// Живой фон: медленно плывущие размытые пятна в фирменных тонах.
+/// Живой фон: медленно плывущие мягкие пятна в фирменных тонах.
+/// Пятна — радиальные градиенты (уже «размытые», без blur-фильтра), рисуются один раз;
+/// движение — offset/scale через repeatForever-анимацию, её выполняет Core Animation на GPU
+/// без пересчёта body. Раньше тут был Canvas + blur(50) на весь экран 20 раз в секунду.
 struct LiveBackground: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var drift = false
+
+    private struct Blob {
+        let color: Color, x: CGFloat, y: CGFloat, size: CGFloat, dx: CGFloat, dy: CGFloat, scale: CGFloat, duration: Double
+    }
+    private static let blobs: [Blob] = [
+        Blob(color: Color.burgundy.opacity(0.11), x: 0.20, y: 0.15, size: 0.95, dx: 0.10, dy: 0.06, scale: 1.10, duration: 9),
+        Blob(color: Color.sand, x: 0.85, y: 0.30, size: 1.05, dx: -0.09, dy: 0.07, scale: 0.92, duration: 13),
+        Blob(color: Color(hex: 0xE9B8A8).opacity(0.38), x: 0.30, y: 0.75, size: 1.00, dx: 0.09, dy: -0.06, scale: 1.08, duration: 11),
+        Blob(color: Color(hex: 0xC9D8B6).opacity(0.42), x: 0.80, y: 0.85, size: 0.90, dx: -0.08, dy: -0.05, scale: 1.12, duration: 15),
+    ]
+
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 20.0)) { tl in
-            let t = tl.date.timeIntervalSinceReferenceDate
-            Canvas { ctx, size in
-                ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.cream))
-                ctx.addFilter(.blur(radius: 50))
-                let blobs: [(Color, Double, Double, Double, Double)] = [
-                    (Color.burgundy.opacity(0.10), 0.20, 0.15, 0.55, 0.11),
-                    (Color.sand.opacity(0.95), 0.85, 0.30, 0.65, 0.07),
-                    (Color(hex: 0xE9B8A8).opacity(0.30), 0.30, 0.75, 0.60, 0.09),
-                    (Color(hex: 0xC9D8B6).opacity(0.35), 0.80, 0.85, 0.50, 0.05),
-                ]
-                for (i, b) in blobs.enumerated() {
-                    let ph = t * b.4 + Double(i) * 1.7
-                    let cx = size.width * (b.1 + 0.08 * sin(ph))
-                    let cy = size.height * (b.2 + 0.06 * cos(ph * 1.3))
-                    let r = size.width * b.3 * (1 + 0.06 * sin(ph * 2))
-                    ctx.fill(Path(ellipseIn: CGRect(x: cx - r / 2, y: cy - r / 2, width: r, height: r)), with: .color(b.0))
+        GeometryReader { g in
+            let w = g.size.width, h = g.size.height
+            ZStack {
+                Color.cream
+                ForEach(0..<Self.blobs.count, id: \.self) { i in
+                    let b = Self.blobs[i]
+                    let d = w * b.size
+                    Circle()
+                        .fill(RadialGradient(colors: [b.color, b.color.opacity(0)], center: .center, startRadius: 0, endRadius: d / 2))
+                        .frame(width: d, height: d)
+                        .scaleEffect(drift ? b.scale : 1)
+                        .position(x: w * b.x, y: h * b.y)
+                        .offset(x: drift ? w * b.dx : 0, y: drift ? h * b.dy : 0)
+                        .animation(reduceMotion ? nil : .easeInOut(duration: b.duration).repeatForever(autoreverses: true), value: drift)
                 }
             }
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
+        .onAppear { if !reduceMotion { drift = true } }
     }
 }
 
@@ -112,7 +138,7 @@ struct Chip: View {
             .padding(.vertical, 8)
             .foregroundStyle(selected ? Color.cream : Color.burgundy)
             .background(
-                Capsule().fill(selected ? AnyShapeStyle(Color.burgundy) : AnyShapeStyle(Material.ultraThinMaterial))
+                Capsule().fill(selected ? Color.burgundy : Color.glassFill)
             )
             .overlay(Capsule().strokeBorder(Color.white.opacity(selected ? 0.25 : 0.8), lineWidth: 1))
     }

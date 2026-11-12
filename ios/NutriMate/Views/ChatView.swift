@@ -111,10 +111,9 @@ struct ChatView: View {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(m.fromUser
                           ? AnyShapeStyle(LinearGradient(colors: [.burgundyLight, .burgundy], startPoint: .top, endPoint: .bottom))
-                          : AnyShapeStyle(Material.regularMaterial))
+                          : AnyShapeStyle(Color.white.opacity(0.82)))
             }
             .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.white.opacity(m.fromUser ? 0.25 : 0.9), lineWidth: 1))
-            .shadow(color: .black.opacity(0.06), radius: 6, y: 3)
             .textSelection(.enabled)
             if !m.fromUser { Spacer(minLength: 50) }
         }
@@ -217,7 +216,7 @@ struct TypingDots: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 13)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.white.opacity(0.9), lineWidth: 1))
         }
     }

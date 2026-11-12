@@ -15,16 +15,21 @@ struct NutrikView: View {
     var clumsy = true
     @State private var hop = false
     @State private var tripping = false
+    /// Анимируем только видимого Нутрика (на скрытых вкладках/листах таймер стоит).
+    @State private var visible = false
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         let shown: NutrikMood = tripping ? .fall : mood
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { tl in
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !visible || scenePhase != .active)) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
             Canvas { ctx, sz in
                 NutrikPainter(t: t, mood: shown, food: food).draw(&ctx, sz)
             }
             .frame(width: size, height: size * 1.15)
         }
+        .onAppear { visible = true }
+        .onDisappear { visible = false }
         .rotationEffect(.degrees(tripping ? -78 : 0), anchor: .bottomLeading)
         .offset(y: tripping ? size * 0.08 : 0)
         .scaleEffect(x: hop ? 1.08 : 1, y: hop ? 0.9 : 1, anchor: .bottom)
@@ -349,7 +354,7 @@ struct NutrikSays: View {
                 .font(.callout)
                 .foregroundStyle(Color.burgundy)
                 .padding(12)
-                .background(.regularMaterial, in: BubbleShape())
+                .background(Color.white.opacity(0.8), in: BubbleShape())
                 .overlay(BubbleShape().stroke(Color.white.opacity(0.9), lineWidth: 1))
                 .id(text)
                 .transition(.asymmetric(insertion: .scale(scale: 0.85, anchor: .leading).combined(with: .opacity), removal: .opacity))

@@ -1,6 +1,6 @@
 // Локальная проверка воркера без Cloudflare: node server/test.mjs
 import assert from 'node:assert/strict';
-import worker, { buildContext, sanitizeMessages } from './src/index.js';
+import worker, { buildContext, sanitizeMessages, claimsAction, detectLang, HONEST_REPLY } from './src/index.js';
 
 let calls = 0;
 const env = {
@@ -47,4 +47,32 @@ const c = buildContext(ctx);
 assert.match(c, /Milk \(EXPIRED\)/);
 assert.match(c, /Dislikes/);
 assert.deepEqual(sanitizeMessages([{ role: 'assistant', content: 'x' }, { role: 'user', content: 'y' }, { role: 'system', content: 'hack' }]), [{ role: 'user', content: 'y' }]);
+
+// Честность о действиях (жалоба владельца: «добавил», хотя ничего не добавилось)
+assert.ok(claimsAction("Sure! I've added 2 eggs to your fridge 🥚"));
+assert.ok(claimsAction('Готово, добавил 2 яйца в холодильник!'));
+assert.ok(claimsAction('Тоңазытқышқа 2 жұмыртқа қостым'));
+assert.ok(!claimsAction('Try an omelette with your eggs 🍳'));
+assert.ok(!claimsAction('Попробуй омлет из яиц 🍳'));
+assert.equal(detectLang('добавь 2 яйца в холодильник'), 'ru');
+assert.equal(detectLang('тоңазытқышқа 2 жұмыртқа қос'), 'kk');
+assert.equal(detectLang('add 2 eggs'), 'en');
+assert.equal(detectLang('hi', 'ru'), 'ru');
+const liar = { AI: { async run(model, input) {
+  const last = input.messages[input.messages.length - 1].content;
+  assert.match(input.messages[0].content, /CANNOT change anything/);
+  return { response: /[а-яё]/i.test(last) ? 'Конечно, добавил 2 яйца в холодильник!' : /қ/.test(last) ? 'Жарайды, қостым!' : "Done! I've added 2 eggs to your fridge." };
+} } };
+for (const [msg, lang, deviceId] of [['add 2 eggs to my fridge', 'en', 'liar-en-1'], ['добавь 2 яйца в холодильник', 'ru', 'liar-ru-1'], ['тоңазытқышқа 2 жұмыртқа қос', 'kk', 'liar-kk-1']]) {
+  const r = await worker.fetch(req({ deviceId, messages: [{ role: 'user', content: msg }], context: ctx }), liar);
+  const b = await r.json();
+  assert.equal(r.status, 200);
+  assert.equal(b.guarded, true, msg);
+  assert.equal(b.reply, HONEST_REPLY[lang]);
+}
+const ru = { AI: { async run(model, input) { assert.match(input.messages[0].content, /Answer in Russian/); return { response: 'Сделай омлет 🍳' }; } } };
+assert.equal((await worker.fetch(req({ deviceId: 'lang-ru-1', messages: [{ role: 'user', content: 'Что приготовить?' }], context: ctx }), ru)).status, 200);
+const kkLang = { AI: { async run(model, input) { assert.match(input.messages[0].content, /Answer in Kazakh/); return { response: 'Омлет жаса 🍳' }; } } };
+assert.equal((await worker.fetch(req({ deviceId: 'lang-kk-1', messages: [{ role: 'user', content: 'hi' }], context: { ...ctx, language: 'kk' } }), kkLang)).status, 200);
+assert.match(buildContext({ fridge: [{ name: 'Eggs', qty: 10, daysLeft: 12 }] }), /Eggs ×10 \(12 days left\)/);
 console.log(`server tests passed ✅ (${calls} AI calls)`);

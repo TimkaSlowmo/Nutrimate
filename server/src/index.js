@@ -24,7 +24,34 @@ Rules:
 - Respect disliked foods: never suggest them.
 - Never give medical diagnoses, never encourage strict diets, fasting or eating far below the calorie goal. For health problems, suggest seeing a doctor.
 - If the question is not about food, cooking, groceries, storage, nutrition or the app, gently bring the talk back to food in one sentence.
-- Never invent the user's data: use only the context below. Do not mention that you got "context".`;
+- Never invent the user's data: use only the context below. Do not mention that you got "context".
+- You CANNOT change anything in the app: you cannot add, remove, log, freeze or move food, and you cannot edit the shopping list. Never say "I added", "I logged", "done", "добавил", "записал" or similar. The app does these actions itself when the user writes a command like "add 2 eggs to fridge", "I ate a banana", "threw away kefir", "freeze the chicken", "add milk to shopping list". If the user asks for such an action, say you can't do it from the chat and show the exact command to type.`;
+
+const LANG_NAMES = { en: 'English', ru: 'Russian', kk: 'Kazakh (Cyrillic)' };
+
+// Честность: ИИ не может менять данные. Если модель всё же «отчиталась» о действии — заменяем ответ.
+const ACTION_CLAIMS = [
+  /\bi('ve| have)? (just )?(added|put|logged|removed|deleted|froze|frozen|moved|marked|updated|saved)\b/i,
+  /\b(added|logged|moved|put) (it|them|\d+|two|three|some|your|the)\b.*\b(fridge|freezer|pantry|list|diary|log)\b/i,
+  /\b(has|have) been (added|logged|removed|frozen)\b/i,
+  /(добавил|добавила|добавлено|записал|записала|положил|положила|выбросил|удалил|заморозил|отметил)/i,
+  /(қостым|қосылды|жаздым|салдым|тастадым|мұздаттым)/i,
+];
+export const claimsAction = (text) => ACTION_CLAIMS.some((re) => re.test(String(text || '')));
+
+export function detectLang(text, hint) {
+  if (hint && LANG_NAMES[hint]) return hint;
+  const t = String(text || '');
+  if (/[әғқңөұүһі]/i.test(t)) return 'kk';
+  if (/[а-яё]/i.test(t)) return 'ru';
+  return 'en';
+}
+
+export const HONEST_REPLY = {
+  en: "🙈 I can't change your fridge from the chat myself. Type a command and the app will really do it, e.g. \"add 2 eggs to fridge\", \"I ate a banana\" or \"add milk to shopping list\".",
+  ru: '🙈 Сам я из чата ничего не меняю. Напиши команду — и приложение правда это сделает, например: «добавь 2 яйца в холодильник», «съел банан» или «добавь молоко в список покупок».',
+  kk: '🙈 Мен чаттан ештеңені өзім өзгерте алмаймын. Команда жаз — қосымша шынымен орындайды, мысалы: «тоңазытқышқа 2 жұмыртқа қос» немесе «банан жедім».',
+};
 
 const json = (obj, status = 200, headers = {}) =>
   new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json; charset=utf-8', ...headers } });
@@ -72,7 +99,8 @@ export function buildContext(ctx = {}) {
     const items = ctx.fridge.slice(0, 40).map((f) => {
       const d = Number(f.daysLeft);
       const when = !Number.isFinite(d) ? '' : d < 0 ? ' (EXPIRED)' : d === 0 ? ' (expires today)' : d === 1 ? ' (expires tomorrow)' : ` (${d} days left)`;
-      return `${clip(f.name, 40)}${when}`;
+      const q = Number(f.qty) > 1 ? ` ×${Math.min(999, Math.round(Number(f.qty)))}` : '';
+      return `${clip(f.name, 40)}${q}${when}`;
     });
     lines.push(`Fridge (soonest first): ${items.join(', ')}`);
   } else {
@@ -158,9 +186,12 @@ export default {
       return json({ error: 'offline', reason: 'daily_limit' }, 429, cors);
     }
 
-    const system = `${SYSTEM_PROMPT}\n\nContext about the user right now:\n${buildContext(body?.context)}`;
+    const lang = detectLang(messages[messages.length - 1].content, clip(body?.context?.language, 4));
+    const langRule = `\n- Answer in ${LANG_NAMES[lang]}${lang === 'kk' ? ' (Cyrillic script, simple correct Kazakh)' : ''}.`;
+    const system = `${SYSTEM_PROMPT}${langRule}\n\nContext about the user right now:\n${buildContext(body?.context)}`;
     try {
       const { reply, model } = await runModel(env, [{ role: 'system', content: system }, ...messages]);
+      if (claimsAction(reply)) return json({ reply: HONEST_REPLY[lang], model, guarded: true }, 200, cors);
       return json({ reply, model }, 200, cors);
     } catch (e) {
       return json({ error: 'offline', reason: e?.quota ? 'ai_quota' : 'ai_error' }, e?.quota ? 429 : 503, cors);

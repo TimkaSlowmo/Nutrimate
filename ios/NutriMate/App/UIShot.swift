@@ -50,6 +50,19 @@ enum UIShot {
                                        added: day(-max(1, f.shelf - left)), expiry: day(left),
                                        storage: place ?? FoodDB.defaultStorage(f)))
         }
+        // складывание одинаковых продуктов: яйца ×10, бананы ×3, вторая партия молока (купил позже)
+        for i in d.pantry.indices {
+            switch d.pantry[i].name {
+            case "Eggs": d.pantry[i].qty = 10
+            case "Banana": d.pantry[i].qty = 3
+            case "Apple": d.pantry[i].qty = 4
+            default: break
+            }
+        }
+        if let milk = db.byName["Milk"] {
+            d.pantry.append(PantryItem(name: milk.name, emoji: milk.emoji, category: milk.category, kcal: milk.kcal,
+                                       added: now, expiry: day(7), storage: .fridge, qty: 2))
+        }
         d.log = [
             LogEntry(emoji: "🥣", name: "Oatmeal · 250 g", kcal: 220, date: now.addingTimeInterval(-5 * 3600)),
             LogEntry(emoji: "🍌", name: "Banana · 120 g", kcal: 107, date: now.addingTimeInterval(-4 * 3600)),

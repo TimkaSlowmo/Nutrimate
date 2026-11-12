@@ -10,7 +10,7 @@ enum NutrikAI {
 
     private struct Payload: Encodable {
         struct Msg: Encodable { let role: String; let content: String }
-        struct FridgeItem: Encodable { let name: String; let daysLeft: Int }
+        struct FridgeItem: Encodable { let name: String; let daysLeft: Int; let qty: Int }
         struct RecipeInfo: Encodable { let name: String; let kcal: Int; let time: String; let ingredients: [String]; let missing: [String] }
         struct Context: Encodable {
             let name: String
@@ -52,7 +52,7 @@ enum NutrikAI {
             deviceId: d.deviceId,
             messages: Array(history),
             context: .init(name: d.profile.name,
-                           fridge: store.sortedPantry.prefix(40).map { .init(name: $0.name, daysLeft: $0.daysLeft) },
+                           fridge: store.sortedPantry.prefix(40).map { .init(name: $0.name, daysLeft: $0.daysLeft, qty: $0.qty) },
                            kcalToday: store.eatenToday, kcalGoal: store.targetCalories,
                            dislikes: d.dislikes, recipes: Array(recipes)))
 
@@ -70,6 +70,9 @@ enum NutrikAI {
             guard code == 200, let a = try? JSONDecoder().decode(Answer.self, from: data) else { return nil }
             let text = a.reply.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { return nil }
+            // ИИ не умеет менять данные: если он «отчитался», что что-то добавил/записал/выбросил, —
+            // это неправда, отвечаем честно офлайн-Нутриком (он либо сделает действие, либо скажет, что не понял).
+            if claimsAction(text) { return nil }
             return NutrikReply(text: text, mood: mood(for: text), recipe: recipeMentioned(in: text, store: store))
         } catch {
             return nil
@@ -83,6 +86,18 @@ enum NutrikAI {
         return store.db.recipes
             .filter { $0.name.count >= 5 && t.contains($0.name.lowercased()) }
             .max { $0.name.count < $1.name.count }?.name
+    }
+
+    static func claimsAction(_ text: String) -> Bool {
+        let t = text.lowercased()
+        let patterns = [
+            #"\bi('ve| have)? (just )?(added|put|logged|removed|deleted|froze|frozen|moved|marked|updated|saved)\b"#,
+            #"\b(added|logged|moved|put) (it|them|\d+|two|three|some|your|the)\b.*\b(fridge|freezer|pantry|list|diary|log)\b"#,
+            #"\b(has|have) been (added|logged|removed|frozen)\b"#,
+            #"(добавил|добавила|добавлено|записал|записала|положил|положила|выбросил|удалил|заморозил|отметил)"#,
+            #"(қостым|қосылды|жаздым|салдым|тастадым|мұздаттым)"#,
+        ]
+        return patterns.contains { t.range(of: $0, options: .regularExpression) != nil }
     }
 
     private static func mood(for text: String) -> NutrikMood {

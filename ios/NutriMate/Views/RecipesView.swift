@@ -32,7 +32,7 @@ struct RecipesView: View {
                         TextField("Recipe or ingredient", text: $query).autocorrectionDisabled()
                     }
                     .padding(12)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(Color.glassFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                     let items = list
                     if items.isEmpty {

@@ -6,8 +6,15 @@ import UIKit
 /// поэтому переустановка поверх и перезапуск ничего не стирают.
 final class AppStore: ObservableObject {
     @Published var data: AppData {
-        didSet { scheduleSave() }
+        didSet {
+            groupsCache = nil
+            rankCache = nil
+            scheduleSave()
+        }
     }
+    // Кэши тяжёлых вычислений: пересчитываются только после изменения данных, а не в каждом body.
+    private var groupsCache: [PantryGroup]?
+    private var rankCache: [Recipe]?
     @Published var toast: String?
     @Published var newMedal: Medal?
     /// Сценка Нутрика (выбегает снизу слева, ест / падает / радуется)
@@ -30,6 +37,9 @@ final class AppStore: ObservableObject {
         }
         fileURL = dir.appendingPathComponent("nutrimate.json")
         data = AppStore.load(from: fileURL)
+        // v9: одинаковые продукты складываются в одну строку — мягко объединяем старые сохранения
+        let merged = AppStore.normalized(data.pantry)
+        if merged.count != data.pantry.count { data.pantry = merged }
         if data.notifications { Reminders.reschedule(data) }
     }
 
@@ -72,10 +82,19 @@ final class AppStore: ObservableObject {
     // MARK: - Вычисляемое
 
     var pantryNames: Set<String> { Set(data.pantry.map(\.name)) }
-    var sortedPantry: [PantryItem] { data.pantry.sorted { $0.daysLeft < $1.daysLeft } }
-    var expiringSoon: [PantryItem] { sortedPantry.filter { $0.daysLeft <= 2 } }
-    var toRescue: [PantryItem] { expiringSoon.filter { $0.daysLeft >= 0 } }
-    var expired: [PantryItem] { data.pantry.filter { $0.daysLeft < 0 } }
+    /// Строки холодильника (одинаковые продукты сложены), от ближайшего срока к дальнему.
+    var sortedPantry: [PantryGroup] {
+        if let c = groupsCache { return c }
+        let g = PantryGroup.make(data.pantry).sorted { $0.expiry < $1.expiry }
+        groupsCache = g
+        return g
+    }
+    /// Сколько всего штук/упаковок дома
+    var unitCount: Int { data.pantry.reduce(0) { $0 + $1.qty } }
+    var expiringSoon: [PantryGroup] { sortedPantry.filter { $0.daysLeft <= 2 } }
+    var toRescue: [PantryGroup] { expiringSoon.filter { $0.daysLeft >= 0 } }
+    var expired: [PantryGroup] { sortedPantry.filter { $0.daysLeft < 0 } }
+    func group(_ key: String) -> PantryGroup? { sortedPantry.first { $0.id == key } }
     var todayLog: [LogEntry] { data.log.filter { Calendar.current.isDateInToday($0.date) } }
     var eatenToday: Int { todayLog.reduce(0) { $0 + $1.kcal } }
     var targetCalories: Int { data.profile.targetCalories }
@@ -85,12 +104,25 @@ final class AppStore: ObservableObject {
         return s.consumed + s.wasted == 0 ? 100 : Int((100.0 * Double(s.consumed) / Double(s.consumed + s.wasted)).rounded())
     }
     var streakDays: Int { daysBetween(data.stats.streakStart, Date()) }
-    var moneyAtRisk: Double { toRescue.reduce(0) { $0 + price($1.category) } }
+    var moneyAtRisk: Double {
+        var sum = 0.0
+        for g in toRescue {
+            for b in g.batches where b.daysLeft <= 2 { sum += price(b.category) * Double(b.qty) }
+        }
+        return sum
+    }
 
     func price(_ category: String) -> Double { FoodDB.price[category] ?? 2.0 }
     func item(_ id: UUID) -> PantryItem? { data.pantry.first { $0.id == id } }
 
     func rankedRecipes() -> [Recipe] {
+        if let c = rankCache { return c }
+        let r = computeRankedRecipes()
+        rankCache = r
+        return r
+    }
+
+    private func computeRankedRecipes() -> [Recipe] {
         let have = pantryNames
         let urgent = Set(toRescue.map(\.name))
         let dislikes = data.dislikes
@@ -133,15 +165,62 @@ final class AppStore: ObservableObject {
         let now = Date()
         let place = storage ?? FoodDB.defaultStorage(f)
         let exp = Calendar.current.date(byAdding: .day, value: days ?? f.shelf, to: now) ?? now
-        for _ in 0..<max(1, count) {
+        let n = max(1, count)
+        // та же партия (тот же продукт, место и срок ±1 день) → просто +n; иначе новая партия в той же строке
+        if let i = data.pantry.firstIndex(where: { $0.name == f.name && $0.storage == place && abs(daysBetween($0.expiry, exp)) <= 1 }) {
+            data.pantry[i].qty += n
+        } else {
             data.pantry.append(PantryItem(name: f.name, emoji: f.emoji, category: f.category, kcal: f.kcal,
-                                          added: now, expiry: exp, storage: place))
+                                          added: now, expiry: exp, storage: place, qty: n))
         }
         if !quiet {
             haptic()
-            say("\(f.emoji) \(count > 1 ? "\(count)× " : "")\(f.name) added to your \(place.title.lowercased())")
+            let total = data.pantry.filter { $0.name == f.name && $0.storage == place }.reduce(0) { $0 + $1.qty }
+            say("\(f.emoji) \(n > 1 ? "\(n)× " : "")\(f.name) added to your \(place.title.lowercased())\(total > n ? " · now ×\(total)" : "")")
         }
         checkMedals()
+    }
+
+    /// Объединяет партии одного продукта в одном месте с одинаковым сроком (±1 день) — ничего не теряя.
+    static func normalized(_ items: [PantryItem]) -> [PantryItem] {
+        var out: [PantryItem] = []
+        for p in items {
+            if let i = out.firstIndex(where: { $0.name == p.name && $0.storage == p.storage && abs(daysBetween($0.expiry, p.expiry)) <= 1 }) {
+                out[i].qty += p.qty
+                if p.expiry < out[i].expiry { out[i].expiry = p.expiry }   // осторожно: берём более ранний срок
+                if p.added < out[i].added { out[i].added = p.added }
+            } else {
+                out.append(p)
+            }
+        }
+        return out
+    }
+
+    /// Списать одну штуку из партии `id` (партия исчезает, когда кончилась).
+    private func takeOne(_ id: UUID) {
+        guard let i = data.pantry.firstIndex(where: { $0.id == id }) else { return }
+        if data.pantry[i].qty > 1 { data.pantry[i].qty -= 1 } else { data.pantry.remove(at: i) }
+    }
+
+    /// Самая старая партия того же продукта в том же месте (FIFO): «съел»/«выбросил» списывают сначала её.
+    private func oldest(_ id: UUID) -> PantryItem? {
+        guard let p = item(id) else { return nil }
+        return data.pantry.filter { $0.groupKey == p.groupKey }.min { $0.expiry < $1.expiry }
+    }
+
+    /// ＋ в карточке: ещё одна штука в самую свежую партию (без статистики).
+    func increment(_ key: String) {
+        guard let g = group(key), let newest = g.batches.last,
+              let i = data.pantry.firstIndex(where: { $0.id == newest.id }) else { return }
+        data.pantry[i].qty += 1
+        haptic()
+    }
+
+    /// − в карточке: убрать одну штуку из самой свежей партии (исправление количества, без статистики).
+    func decrement(_ key: String) {
+        guard let g = group(key), let newest = g.batches.last else { return }
+        takeOne(newest.id)
+        haptic()
     }
 
     private func use(_ p: PantryItem) {
@@ -205,10 +284,10 @@ final class AppStore: ObservableObject {
     var wastedKg: Double { Double(data.stats.wasted) * 0.3 }
 
     func eat(_ id: UUID, grams: Int, finished: Bool) {
-        guard let p = item(id) else { return }
+        guard let p = oldest(id) else { return }
         if finished {
             use(p)
-            data.pantry.removeAll { $0.id == id }
+            takeOne(p.id)
         }
         data.log.append(LogEntry(emoji: p.emoji, name: "\(p.name) · \(grams) g", kcal: Int((Double(p.kcal) * Double(grams) / 100).rounded())))
         haptic(.medium)
@@ -226,8 +305,8 @@ final class AppStore: ObservableObject {
     func removeLog(_ id: UUID) { data.log.removeAll { $0.id == id } }
 
     func throwAway(_ id: UUID, reason: WasteReason) {
-        guard let p = item(id) else { return }
-        data.pantry.removeAll { $0.id == id }
+        guard let p = oldest(id) else { return }
+        takeOne(p.id)
         data.stats.wasted += 1
         data.stats.wastedMoney += price(p.category)
         data.stats.streakStart = Date()
@@ -238,25 +317,37 @@ final class AppStore: ObservableObject {
         react(.sad, "Oops… \(p.emoji) went to the bin 😿 Next time we'll save it!")
     }
 
+    /// Заморозить всю строку (все партии этого продукта из холодильника/шкафа); статистика — по штукам.
     func freeze(_ id: UUID) {
-        guard let i = data.pantry.firstIndex(where: { $0.id == id }) else { return }
-        let p = data.pantry[i]
-        if p.daysLeft >= 0 && p.daysLeft <= 2 {
-            data.stats.rescued += 1
-            data.stats.rescuedMoney += price(p.category)
+        guard let p = item(id) else { return }
+        let batch = data.pantry.filter { $0.groupKey == p.groupKey }
+        var units = 0
+        for b in batch {
+            for _ in 0..<b.qty {
+                if b.daysLeft >= 0 && b.daysLeft <= 2 {
+                    data.stats.rescued += 1
+                    data.stats.rescuedMoney += price(b.category)
+                }
+                data.events.append(EcoEvent(kind: .frozen, money: price(b.category)))
+                data.stats.frozen += 1
+                units += 1
+            }
         }
-        data.events.append(EcoEvent(kind: .frozen, money: price(p.category)))
-        data.pantry[i].storage = .freezer
-        data.pantry[i].expiry = Calendar.current.date(byAdding: .day, value: 90, to: Date()) ?? Date()
-        data.stats.frozen += 1
+        let exp = Calendar.current.date(byAdding: .day, value: 90, to: Date()) ?? Date()
+        var pantry = data.pantry
+        for i in pantry.indices where pantry[i].groupKey == p.groupKey {
+            pantry[i].storage = .freezer
+            pantry[i].expiry = exp
+        }
+        data.pantry = AppStore.normalized(pantry)
         haptic()
-        react(.cheer, "❄️ Frozen — good for 3 more months!")
+        react(.cheer, "❄️ \(units > 1 ? "\(units)× \(p.name) frozen" : "Frozen") — good for 3 more months!")
         checkMedals()
     }
 
     func share(_ id: UUID) {
-        guard let p = item(id) else { return }
-        data.pantry.removeAll { $0.id == id }
+        guard let p = oldest(id) else { return }
+        takeOne(p.id)
         data.stats.shared += 1
         data.stats.rescued += 1
         data.stats.consumed += 1
@@ -267,16 +358,23 @@ final class AppStore: ObservableObject {
         checkMedals()
     }
 
-    func delete(_ id: UUID) { data.pantry.removeAll { $0.id == id } }
+    /// Убрать строку целиком без статистики (ошибся при добавлении).
+    func delete(_ id: UUID) {
+        guard let p = item(id) else { return }
+        data.pantry.removeAll { $0.groupKey == p.groupKey }
+    }
 
     func setExpiry(_ id: UUID, _ d: Date) {
         guard let i = data.pantry.firstIndex(where: { $0.id == id }) else { return }
         data.pantry[i].expiry = d
     }
 
+    /// Переложить всю строку в другое место (там сложится с таким же продуктом).
     func move(_ id: UUID, to s: StorageKind) {
-        guard let i = data.pantry.firstIndex(where: { $0.id == id }) else { return }
-        data.pantry[i].storage = s
+        guard let p = item(id), p.storage != s else { return }
+        var pantry = data.pantry
+        for i in pantry.indices where pantry[i].groupKey == p.groupKey { pantry[i].storage = s }
+        data.pantry = AppStore.normalized(pantry)
     }
 
     func cook(_ r: Recipe, portions: Int) {
@@ -284,7 +382,7 @@ final class AppStore: ObservableObject {
             let matches = data.pantry.filter { $0.name == ing.name }.sorted { $0.daysLeft < $1.daysLeft }
             if let first = matches.first {
                 use(first) // сначала то, что скорее испортится
-                data.pantry.removeAll { $0.id == first.id }
+                takeOne(first.id)
             }
         }
         data.log.append(LogEntry(emoji: r.emoji, name: "\(r.name) ×\(portions)", kcal: r.kcal * portions))
@@ -391,13 +489,13 @@ final class AppStore: ObservableObject {
         case "first": return s.consumed >= 1 || s.cooked >= 1
         case "rescue": return s.rescued >= 3
         case "chef": return s.cooked >= 3
-        case "fridge": return data.pantry.count >= 10
+        case "fridge": return unitCount >= 10
         case "streak": return streakDays >= 7
         case "shop": return s.bought >= 1
         case "weight": return data.weights.count >= 3
         case "freezer": return s.frozen >= 3
         case "share": return s.shared >= 1
-        case "cleanfridge": return data.pantry.count >= 5 && expired.isEmpty
+        case "cleanfridge": return unitCount >= 5 && expired.isEmpty
         case "chatty": return data.chat.filter(\.fromUser).count >= 5
         default: return co2 >= 2
         }
