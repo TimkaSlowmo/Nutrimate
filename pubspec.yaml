@@ -1,7 +1,7 @@
 name: nutrimate
 description: NutriMate Pro - calories, fridge, recipes and less food waste.
 publish_to: 'none'
-version: 32.0.0+32
+version: 33.0.0+33
 
 environment:
   sdk: ^3.7.0
