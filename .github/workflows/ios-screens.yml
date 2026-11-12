@@ -83,10 +83,28 @@ jobs:
           shot 10-shopping 5 -sheet shopping
           shot 11-tutorial 6 -tutorial
           shot 12-week 6 -sheet week
-          shot 13-onboarding-goal 6 -onboarding -obStep 3
+          shot 13-onboarding-goal 6 -onboarding -obStep 4
           shot 14-profile-bottom 6 -tab profile -scrollBottom
           shot 15-edit-profile 6 -tab profile -push edit
           shot 16-medals 6 -tab profile -push medals
+          shot 17-onboarding-hello 6 -onboarding -obStep 1
+          # три языка: ключевые экраны по-русски и по-казахски (ищем обрезанный текст)
+          for LG in ru kk; do
+            shot $LG-00-onboarding 7 -onboarding -lang $LG
+            shot $LG-01-home 6 -tab home -lang $LG
+            shot $LG-02-fridge 5 -tab fridge -lang $LG
+            shot $LG-03-search 5 -tab search -lang $LG
+            shot $LG-04-recipes 5 -tab recipes -lang $LG
+            shot $LG-05-profile 5 -tab profile -lang $LG
+            shot $LG-06-body 6 -sheet body -lang $LG
+            shot $LG-07-chat 5 -sheet chat -lang $LG
+            shot $LG-08-eco 5 -sheet eco -lang $LG
+            shot $LG-12-week 6 -sheet week -lang $LG
+            shot $LG-13-onboarding-goal 6 -onboarding -obStep 4 -lang $LG
+            shot $LG-14-profile-bottom 6 -tab profile -scrollBottom -lang $LG
+            shot $LG-15-edit-profile 6 -tab profile -push edit -lang $LG
+            shot $LG-11-tutorial 6 -tutorial -lang $LG
+          done
           # замер плавности: приложение само прокручивает экран 6 с и пишет fps в Documents/fps.txt
           : > screens/fps.txt
           for T in home fridge search recipes; do
@@ -98,7 +116,7 @@ jobs:
             rm -f "$C/Documents/fps.txt"
           done
           # поиск дорогой части Home: то же самое с отключённым Нутриком / фоном / тенями
-          for OFF in nutrik bg shadow nutrik,bg,shadow; do
+          for OFF in nutrik nopause sync nopause,sync; do
             xcrun simctl terminate "$UDID" $BID 2>/dev/null || true
             xcrun simctl launch "$UDID" $BID -uiShot -fps -tab home -perfOff $OFF
             sleep 11

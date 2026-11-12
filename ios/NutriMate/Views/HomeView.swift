@@ -91,6 +91,7 @@ struct HomeView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 20)
             }
+            .pausesNutrikWhileScrolling()
             .background(LiveBackground())
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showShopping) { ShoppingView() }

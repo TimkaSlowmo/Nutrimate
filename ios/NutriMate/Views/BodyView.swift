@@ -215,6 +215,7 @@ struct BodyView: View {
                 }
                 .padding(16)
             }
+            .pausesNutrikWhileScrolling()
             .background(LiveBackground())
             .navigationTitle("Body dashboard")
             .navigationBarTitleDisplayMode(.inline)

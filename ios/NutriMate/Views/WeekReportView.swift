@@ -114,6 +114,7 @@ struct WeekReportView: View {
                 }
                 .padding(16)
             }
+            .pausesNutrikWhileScrolling()
             .background(LiveBackground())
             .navigationTitle("Your week")
             .navigationBarTitleDisplayMode(.inline)

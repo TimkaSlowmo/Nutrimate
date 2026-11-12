@@ -32,7 +32,8 @@ struct RootView: View {
     var body: some View {
         ZStack {
             if store.data.profile.registered {
-                mainTabs.transition(.opacity.combined(with: .scale(scale: 1.03)))
+                // смена языка — сразу: экраны пересоздаются с новыми строками
+                mainTabs.id(store.data.language).transition(.opacity.combined(with: .scale(scale: 1.03)))
             } else {
                 OnboardingView().transition(.opacity)
             }
@@ -67,6 +68,8 @@ struct RootView: View {
                 .presentationDetents([.medium])
                 .presentationBackground(.regularMaterial)
         }
+        // даты/числа — в локали выбранного языка
+        .environment(\.locale, store.data.language.locale)
     }
 
     private var mainTabs: some View {
@@ -144,6 +147,7 @@ struct GlassTabBar: View {
                             .font(.system(size: 19, weight: .semibold))
                             .scaleEffect(bounce == t ? 1.25 : 1)
                         Text(t.title).font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .lineLimit(1).minimumScaleFactor(0.75)
                     }
                     .foregroundStyle(selection == t ? Color.cream : Color.burgundy.opacity(0.75))
                     .frame(maxWidth: .infinity)

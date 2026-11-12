@@ -58,6 +58,8 @@ struct FoodDB {
     let categories: [String]
     /// Советы по хранению (по названию продукта или категории) — из storageTips в lib/main.dart
     var tips: [String: String] = [:]
+    /// Рецепты по названию (для переводов названий)
+    var recipeByName: [String: Recipe] = [:]
 
     static let shared: FoodDB = {
         guard let url = Bundle.main.url(forResource: "foods", withExtension: "json"),
@@ -72,7 +74,9 @@ struct FoodDB {
         }
         var map: [String: Food] = [:]
         for f in file.foods where map[f.name] == nil { map[f.name] = f }
-        return FoodDB(foods: file.foods, recipes: file.recipes, byName: map, categories: cats, tips: file.tips ?? [:])
+        var rmap: [String: Recipe] = [:]
+        for r in file.recipes where rmap[r.name] == nil { rmap[r.name] = r }
+        return FoodDB(foods: file.foods, recipes: file.recipes, byName: map, categories: cats, tips: file.tips ?? [:], recipeByName: rmap)
     }()
 
     static let catEmoji: [String: String] = [
@@ -417,6 +421,8 @@ struct AppData: Codable {
     var smartNutrik = true
     /// Случайный id устройства — только для дневного лимита ИИ на сервере
     var deviceId = UUID().uuidString
+    /// Язык интерфейса (en/ru/kk); для старых сохранений — язык системы
+    var language: AppLang = AppLang.system
 
     init() {}
     init(from decoder: Decoder) throws {
@@ -438,6 +444,7 @@ struct AppData: Codable {
         suggestIndex = (try? c.decodeIfPresent(Int.self, forKey: .suggestIndex)) ?? 0
         smartNutrik = (try? c.decodeIfPresent(Bool.self, forKey: .smartNutrik)) ?? true
         deviceId = (try? c.decodeIfPresent(String.self, forKey: .deviceId)) ?? UUID().uuidString
+        language = (try? c.decodeIfPresent(AppLang.self, forKey: .language)) ?? AppLang.system
     }
 }
 

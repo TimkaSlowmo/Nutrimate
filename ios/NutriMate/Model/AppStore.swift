@@ -7,6 +7,7 @@ import UIKit
 final class AppStore: ObservableObject {
     @Published var data: AppData {
         didSet {
+            if AppLang.current != data.language { AppLang.current = data.language }
             groupsCache = nil
             rankCache = nil
             scheduleSave()
@@ -33,10 +34,12 @@ final class AppStore: ObservableObject {
             // режим скриншотов: демо-данные в отдельном файле, настоящие данные не трогаем
             fileURL = dir.appendingPathComponent("nutrimate-uishot.json")
             data = UIShot.demoData()
+            AppLang.current = data.language
             return
         }
         fileURL = dir.appendingPathComponent("nutrimate.json")
         data = AppStore.load(from: fileURL)
+        AppLang.current = data.language
         // v9: одинаковые продукты складываются в одну строку — мягко объединяем старые сохранения
         let merged = AppStore.normalized(data.pantry)
         if merged.count != data.pantry.count { data.pantry = merged }

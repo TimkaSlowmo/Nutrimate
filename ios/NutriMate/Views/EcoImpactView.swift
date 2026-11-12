@@ -32,6 +32,7 @@ struct EcoImpactView: View {
                 }
                 .padding(16)
             }
+            .pausesNutrikWhileScrolling()
             .background(LiveBackground())
             .navigationTitle("Eco Impact")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }

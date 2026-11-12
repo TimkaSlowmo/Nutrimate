@@ -3,7 +3,8 @@ import SwiftUI
 /// Знакомство с Нутриком и регистрация (данные хранятся только на телефоне).
 struct OnboardingView: View {
     @EnvironmentObject var store: AppStore
-    @State private var step = min(3, max(0, Int(UIShot.value("-obStep") ?? "") ?? 0))
+    /// 0 язык · 1 знакомство · 2 имя · 3 параметры · 4 активность и цель
+    @State private var step = min(4, max(0, Int(UIShot.value("-obStep") ?? "") ?? 0))
     @State private var name = ""
     @State private var email = ""
     @State private var isMan = true
@@ -15,7 +16,7 @@ struct OnboardingView: View {
     @State private var goal = 0
     @State private var goalTouched = false
 
-    private let lastStep = 3
+    private let lastStep = 4
 
     /// Временный профиль для живого расчёта цели калорий.
     private var preview: Profile {
@@ -27,14 +28,15 @@ struct OnboardingView: View {
 
     private var line: String {
         switch step {
-        case 0: return "Hi! I'm Nutrik 🐾 I help people stop wasting food. Nice to meet you!"
-        case 1: return "What should I call you?"
-        case 2: return "A few numbers so I can count your daily calories 📏"
+        case 0: return store.data.language.hello
+        case 1: return L("Hi! I'm Nutrik 🐾 I help people stop wasting food. Nice to meet you!")
+        case 2: return L("What should I call you?")
+        case 3: return L("A few numbers so I can count your daily calories 📏")
         default:
             switch preview.bmiCategory {
-            case .under: return "How active are you? You're a bit light — I'd suggest \"Gain\" 🍝"
-            case .over, .obese: return "How active are you? A gentle \"Lose\" goal works best — no strict diets! 🥗"
-            case .normal: return "How active are you, and what's your goal? 🎯"
+            case .under: return L("How active are you? You're a bit light — I'd suggest \"Gain\" 🍝")
+            case .over, .obese: return L("How active are you? A gentle \"Lose\" goal works best — no strict diets! 🥗")
+            case .normal: return L("How active are you, and what's your goal? 🎯")
             }
         }
     }
@@ -46,9 +48,9 @@ struct OnboardingView: View {
                 VStack(spacing: 18) {
                     Spacer(minLength: 30)
                     Text("NutriMate").font(.system(size: 40, weight: .bold, design: .serif)).foregroundStyle(Color.burgundy)
-                    Text("Eat well · waste less · save the planet")
+                    Text(L("Eat well · waste less · save the planet"))
                         .font(.subheadline).foregroundStyle(Color.burgundy.opacity(0.7))
-                    NutrikView(mood: step == 0 ? .wave : .happy, size: 150)
+                    NutrikView(mood: step <= 1 ? .wave : .happy, size: 150)
                     Text(line)
                         .font(.body)
                         .multilineTextAlignment(.center)
@@ -60,21 +62,22 @@ struct OnboardingView: View {
                         .transition(.scale(scale: 0.9).combined(with: .opacity))
 
                     Group {
-                        if step == 1 { account }
-                        if step == 2 { params }
-                        if step == 3 { activityGoal }
+                        if step == 0 { languagePicker }
+                        if step == 2 { account }
+                        if step == 3 { params }
+                        if step == 4 { activityGoal }
                     }
                     .transition(.move(edge: .trailing).combined(with: .opacity))
 
-                    Button(step == lastStep ? "Start saving food 🌱" : "Next") { next() }
+                    Button(step == lastStep ? L("Start saving food 🌱") : L("Next")) { next() }
                         .buttonStyle(PrimaryButtonStyle())
-                        .disabled(step == 1 && name.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .opacity(step == 1 && name.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
+                        .disabled(step == 2 && name.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .opacity(step == 2 && name.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
                     if step > 0 {
-                        Button("Back") { withAnimation(.spring) { step -= 1 } }
+                        Button(L("Back")) { withAnimation(.spring) { step -= 1 } }
                             .foregroundStyle(Color.burgundy)
                     }
-                    Text("Your data stays on this iPhone.")
+                    Text(L("Your data stays on this iPhone."))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 22)
@@ -85,11 +88,42 @@ struct OnboardingView: View {
         }
     }
 
+    /// Шаг 0: выбор языка — крупные карточки, смена сразу (Нутрик здоровается на выбранном языке).
+    private var languagePicker: some View {
+        VStack(spacing: 10) {
+            ForEach(AppLang.allCases) { lang in
+                let on = store.data.language == lang
+                Button {
+                    UISelectionFeedbackGenerator().selectionChanged()
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) { store.data.language = lang }
+                } label: {
+                    HStack(spacing: 14) {
+                        Text(lang.flag).font(.system(size: 34))
+                        Text(lang.native).font(.title3.weight(.semibold))
+                        Spacer()
+                        Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                            .font(.title2)
+                            .foregroundStyle(on ? Color.burgundy : Color.burgundy.opacity(0.3))
+                    }
+                    .foregroundStyle(Color.burgundy)
+                    .padding(.horizontal, 16).padding(.vertical, 14)
+                    .background(on ? Color.burgundy.opacity(0.10) : Color.white.opacity(0.7),
+                                in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(on ? Color.burgundy.opacity(0.55) : Color.white.opacity(0.9), lineWidth: on ? 1.5 : 1))
+                    .scaleEffect(on ? 1.02 : 1)
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(on ? .isSelected : [])
+            }
+        }
+    }
+
     private var account: some View {
         VStack(spacing: 12) {
-            field("Your name", text: $name, icon: "person.fill")
+            field(L("Your name"), text: $name, icon: "person.fill")
                 .textContentType(.givenName)
-            field("Email (optional)", text: $email, icon: "envelope.fill")
+            field(L("Email (optional)"), text: $email, icon: "envelope.fill")
                 .keyboardType(.emailAddress)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -99,21 +133,21 @@ struct OnboardingView: View {
 
     private var params: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Picker("Sex", selection: $isMan) {
-                Text("Male").tag(true)
-                Text("Female").tag(false)
+            Picker(L("Sex"), selection: $isMan) {
+                Text(L("Male")).tag(true)
+                Text(L("Female")).tag(false)
             }
             .pickerStyle(.segmented)
-            Stepper("Age: \(age)", value: $age, in: 10...100)
+            Stepper(L("Age: {0}", age), value: $age, in: 10...100)
             VStack(alignment: .leading) {
-                Text("Weight: \(weight, specifier: "%.0f") kg")
+                Text(L("Weight: {0} kg", Int(weight)))
                 Slider(value: $weight, in: 35...180, step: 1)
             }
             VStack(alignment: .leading) {
-                Text("Height: \(height, specifier: "%.0f") cm")
+                Text(L("Height: {0} cm", Int(height)))
                 Slider(value: $height, in: 120...220, step: 1)
             }
-            Toggle("Fill my fridge with demo products", isOn: $demo)
+            Toggle(L("Fill my fridge with demo products"), isOn: $demo)
         }
         .foregroundStyle(Color.burgundy)
         .glassCard()
@@ -123,7 +157,7 @@ struct OnboardingView: View {
         let p = preview
         let underweight = p.bmiCategory == .under
         return VStack(alignment: .leading, spacing: 14) {
-            Text("Activity").font(.headline)
+            Text(L("Activity")).font(.headline)
             VStack(spacing: 8) {
                 ForEach(0..<Profile.activityTitles.count, id: \.self) { i in
                     Button {
@@ -131,7 +165,7 @@ struct OnboardingView: View {
                         withAnimation(.spring(response: 0.35)) { activity = i }
                     } label: {
                         HStack {
-                            Text(Profile.activityTitles[i]).font(.subheadline)
+                            Text(L(Profile.activityTitles[i])).font(.subheadline)
                                 .multilineTextAlignment(.leading)
                             Spacer(minLength: 6)
                             Image(systemName: activity == i ? "checkmark.circle.fill" : "circle")
@@ -146,32 +180,33 @@ struct OnboardingView: View {
                     .buttonStyle(.plain)
                 }
             }
-            Text("Goal").font(.headline)
-            Picker("Goal", selection: Binding(get: { goal }, set: { goal = $0; goalTouched = true })) {
-                Text("📉 Lose").tag(-1)
-                Text("⚖️ Keep").tag(0)
-                Text("📈 Gain").tag(1)
+            Text(L("Goal")).font(.headline)
+            Picker(L("Goal"), selection: Binding(get: { goal }, set: { goal = $0; goalTouched = true })) {
+                Text(L("📉 Lose")).tag(-1)
+                Text(L("⚖️ Keep")).tag(0)
+                Text(L("📈 Gain")).tag(1)
             }
             .pickerStyle(.segmented)
             if underweight && goal < 0 {
-                Text("Your weight is already below the healthy range, so I'll plan for keeping it instead 💛")
+                Text(L("Your weight is already below the healthy range, so I'll plan for keeping it instead 💛"))
                     .font(.caption).foregroundStyle(Color.warnOrange)
             }
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Your daily goal").font(.caption.bold()).foregroundStyle(Color.burgundy.opacity(0.7))
-                    Text("\(effectiveTarget) kcal")
+                    Text(L("Your daily goal")).font(.caption.bold()).foregroundStyle(Color.burgundy.opacity(0.7))
+                    Text(L("{0} kcal", effectiveTarget))
                         .font(.system(size: 30, weight: .bold, design: .rounded))
                         .contentTransition(.numericText())
                         .animation(.spring, value: effectiveTarget)
                 }
                 Spacer()
-                Text("BMI \(p.bmi, specifier: "%.1f")")
+                Text(L("BMI {0}", String(format: "%.1f", p.bmi)))
                     .font(.caption.bold())
                     .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(p.bmiCategory.color.opacity(0.18), in: Capsule())
             }
-            Text("Base metabolism \(p.bmr) × activity, \(goal < 0 && !underweight ? "−400 to lose gently" : goal > 0 ? "+300 to gain" : "to keep your weight"). You can change it later in Profile.")
+            Text(L("Base metabolism {0} × activity, {1}. You can change it later in Profile.", p.bmr,
+                   goal < 0 && !underweight ? L("−400 to lose gently") : goal > 0 ? L("+300 to gain") : L("to keep your weight")))
                 .font(.caption).foregroundStyle(.secondary)
         }
         .foregroundStyle(Color.burgundy)

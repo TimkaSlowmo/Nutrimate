@@ -1,4 +1,5 @@
 import SwiftUI
+import QuartzCore
 
 /// Нутрик — маскот NutriMate: чиби-кошечка на коротких ножках, чёрное каре с ушками,
 /// бежевая рубашка-оверсайз с красным бантом, хвост и листик-заколка. Немного неряшливая:
@@ -18,15 +19,18 @@ struct NutrikView: View {
     /// Анимируем только видимого Нутрика (на скрытых вкладках/листах таймер стоит).
     @State private var visible = false
     @Environment(\.scenePhase) private var scenePhase
+    /// Экран прокручивается — Нутрик замирает на это время (анимация Canvas во время прокрутки
+    /// стоила Home ~40 кадров/с в симуляторе). Отпустил палец — снова двигается.
+    @Environment(\.nutrikPaused) private var scrollPaused
 
     var body: some View {
         let shown: NutrikMood = tripping ? .fall : mood
         // Спокойные настроения — 30 кадров (мультяшно и дёшево), бег/падение/радость/еда — 60.
         // Canvas рисуется асинхронно, вне главного потока: прокрутка экрана не ждёт Нутрика.
         let fast = ([.run, .fall, .cheer, .eating] as [NutrikMood]).contains(shown)
-        TimelineView(.animation(minimumInterval: fast ? 1.0 / 60.0 : 1.0 / 30.0, paused: !visible || scenePhase != .active || UIShot.perfOff.contains("nutrik"))) { tl in
+        TimelineView(.animation(minimumInterval: fast ? 1.0 / 60.0 : 1.0 / 30.0, paused: !visible || scrollPaused || scenePhase != .active || UIShot.perfOff.contains("nutrik"))) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
-            Canvas(rendersAsynchronously: true) { ctx, sz in
+            Canvas(rendersAsynchronously: !UIShot.perfOff.contains("sync")) { ctx, sz in
                 NutrikPainter(t: t, mood: shown, food: food).draw(&ctx, sz)
             } symbols: {
                 // эмодзи рендерятся один раз и дальше рисуются как готовые картинки (раньше — текст каждый кадр)
@@ -405,4 +409,51 @@ struct BubbleShape: Shape {
         p.closeSubpath()
         return p
     }
+}
+
+// MARK: - Пауза Нутрика во время прокрутки
+
+private struct NutrikPausedKey: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    var nutrikPaused: Bool {
+        get { self[NutrikPausedKey.self] }
+        set { self[NutrikPausedKey.self] = newValue }
+    }
+}
+
+/// Пока ScrollView двигается (пальцем или программно), Нутрики внутри не перерисовываются.
+private final class ScrollClock { var last: CFTimeInterval = 0 }
+
+private struct PauseNutrikWhileScrolling: ViewModifier {
+    @State private var scrolling = false
+    @State private var clock = ScrollClock()
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *), !UIShot.perfOff.contains("nopause") {
+            content
+                .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { _, _ in moved() }
+                .environment(\.nutrikPaused, scrolling)
+        } else {
+            content
+        }
+    }
+
+    private func moved() {
+        clock.last = CACurrentMediaTime()
+        guard !scrolling else { return }
+        scrolling = true
+        watch()
+    }
+
+    /// Проверяем 5 раз в секунду: 0.25 с без движения — прокрутка закончилась.
+    private func watch() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            if CACurrentMediaTime() - clock.last > 0.25 { scrolling = false } else { watch() }
+        }
+    }
+}
+
+extension View {
+    /// Ставится на ScrollView, внутри которого есть Нутрик.
+    func pausesNutrikWhileScrolling() -> some View { modifier(PauseNutrikWhileScrolling()) }
 }

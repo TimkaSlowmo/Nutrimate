@@ -65,6 +65,28 @@ struct ProfileView: View {
                         SettingsRow(icon: "graduationcap.fill", tint: Color(hex: 0x00897B), title: "Replay tutorial", chevron: false) { store.replayTutorial() }
                     }
 
+                    SettingsGroup(title: L("Language")) {
+                        Menu {
+                            Picker(L("Language"), selection: $store.data.language) {
+                                ForEach(AppLang.allCases) { lang in
+                                    Text("\(lang.flag) \(lang.native)").tag(lang)
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                SettingsIcon(name: "globe", tint: Color(hex: 0x3949AB))
+                                Text(L("App language")).foregroundStyle(.primary).lineLimit(1).minimumScaleFactor(0.8)
+                                Spacer(minLength: 6)
+                                Text("\(store.data.language.flag) \(store.data.language.native)")
+                                    .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                                Image(systemName: "chevron.up.chevron.down").font(.footnote.bold()).foregroundStyle(.tertiary)
+                            }
+                            .padding(.horizontal, 14).padding(.vertical, 11)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(RowPressStyle())
+                    }
+
                     SettingsGroup(title: "Notifications") {
                         SettingsToggle(icon: "bell.badge.fill", tint: .badRed, title: "Daily reminders",
                                        subtitle: "At 9:00 Nutrik tells you what expires today and tomorrow",
@@ -89,6 +111,7 @@ struct ProfileView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
             }
+            .pausesNutrikWhileScrolling()
             .onAppear {
                 // режим скриншотов: `-scrollBottom` показывает низ профиля
                 if UIShot.enabled && UIShot.args.contains("-scrollBottom") {
