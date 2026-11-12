@@ -79,8 +79,11 @@ struct RecipeCard: View, Equatable {
         let haveCount = recipe.ingredients.filter { have.contains($0.name) }.count
         let rescues = recipe.ingredients.filter { urgent.contains($0.name) }.count
         HStack(spacing: 12) {
-            Text(recipe.emoji).font(.system(size: 38)).frame(width: 58, height: 58)
-                .background(Circle().fill(Color.paper.opacity(0.6)))
+            Group {
+                if UIShot.perfOff.contains("emoji") { Color.clear } else { Text(recipe.emoji).font(.system(size: 38)) }
+            }
+            .frame(width: 58, height: 58)
+            .background(Circle().fill(Color.paper.opacity(0.6)))
             VStack(alignment: .leading, spacing: 4) {
                 Text(N(recipe.name)).font(.headline).foregroundStyle(Color.burgundy).lineLimit(2)
                 Text(L("⏱ {0} · {1} kcal/serving", recipe.localTime, recipe.kcal)).font(.caption).foregroundStyle(.secondary)
