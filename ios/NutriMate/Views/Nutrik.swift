@@ -21,9 +21,12 @@ struct NutrikView: View {
 
     var body: some View {
         let shown: NutrikMood = tripping ? .fall : mood
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !visible || scenePhase != .active)) { tl in
+        // Спокойные настроения — 30 кадров (мультяшно и дёшево), бег/падение/радость/еда — 60.
+        // Canvas рисуется асинхронно, вне главного потока: прокрутка экрана не ждёт Нутрика.
+        let fast = ([.run, .fall, .cheer, .eating] as [NutrikMood]).contains(shown)
+        TimelineView(.animation(minimumInterval: fast ? 1.0 / 60.0 : 1.0 / 30.0, paused: !visible || scenePhase != .active)) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
-            Canvas { ctx, sz in
+            Canvas(rendersAsynchronously: true) { ctx, sz in
                 NutrikPainter(t: t, mood: shown, food: food).draw(&ctx, sz)
             }
             .frame(width: size, height: size * 1.15)

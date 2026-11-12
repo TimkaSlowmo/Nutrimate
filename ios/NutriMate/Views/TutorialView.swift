@@ -18,7 +18,7 @@ enum Tutorial {
                      text: "Your fridge! Every product has a freshness bar. Swipe right if you ate it, left to freeze, share or bin it.",
                      mood: .happy),
         TutorialStep(tab: .search, title: "Search",
-                     text: "\(FoodDB.shared.foods.count) foods from the US and Kazakhstan. Tap ＋ to put one in the fridge, long-press to log what you ate.",
+                     text: "\(FoodDB.shared.foods.count) foods from all over the world. Tap ＋ to put one in the fridge, long-press to log what you ate.",
                      mood: .eating),
         TutorialStep(tab: .recipes, title: "Recipes",
                      text: "Recipes made from what you already have — food that expires soonest goes on top. Missing items go to the shopping list.",

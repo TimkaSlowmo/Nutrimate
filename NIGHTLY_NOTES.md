@@ -1,13 +1,21 @@
 # NutriMate — журнал ночного агента
 
 ## Текущее состояние
-- Веб: **v15** · iOS: **v6** · продуктов: **1357** · рецептов: **110** (zero-waste: 43)
-- ИИ-сервер: код в server/, деплой — server.yml; ждёт секретов Cloudflare (server/SETUP_RU.md). После деплоя — подключить к веб-чату.
-- Главная версия теперь iOS (папка ios/, журнал ios/NIGHTLY_NOTES_IOS.md). Веб — только баги.
+- Веб: **v17** · iOS: **v9** · продуктов: **1424** · рецептов: **118** (zero-waste: 47) · переводов ru/kk: 0 (начнутся с жалобы 3)
+- ИИ-сервер работает (Cloudflare Workers AI, бесплатно); с 12.11 честен о действиях (тест + smoke-тест).
+- Главная версия — iOS (ios/, журнал ios/NIGHTLY_NOTES_IOS.md, жалобы ios/BUILD_ERRORS.md). Веб — баги и перенос закрытых жалоб.
 - Единая база: `python3 tool/export_data.py` проверяет дубли/ингредиенты и пишет ios/NutriMate/Resources/foods.json.
-- Иконки: все продукты показываются 3D-картинками (Fluent 3D + свои). Уникальная иконка: **40 / 1218**.
-- Локально Flutter недоступен (сервер Google заблокирован прокси) → компиляцию проверяет GitHub Actions.
-  Неудачная сборка не публикуется, так что сайт остаётся на прошлой версии.
+- Локально Flutter недоступен → компиляцию проверяет GitHub Actions.
+
+## 2026-11-12 (утро) · веб v17 · iOS v9
+- iOS v9: плавность (жалоба 1), складывание одинаковых продуктов (жалоба 2), честные команды-действия в чате на 3 языках (жалоба 5, частично).
+- Сервер: не утверждает, что сделал действие; отвечает на языке пользователя.
+- Веб v17: только данные. +36 продуктов: Kabocha/Delicata Squash, Celtuce, Salsify, Fiddlehead Ferns, Ramps, Nopales, Tomatillo,
+  Shishito/Padron Peppers, Samphire, Garlic Scapes, Pea Shoots, Purple Sweet Potato, Maitake, Lion's Mane, Black Trumpet,
+  Lovage, Culantro, Lemon Verbena, Jabuticaba, Acerola, Camu Camu, Cupuacu, Mamey Sapote, Medlar, Pawpaw, Calamansi,
+  Buddha's Hand, Finger Lime, Ugli Fruit, Chili Crisp, Hot Honey, Tajin Seasoning, Togarashi, Hearts of Palm.
+- +4 рецепта: Chili Crisp Fried Eggs on Rice (zw), Blistered Shishito Peppers, Hot Honey Halloumi Toast (zw), Roasted Kabocha Squash Soup (zw).
+- Бэклог веба: складывание продуктов, честные команды в чате, три языка.
 
 ## 2026-11-12 (ночь 6) · веб v15 · iOS v6
 - iOS v6: онлайн-ИИ Нутрик через бесплатный Cloudflare Worker (код готов, ждёт настройки), офлайн — запасной.
