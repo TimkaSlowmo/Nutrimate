@@ -234,6 +234,8 @@ struct PantryItem: Codable, Identifiable, Hashable {
     var storage: StorageKind
     /// Сколько штук/упаковок в этой партии (v9; в старых сохранениях нет → 1)
     var qty: Int = 1
+    /// Остатки приготовленного блюда (v27): name — рецепт, qty — порции. В старых сохранениях нет → false.
+    var leftover: Bool = false
 
     var food: Food { FoodDB.shared.byName[name] ?? Food(emoji: emoji, name: name, kcal: kcal, category: category, shelf: 7) }
     var daysLeft: Int { daysBetween(Date(), expiry) }
@@ -259,13 +261,14 @@ extension PantryItem {
         expiry = (try? c.decodeIfPresent(Date.self, forKey: .expiry)) ?? added
         storage = (try? c.decodeIfPresent(StorageKind.self, forKey: .storage)) ?? .fridge
         qty = max(1, (try? c.decodeIfPresent(Int.self, forKey: .qty)) ?? 1)
+        leftover = (try? c.decodeIfPresent(Bool.self, forKey: .leftover)) ?? false
     }
 
-    /// Остатки приготовленного блюда (v27): строка, чьё имя — рецепт из базы, а не продукт. qty = порции.
-    var isLeftover: Bool { FoodDB.shared.byName[name] == nil && FoodDB.shared.recipeByName[name] != nil }
+    var isLeftover: Bool { leftover }
 
-    /// Ключ строки в холодильнике: одинаковый продукт в одном месте хранения складывается.
-    var groupKey: String { "\(name)|\(storage.rawValue)" }
+    /// Ключ строки в холодильнике: одинаковый продукт в одном месте хранения складывается
+    /// (остатки «Chicken Curry» не смешиваются с купленным готовым карри).
+    var groupKey: String { "\(name)|\(storage.rawValue)\(leftover ? "|leftover" : "")" }
 }
 
 /// Одна строка холодильника: «🥚 Eggs ×3» — все партии одного продукта в одном месте.

@@ -72,7 +72,7 @@ enum UIShot {
         // остатки приготовленного (v27): 2 порции карри со вчера
         if let r = db.recipeByName["Chicken Curry"] {
             d.pantry.append(PantryItem(name: r.name, emoji: r.emoji, category: "Ready Meals", kcal: r.kcalPer100,
-                                       added: day(-1), expiry: day(2), storage: .fridge, qty: 2))
+                                       added: day(-1), expiry: day(2), storage: .fridge, qty: 2, leftover: true))
             d.stats.leftoversSaved = 2
         }
         d.log = [

@@ -218,7 +218,7 @@ final class AppStore: ObservableObject {
         let exp = Calendar.current.date(byAdding: .day, value: days ?? f.shelf, to: now) ?? now
         let n = max(1, count)
         // та же партия (тот же продукт, место и срок ±1 день) → просто +n; иначе новая партия в той же строке
-        if let i = data.pantry.firstIndex(where: { $0.name == f.name && $0.storage == place && abs(daysBetween($0.expiry, exp)) <= 1 }) {
+        if let i = data.pantry.firstIndex(where: { $0.name == f.name && !$0.leftover && $0.storage == place && abs(daysBetween($0.expiry, exp)) <= 1 }) {
             data.pantry[i].qty += n
         } else {
             data.pantry.append(PantryItem(name: f.name, emoji: f.emoji, category: f.category, kcal: f.kcal,
@@ -226,7 +226,7 @@ final class AppStore: ObservableObject {
         }
         if !quiet {
             haptic()
-            let total = data.pantry.filter { $0.name == f.name && $0.storage == place }.reduce(0) { $0 + $1.qty }
+            let total = data.pantry.filter { $0.name == f.name && !$0.leftover && $0.storage == place }.reduce(0) { $0 + $1.qty }
             let what = n > 1 ? "\(n)× \(N(f.name))" : N(f.name)
             let msg = L("{0} {1} added to your {2}", f.emoji, what, place.title.lowercased())
             say(total > n ? msg + L(" · now ×{0}", total) : msg)
@@ -238,7 +238,7 @@ final class AppStore: ObservableObject {
     static func normalized(_ items: [PantryItem]) -> [PantryItem] {
         var out: [PantryItem] = []
         for p in items {
-            if let i = out.firstIndex(where: { $0.name == p.name && $0.storage == p.storage && abs(daysBetween($0.expiry, p.expiry)) <= 1 }) {
+            if let i = out.firstIndex(where: { $0.groupKey == p.groupKey && abs(daysBetween($0.expiry, p.expiry)) <= 1 }) {
                 out[i].qty += p.qty
                 if p.expiry < out[i].expiry { out[i].expiry = p.expiry }   // осторожно: берём более ранний срок
                 if p.added < out[i].added { out[i].added = p.added }
@@ -445,7 +445,7 @@ final class AppStore: ObservableObject {
             // остальные — одна упаковка, как раньше. Меньше половины штуки (зубчик чеснока) — головка остаётся.
             var need = ing.pieces ?? 1
             var first = true
-            while need > 0, let p = data.pantry.filter({ $0.name == ing.name }).min(by: { $0.expiry < $1.expiry }) {
+            while need > 0, let p = data.pantry.filter({ $0.name == ing.name && !$0.leftover }).min(by: { $0.expiry < $1.expiry }) {
                 if first { use(p); first = false } // сначала то, что скорее испортится
                 takeOne(p.id)
                 need -= 1
@@ -458,11 +458,11 @@ final class AppStore: ObservableObject {
             // Остатки — в холодильник отдельной строкой «🍳 Омлет ×2» (порции), срок 3 дня; Нутрик напомнит
             let now = Date()
             let exp = Calendar.current.date(byAdding: .day, value: AppStore.leftoverDays, to: now) ?? now
-            if let i = data.pantry.firstIndex(where: { $0.name == r.name && $0.storage == .fridge && abs(daysBetween($0.expiry, exp)) <= 1 }) {
+            if let i = data.pantry.firstIndex(where: { $0.leftover && $0.name == r.name && $0.storage == .fridge && abs(daysBetween($0.expiry, exp)) <= 1 }) {
                 data.pantry[i].qty += leftovers
             } else {
                 data.pantry.append(PantryItem(name: r.name, emoji: r.emoji, category: "Ready Meals", kcal: r.kcalPer100,
-                                              added: now, expiry: exp, storage: .fridge, qty: leftovers))
+                                              added: now, expiry: exp, storage: .fridge, qty: leftovers, leftover: true))
             }
             data.stats.leftoversSaved += leftovers
             react(.cheer, L("Bon appétit! 🥡 {0} saved in the fridge — eat within 3 days", Lp(leftovers, "portion|portions")), emoji: r.emoji)
