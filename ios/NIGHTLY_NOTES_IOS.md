@@ -27,7 +27,17 @@
 - [x] 8. Недельный отчёт (v8), плавность 60/120 fps и складывание продуктов (v9)
 - [x] 9. Жалобы 4 (новый профиль) и 5 (structured actions от сервера) — v10
 - [x] 10. Жалоба 3 (три языка) — v17; все жалобы 12.11 закрыты
-- [ ] 7+. Улучшения: полировка, тёмная тема, недельная статистика
+- [ ] 7+. Улучшения: полировка, тёмная тема
+
+## 2026-11-12 (поздний вечер) · v19 — данные, мелкие переводы, снимок рецепта
+- База: **1531 продукт** (+25: Burdock Root, Yardlong Beans, Water Spinach, Luffa, Garlic Chives, Lemon Balm, Black Truffle,
+  Nameko, Chicken of the Woods, Jujube, Wax Apple, Pepino Melon, Kiwiberries, Saskatoon Berries, Guanciale, Nduja,
+  Beef Short Ribs, Oxtail, Barramundi, Cuttlefish, Sea Urchin, Ancho Chiles, Peanut Oil, Corn Syrup, Spam),
+  **130 рецептов** (+3: Spam Musubi, Nduja Burrata Rigatoni, Garlic Water Spinach Stir-Fry ♻️); все названия и шаги — ru/kk.
+- «Also: salt, pepper…» в рецепте и время готовки в карточке на Home — теперь на языке приложения (`Recipe.localStaples`, `localTime`).
+- Скриншоты: `-sheet recipe` → 18-recipe (+ ru/kk) — проверка переведённых шагов.
+- Строки веба лежат в `tool/l10n/web.json` (общая папка с iOS; при одинаковом ключе побеждает перевод iOS).
+- Бэклог: тёмная тема (аккуратно, айдентика бордо/крем), полировка по снимкам.
 
 ## 2026-11-12 (вечер) · v18 — переводы целиком, Recipes быстрее
 - **Переводы**: все 1506 названий продуктов и все 127 рецептов — ru/kk (`tool/translations_src.txt`); шаги всех рецептов —

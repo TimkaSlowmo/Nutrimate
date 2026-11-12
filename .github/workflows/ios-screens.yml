@@ -6,7 +6,7 @@ name: iOS screenshots (simulator)
 on:
   push:
     branches: [main]
-    paths: ['ios/**', '.github/workflows/ios-screens.yml']
+    paths: ['ios/**', '!ios/*.md', '.github/workflows/ios-screens.yml']
   workflow_dispatch:
 
 permissions:

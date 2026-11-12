@@ -1,11 +1,28 @@
 # NutriMate — журнал ночного агента
 
 ## Текущее состояние
-- Веб: **v20** · iOS: **v18** (нумерация продолжает версии из DartPad: v1–v15 были там) · продуктов: **1506** · рецептов: **127** (zero-waste: 53) · переводы ru/kk: **все** названия продуктов и рецептов + шаги всех рецептов · строк интерфейса iOS: **540**
+- Веб: **v21** · iOS: **v19** (нумерация продолжает версии из DartPad: v1–v15 были там) · продуктов: **1531** · рецептов: **130** (zero-waste: 54) · переводы ru/kk: **все** названия продуктов и рецептов + шаги всех рецептов · строк интерфейса: iOS 510 ключей, веб ~280 своих + общие
 - ИИ-сервер работает (Cloudflare Workers AI, бесплатно); с v10 предлагает действия только структурированно (`actions`), приложение выполняет само.
 - Главная версия — iOS (ios/, журнал ios/NIGHTLY_NOTES_IOS.md, жалобы ios/BUILD_ERRORS.md). Веб — баги и перенос закрытых жалоб.
 - Единая база: `python3 tool/export_data.py` проверяет дубли/ингредиенты и пишет ios/NutriMate/Resources/foods.json.
 - Локально Flutter недоступен → компиляцию проверяет GitHub Actions.
+
+## 2026-11-12 (поздний вечер) · веб v21 · iOS v19
+- **Веб v21 — три языка (EN/RU/KK)**: `lib/l10n.dart` (`tr('English', [args])` с `{0}`, `trp(n, 'one|other')` — русские формы
+  «день/дня/дней», `tn(name)` — продукт/рецепт/категория, `trSteps`, `trTime`, `trStaples`, `fmtDate` по-русски/казахски) +
+  `lib/l10n_data.dart` (генерирует `python3 tool/export_web_l10n.py` из tool/l10n/*.json, translations_src.txt и
+  recipe_steps_l10n.json; падает, если у tr('…') в коде нет перевода). Первый экран регистрации — крупные карточки
+  🇬🇧/🇷🇺/🇰🇿, Нутрик здоровается на выбранном; Profile → Language — смена сразу. Поле `language` в сохранении
+  (мягко; по умолчанию язык браузера, если ru/kk). Переведены: регистрация, туториал, реплики Нутрика, Home, Fridge,
+  Search (ищет на 3 языках), Recipes + шаги, Eco, Weight, Shopping, Medals, Profile, советы, причины выброса.
+  ИИ получает `context.language`. Пока по-английски: офлайн-ответы веб-чата (MockAiService), системный выбор даты.
+- iOS v19: +25 продуктов, +3 рецепта, специи/время рецепта на языке приложения, снимок 18-recipe.
+- +25 продуктов (Burdock Root, Yardlong Beans, Water Spinach, Luffa, Garlic Chives, Lemon Balm, Black Truffle, Nameko,
+  Chicken of the Woods, Jujube, Wax Apple, Pepino Melon, Kiwiberries, Saskatoon Berries, Guanciale, Nduja, Beef Short Ribs,
+  Oxtail, Barramundi, Cuttlefish, Sea Urchin, Ancho Chiles, Peanut Oil, Corn Syrup, Spam); +3 рецепта: Spam Musubi,
+  Nduja Burrata Rigatoni, Garlic Water Spinach Stir-Fry (zw).
+- Бэклог веба: офлайн-ответы чата на ru/kk, проверить вёрстку длинных русских/казахских строк (снимков веба нет — сайт
+  из песочницы не открывается).
 
 ## 2026-11-12 (вечер) · веб v20 · iOS v18
 - iOS v18: переведены все оставшиеся ~950 названий продуктов и шаги всех рецептов (ru/kk); Recipes легче; Edit profile — подпись не под таб-баром.
