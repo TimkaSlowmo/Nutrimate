@@ -2067,6 +2067,22 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// ＋ в строке холодильника: ещё одна штука того же продукта в том же месте.
+  void addMore(PantryItem p) {
+    final n = now();
+    pantry.add(PantryItem(_id++, p.food, n, n.add(Duration(days: p.storage == Storage.freezer ? 90 : p.food.shelf)), p.storage));
+    _check();
+    notifyListeners();
+  }
+
+  /// − в строке холодильника: исправление количества (не считается отходом) — убираем самую свежую штуку.
+  void removeOne(PantryItem p) {
+    final same = pantry.where((x) => x.food.name == p.food.name && x.storage == p.storage).toList()
+      ..sort((a, b) => b.daysLeft.compareTo(a.daysLeft));
+    if (same.isNotEmpty) pantry.remove(same.first);
+    notifyListeners();
+  }
+
   /// Набор продуктов для демонстрации: часть уже «горит», часть свежая.
   void loadDemo() {
     const demo = {
@@ -6967,7 +6983,22 @@ void itemSheet(BuildContext ctx, AppState s, PantryItem p) {
 class PantryTile extends StatelessWidget {
   final PantryItem item;
   final AppState state;
-  const PantryTile({super.key, required this.item, required this.state});
+  final int count;
+  final int batches;
+  const PantryTile({super.key, required this.item, required this.state, this.count = 1, this.batches = 1});
+
+  Widget _step(IconData i, String tip, VoidCallback f) => SizedBox(
+    width: 30,
+    height: 30,
+    child: IconButton(
+      tooltip: tip,
+      padding: EdgeInsets.zero,
+      iconSize: 18,
+      style: IconButton.styleFrom(backgroundColor: burgundy.withValues(alpha: 0.08)),
+      icon: Icon(i, color: burgundy),
+      onPressed: f,
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -7026,11 +7057,24 @@ class PantryTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        item.food.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              item.food.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                          ),
+                          if (count > 1)
+                            Container(
+                              margin: const EdgeInsets.only(left: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                              decoration: BoxDecoration(color: burgundy, borderRadius: BorderRadius.circular(10)),
+                              child: Text('×$count', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Row(
@@ -7039,18 +7083,30 @@ class PantryTile extends StatelessWidget {
                             item.status,
                             style: TextStyle(color: item.color, fontWeight: FontWeight.bold, fontSize: 12),
                           ),
-                          Text('  ·  ${storageLabel[item.storage]}', style: const TextStyle(color: Colors.black45, fontSize: 12)),
+                          Flexible(
+                            child: Text(
+                              '  ·  ${batches > 1 ? '$batches batches' : storageLabel[item.storage]}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.black45, fontSize: 12),
+                            ),
+                          ),
                         ],
                       ),
                     ],
                   ),
                 ),
+                _step(Icons.remove, 'One less', () => state.removeOne(item)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text('$count', style: const TextStyle(fontWeight: FontWeight.bold, color: burgundy)),
+                ),
+                _step(Icons.add, 'One more', () => state.addMore(item)),
                 IconButton(
                   tooltip: 'Eat',
                   icon: const Icon(Icons.restaurant, color: burgundy),
                   onPressed: () => eatSheet(context, state, item),
                 ),
-                const Icon(Icons.more_vert, color: Colors.black38),
               ],
             ),
           ),
@@ -7310,7 +7366,17 @@ class _PantryPageState extends State<PantryPage> {
   Widget build(BuildContext context) {
     final s = widget.state;
     final all = [...s.pantry]..sort((a, b) => a.daysLeft.compareTo(b.daysLeft));
-    final items = all.where((p) => place == null || p.storage == place).toList();
+    // Одинаковые продукты в одном месте складываются в одну строку «×N» (жалоба 2):
+    // строка показывает самую старую партию — «съел»/«выбросил» списывают сначала её.
+    final count = <String, int>{};
+    final batches = <String, Set<int>>{};
+    String key(PantryItem p) => '${p.food.name}|${p.storage.index}';
+    for (final p in all) {
+      count[key(p)] = (count[key(p)] ?? 0) + 1;
+      (batches[key(p)] ??= <int>{}).add(p.daysLeft);
+    }
+    final seen = <String>{};
+    final items = all.where((p) => (place == null || p.storage == place) && seen.add(key(p))).toList();
     final groups = <(String, String, List<PantryItem>)>[
       ('☠️', 'Expired', items.where((p) => p.daysLeft < 0).toList()),
       ('🔥', 'Use today or tomorrow', items.where((p) => p.daysLeft >= 0 && p.daysLeft <= 1).toList()),
@@ -7383,7 +7449,7 @@ class _PantryPageState extends State<PantryPage> {
                                   Text('${g.$1}  ${g.$2}', style: headStyle),
                                   const Spacer(),
                                   Text(
-                                    '${g.$3.length}',
+                                    '${g.$3.fold<int>(0, (a, p) => a + (count[key(p)] ?? 1))}',
                                     style: const TextStyle(color: Colors.black45, fontWeight: FontWeight.bold),
                                   ),
                                 ],
@@ -7393,7 +7459,7 @@ class _PantryPageState extends State<PantryPage> {
                               Appear(
                                 key: ValueKey('p${p.id}'),
                                 index: idx++,
-                                child: PantryTile(item: p, state: s),
+                                child: PantryTile(item: p, state: s, count: count[key(p)] ?? 1, batches: batches[key(p)]?.length ?? 1),
                               ),
                           ],
                       ],
