@@ -90,6 +90,15 @@ assert.equal(e.reply, 'Хорошо!');
 e = extractActions('ACTIONS: [{"type":"delete_everything","name":"Eggs"},{"type":"freeze","name":"Chicken Breast","qty":500}]');
 assert.deepEqual(e.actions, [{ type: 'freeze', name: 'Chicken Breast', qty: 99 }]);
 assert.deepEqual(extractActions('ACTIONS: [not json').actions, []);
+// метка кириллицей (так ответила модель на казахском в smoke-тесте) — действие не теряется и не попадает в текст
+e = extractActions('Жарайды! 🐾\nАқырында, жұмыртқа тоңазытқышта сақталады.\n\nАCTIONS: [{"type":"add_fridge","name":"Eggs","qty":2}]');
+assert.deepEqual(e.actions, [{ type: 'add_fridge', name: 'Eggs', qty: 2 }]);
+assert.ok(!/CTIONS/.test(e.reply), e.reply);
+// голый JSON-массив действий на отдельной строке
+e = extractActions('Ок!\n[{"type":"eat","name":"Banana","qty":1}]');
+assert.deepEqual(e.actions, [{ type: 'eat', name: 'Banana', qty: 1 }]);
+// обычный текст со списком в скобках — не действие
+assert.deepEqual(extractActions('Try: [eggs, milk]').actions, []);
 assert.deepEqual(extractActions('Try an omelette 🍳').actions, []);
 
 const actor = (answer) => ({ AI: { async run(model, input) {

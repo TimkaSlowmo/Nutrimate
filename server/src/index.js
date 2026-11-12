@@ -53,15 +53,20 @@ const PROMISES_ACTION = /(passing it to the app|i'?ll add|i will add|сейча�
 
 const ACTION_TYPES = new Set(['add_fridge', 'add_freezer', 'add_shopping', 'eat', 'discard', 'freeze']);
 
+const HOMOGLYPHS = { А: 'A', В: 'B', С: 'C', Е: 'E', Н: 'H', І: 'I', К: 'K', М: 'M', О: 'O', Р: 'P', Т: 'T', Х: 'X', Ѕ: 'S' };
+const toLatin = (s) => String(s).toUpperCase().replace(/[АВСЕНІКМОРТХЅ]/g, (ch) => HOMOGLYPHS[ch] || ch);
+
 // Достаём «ACTIONS: [...]» (или ```json [...]```) из ответа модели, проверяем и убираем из текста.
 export function extractActions(text) {
   let reply = String(text || '');
   let raw = null;
-  const line = reply.match(/^[ \t>*`]*ACTIONS?\s*:?\s*(\[[\s\S]*?\])\s*`*\s*$/im);
-  if (line) { raw = line[1]; reply = reply.replace(line[0], ''); }
+  const block = reply.match(/```(?:json)?\s*(\[[\s\S]*?"type"[\s\S]*?\])\s*```/i);
+  if (block) { raw = block[1]; reply = reply.replace(block[0], ''); }
   else {
-    const block = reply.match(/```(?:json)?\s*(\[[\s\S]*?"type"[\s\S]*?\])\s*```/i);
-    if (block) { raw = block[1]; reply = reply.replace(block[0], ''); }
+    // Модель иногда пишет метку кириллицей («АCTIONS») или без метки — принимаем и это.
+    for (const m of reply.matchAll(/^[ \t>*`]*([^\s:\[`]{5,9})?\s*:?\s*(\[\s*\{[\s\S]*?\])\s*`*\s*$/gim)) {
+      if (!m[1] || toLatin(m[1]).startsWith('ACTION')) { raw = m[2]; reply = reply.replace(m[0], ''); break; }
+    }
   }
   let actions = [];
   if (raw) {
