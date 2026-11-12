@@ -64,7 +64,8 @@ struct RootView: View {
             case "cook":
                 let db = FoodDB.shared
                 if let r = db.recipes.first(where: { $0.name == "Savory Bread Strata" }) ?? db.recipes.first {
-                    CookModeView(recipe: r, startPage: Int(UIShot.value("-cookPage") ?? "2") ?? 2)
+                    CookModeView(recipe: r.scaled(to: Int(UIShot.value("-serves") ?? "") ?? r.servings),
+                                 startPage: Int(UIShot.value("-cookPage") ?? "2") ?? 2)
                 }
             case "recipe":
                 let db = FoodDB.shared

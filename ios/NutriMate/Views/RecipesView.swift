@@ -111,6 +111,7 @@ struct RecipeDetail: View {
     @Environment(\.dismiss) private var dismiss
     let base: Recipe
     @State private var portions = 1
+    @State private var keepLeftovers = true
     @State private var done = Set<Int>()
     @State private var cooking = false
     /// На сколько порций готовим: граммы в списке, режиме готовки и списании пересчитываются
@@ -189,8 +190,9 @@ struct RecipeDetail: View {
                 VStack(spacing: 10) {
                     Stepper(L("Portions eaten: {0} · {1} kcal", portions, recipe.kcal * portions), value: $portions, in: 1...max(1, recipe.servings))
                         .onChange(of: serves) { _, n in portions = min(portions, n) }
+                    LeftoversToggle(recipe: recipe, portions: portions, on: $keepLeftovers)
                     Button(L("I cooked it! 👩‍🍳")) {
-                        store.cook(recipe, portions: portions)
+                        store.cook(recipe, portions: portions, leftovers: keepLeftovers ? max(0, recipe.servings - portions) : 0)
                         dismiss()
                     }
                     .buttonStyle(PrimaryButtonStyle())
@@ -339,4 +341,29 @@ extension Recipe {
         "soy sauce": ["соевый соус", "соя соусы"], "oil for frying": ["масло для жарки", "қуыруға май"],
         "ice": ["лёд", "мұз"], "nothing else": ["больше ничего", "басқа ештеңе"],
     ]
+}
+
+
+/// «🥡 Убрать остатки в холодильник»: приготовили больше, чем съели → порции-остатки отдельной строкой, срок 3 дня (v27).
+struct LeftoversToggle: View {
+    let recipe: Recipe
+    let portions: Int
+    @Binding var on: Bool
+
+    var body: some View {
+        let left = recipe.servings - portions
+        if left > 0 {
+            Toggle(isOn: $on.animation(.snappy)) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L("🥡 Put {0} in the fridge", Lp(left, "leftover portion|leftover portions")))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.burgundy)
+                    Text(L("Eat within 3 days — Nutrik will remind you"))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .tint(Color.freshGreen)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
+    }
 }

@@ -58,7 +58,7 @@ struct FridgeView: View {
                                     }
                                 }
                                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                    Button { store.eat(p.first.id, grams: 100, finished: true) } label: { Label(p.qty > 1 ? L("Ate 1") : L("Ate it"), systemImage: "fork.knife") }
+                                    Button { store.eat(p.first.id, grams: p.defaultGrams, finished: true) } label: { Label(p.qty > 1 ? L("Ate 1") : L("Ate it"), systemImage: "fork.knife") }
                                         .tint(.freshGreen)
                                 }
                         }
@@ -123,14 +123,18 @@ struct ItemSheet: View {
                         EmojiBadge(emoji: g.emoji, size: 96)
                         VStack(spacing: 4) {
                             Text(N(g.name)).font(.title.bold()).foregroundStyle(Color.burgundy).multilineTextAlignment(.center)
-                            Text(L("{0} · {1} kcal / 100 g", N(g.category), g.kcal)).foregroundStyle(.secondary)
+                            if g.isLeftover, let r = FoodDB.shared.recipeByName[g.name] {
+                                Text(L("🥡 Leftovers · {0} kcal / portion", r.kcal)).foregroundStyle(.secondary)
+                            } else {
+                                Text(L("{0} · {1} kcal / 100 g", N(g.category), g.kcal)).foregroundStyle(.secondary)
+                            }
                         }
 
                         // Количество: одинаковые продукты сложены в одну строку
                         HStack(spacing: 14) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(L("Quantity")).font(.headline).foregroundStyle(Color.burgundy)
-                                Text(g.batches.count > 1 ? L("{0} · oldest goes first", Lp(g.batches.count, "batch|batches")) : L("pieces / packs"))
+                                Text(g.batches.count > 1 ? L("{0} · oldest goes first", Lp(g.batches.count, "batch|batches")) : (g.isLeftover ? L("portions") : L("pieces / packs")))
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -205,6 +209,7 @@ struct ItemSheet: View {
                     .padding(20)
                 }
                 .background(LiveBackground())
+                .onAppear { grams = g.defaultGrams }
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button(L("Done")) { dismiss() } } }
                 .confirmationDialog(L("Why is it going in the bin?"), isPresented: $askReason, titleVisibility: .visible) {
                     ForEach(WasteReason.allCases) { r in

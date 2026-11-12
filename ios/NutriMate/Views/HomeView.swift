@@ -279,6 +279,9 @@ struct PantryRow: View {
                 }
                 HStack(spacing: 6) {
                     Text(item.status).font(.caption.weight(.semibold)).foregroundStyle(Color.freshness(item.daysLeft))
+                    if item.isLeftover {
+                        Text(L("· 🥡 leftovers")).font(.caption).foregroundStyle(.secondary)
+                    }
                     if item.batches.count > 1 {
                         Text("· " + Lp(item.batches.count, "batch|batches")).font(.caption).foregroundStyle(.secondary)
                     }

@@ -56,6 +56,15 @@ struct Recipe: Codable, Hashable, Identifiable {
         return Int((total / Double(max(1, servings))).rounded())
     }
 
+    /// Примерный вес одной порции (г, до 10) — для остатков в холодильнике (v27).
+    var portionGrams: Int {
+        let g = Double(ingredients.reduce(0) { $0 + $1.g }) / Double(max(1, servings))
+        return max(50, Int((g / 10).rounded()) * 10)
+    }
+
+    /// ккал на 100 г готового блюда — остатки в холодильнике хранят калорийность как обычные продукты.
+    var kcalPer100: Int { Int((Double(kcal) * 100 / Double(portionGrams)).rounded()) }
+
     func missing(_ have: Set<String>) -> [String] {
         ingredients.map(\.name).filter { !have.contains($0) }
     }
@@ -252,6 +261,9 @@ extension PantryItem {
         qty = max(1, (try? c.decodeIfPresent(Int.self, forKey: .qty)) ?? 1)
     }
 
+    /// Остатки приготовленного блюда (v27): строка, чьё имя — рецепт из базы, а не продукт. qty = порции.
+    var isLeftover: Bool { FoodDB.shared.byName[name] == nil && FoodDB.shared.recipeByName[name] != nil }
+
     /// Ключ строки в холодильнике: одинаковый продукт в одном месте хранения складывается.
     var groupKey: String { "\(name)|\(storage.rawValue)" }
 }
@@ -274,6 +286,9 @@ struct PantryGroup: Identifiable, Hashable {
     var fresh: Double { first.fresh }
     var status: String { first.status }
     var title: String { qty > 1 ? "\(N(name)) ×\(qty)" : N(name) }
+    var isLeftover: Bool { first.isLeftover }
+    /// «Съел» по умолчанию: 100 г продукта или одна порция остатков
+    var defaultGrams: Int { isLeftover ? (FoodDB.shared.recipeByName[name]?.portionGrams ?? 100) : 100 }
 
     static func make(_ items: [PantryItem]) -> [PantryGroup] {
         var order: [String] = []
@@ -438,6 +453,8 @@ enum BMICategory: String {
 
 struct Stats: Codable {
     var consumed = 0, rescued = 0, wasted = 0, cooked = 0, bought = 0, frozen = 0, shared = 0
+    /// порций остатков, убранных в холодильник после готовки (v27)
+    var leftoversSaved = 0
     var rescuedMoney = 0.0, wastedMoney = 0.0
     var streakStart = Date()
 
@@ -447,7 +464,7 @@ struct Stats: Codable {
         func i(_ k: CodingKeys) -> Int { (try? c.decodeIfPresent(Int.self, forKey: k)) ?? 0 }
         func m(_ k: CodingKeys) -> Double { (try? c.decodeIfPresent(Double.self, forKey: k)) ?? 0 }
         consumed = i(.consumed); rescued = i(.rescued); wasted = i(.wasted); cooked = i(.cooked)
-        bought = i(.bought); frozen = i(.frozen); shared = i(.shared)
+        bought = i(.bought); frozen = i(.frozen); shared = i(.shared); leftoversSaved = i(.leftoversSaved)
         rescuedMoney = m(.rescuedMoney); wastedMoney = m(.wastedMoney)
         streakStart = (try? c.decodeIfPresent(Date.self, forKey: .streakStart)) ?? Date()
     }
@@ -533,6 +550,7 @@ struct Medal: Identifiable {
         Medal(id: "share", emoji: "🤝", title: LK("Good Neighbor"), desc: LK("Share food with someone instead of binning it")),
         Medal(id: "cleanfridge", emoji: "✨", title: LK("Clean Fridge"), desc: LK("5+ products and nothing expired")),
         Medal(id: "chatty", emoji: "💬", title: LK("Chatterbox"), desc: LK("Ask Nutrik 5 questions")),
+        Medal(id: "leftovers", emoji: "🥡", title: LK("Leftover Hero"), desc: LK("Save 3 leftover portions for later instead of binning them")),
     ]
 }
 

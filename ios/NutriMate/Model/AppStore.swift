@@ -435,7 +435,10 @@ final class AppStore: ObservableObject {
         data.pantry = AppStore.normalized(pantry)
     }
 
-    func cook(_ r: Recipe, portions: Int) {
+    /// Сколько дней хранятся остатки приготовленного в холодильнике (правило 3–4 дней, берём осторожно 3).
+    static let leftoverDays = 3
+
+    func cook(_ r: Recipe, portions: Int, leftovers: Int = 0) {
         remember("frying.pan", L("Cooked: {0}", "\(r.emoji) \(N(r.name))"))
         for ing in r.ingredients {
             // Штучные продукты (яйца, бананы…) списываются по количеству из рецепта (омлет на двоих — 6 яиц),
@@ -451,7 +454,21 @@ final class AppStore: ObservableObject {
         data.log.append(LogEntry(emoji: r.emoji, name: "\(N(r.name)) ×\(portions)", kcal: r.kcal * portions))
         data.stats.cooked += 1
         haptic(.medium)
-        react(.eat, L("Bon appétit! {0} cooked 👩‍🍳", N(r.name)), emoji: r.emoji)
+        if leftovers > 0 {
+            // Остатки — в холодильник отдельной строкой «🍳 Омлет ×2» (порции), срок 3 дня; Нутрик напомнит
+            let now = Date()
+            let exp = Calendar.current.date(byAdding: .day, value: AppStore.leftoverDays, to: now) ?? now
+            if let i = data.pantry.firstIndex(where: { $0.name == r.name && $0.storage == .fridge && abs(daysBetween($0.expiry, exp)) <= 1 }) {
+                data.pantry[i].qty += leftovers
+            } else {
+                data.pantry.append(PantryItem(name: r.name, emoji: r.emoji, category: "Ready Meals", kcal: r.kcalPer100,
+                                              added: now, expiry: exp, storage: .fridge, qty: leftovers))
+            }
+            data.stats.leftoversSaved += leftovers
+            react(.cheer, L("Bon appétit! 🥡 {0} saved in the fridge — eat within 3 days", Lp(leftovers, "portion|portions")), emoji: r.emoji)
+        } else {
+            react(.eat, L("Bon appétit! {0} cooked 👩‍🍳", N(r.name)), emoji: r.emoji)
+        }
         checkMedals()
     }
 
@@ -586,6 +603,7 @@ final class AppStore: ObservableObject {
         case "share": return s.shared >= 1
         case "cleanfridge": return unitCount >= 5 && expired.isEmpty
         case "chatty": return data.chat.filter(\.fromUser).count >= 5
+        case "leftovers": return s.leftoversSaved >= 3
         default: return co2 >= 2
         }
     }

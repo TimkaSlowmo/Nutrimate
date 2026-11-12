@@ -22,6 +22,7 @@ struct CookModeView: View {
     @State private var rung: Set<String> = []
     @State private var now = Date()
     @State private var portions = 1
+    @State private var keepLeftovers = true
     @State private var alert: String? = nil
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -246,8 +247,9 @@ struct CookModeView: View {
                 VStack(spacing: 12) {
                     Stepper(L("Portions eaten: {0} · {1} kcal", portions, recipe.kcal * portions),
                             value: $portions, in: 1...max(1, recipe.servings))
+                    LeftoversToggle(recipe: recipe, portions: portions, on: $keepLeftovers)
                     Button {
-                        store.cook(recipe, portions: portions)
+                        store.cook(recipe, portions: portions, leftovers: keepLeftovers ? max(0, recipe.servings - portions) : 0)
                         dismiss()
                         onCooked()
                     } label: {
@@ -256,10 +258,6 @@ struct CookModeView: View {
                     .buttonStyle(PrimaryButtonStyle())
                     Text(L("Ingredients from your fridge are used up — the ones expiring first."))
                         .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    if recipe.servings > portions {
-                        Text(L("Leftovers? Put them in the fridge — Nutrik will remind you 🥡"))
-                            .font(.caption).foregroundStyle(Color.freshGreen).multilineTextAlignment(.center)
-                    }
                 }
                 .glassCard()
                 Button { go(lastPage - 1) } label: {
