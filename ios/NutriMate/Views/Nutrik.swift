@@ -28,6 +28,11 @@ struct NutrikView: View {
             let t = tl.date.timeIntervalSinceReferenceDate
             Canvas(rendersAsynchronously: true) { ctx, sz in
                 NutrikPainter(t: t, mood: shown, food: food).draw(&ctx, sz)
+            } symbols: {
+                // эмодзи рендерятся один раз и дальше рисуются как готовые картинки (раньше — текст каждый кадр)
+                Text(food ?? "🍎").font(.system(size: 48)).tag(NutrikPainter.foodSymbol)
+                Text("⭐️").font(.system(size: 32)).tag(NutrikPainter.starSymbol)
+                Text("✨").font(.system(size: 32)).tag(NutrikPainter.sparkSymbol)
             }
             .frame(width: size, height: size * 1.15)
         }
@@ -60,6 +65,7 @@ struct NutrikView: View {
 }
 
 struct NutrikPainter {
+    static let foodSymbol = 0, starSymbol = 1, sparkSymbol = 2
     let t: Double
     let mood: NutrikMood
     var food: String? = nil
@@ -316,7 +322,7 @@ struct NutrikPainter {
             for k in 0..<3 {
                 let a = t * 3 + Double(k) * 2.094
                 let c = p(50 + cos(a) * 22, 12 + sin(a) * 5)
-                ctx.draw(Text("⭐️").font(.system(size: 7 * s)), at: c)
+                emoji(&ctx, Self.starSymbol, at: c, size: 7 * s)
             }
         }
         // Искорки радости
@@ -324,18 +330,27 @@ struct NutrikPainter {
             for k in 0..<4 {
                 let ph = (t * 0.9 + Double(k) / 4).truncatingRemainder(dividingBy: 1)
                 let x = [14.0, 86.0, 22.0, 80.0][k]
-                ctx.draw(Text("✨").font(.system(size: (5 + ph * 4) * s)), at: pf(x, 40 - ph * 30))
+                emoji(&ctx, Self.sparkSymbol, at: pf(x, 40 - ph * 30), size: (5 + ph * 4) * s)
             }
         }
         // Еда в лапке
         if mood == .eating, let food {
-            ctx.draw(Text(food).font(.system(size: 13 * s)), at: CGPoint(x: handR.x, y: handR.y - 4 * s))
+            _ = food
+            emoji(&ctx, Self.foodSymbol, at: CGPoint(x: handR.x, y: handR.y - 4 * s), size: 13 * s)
             if bite > 0.92 {
                 ctx.fill(Path(ellipseIn: r(44, 60, 1.6, 1.4)), with: .color(Color(hex: 0xB07A3A)))
                 ctx.fill(Path(ellipseIn: r(57, 62, 1.3, 1.2)), with: .color(Color(hex: 0xB07A3A)))
             }
         }
         _ = pf(0, 0)
+    }
+
+    /// Готовый символ-эмодзи (из `symbols:` у Canvas) по центру точки, высотой ≈ размер шрифта.
+    private func emoji(_ ctx: inout GraphicsContext, _ id: Int, at c: CGPoint, size: CGFloat) {
+        guard let sym = ctx.resolveSymbol(id: id), sym.size.height > 0 else { return }
+        let k = size * 1.2 / sym.size.height
+        let w = sym.size.width * k, h = sym.size.height * k
+        ctx.draw(sym, in: CGRect(x: c.x - w / 2, y: c.y - h / 2, width: w, height: h))
     }
 }
 
