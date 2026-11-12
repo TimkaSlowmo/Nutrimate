@@ -657,6 +657,30 @@ struct ShoppingView: View {
         text.count < 2 ? [] : Array(store.db.search(text, category: nil).prefix(5))
     }
 
+    /// «Часто ешь, но в холодильнике нет»: продукты из дневника за 3 недели, которых нет ни дома, ни в списке.
+    private var suggestions: [Food] {
+        let have = Set(store.data.pantry.map(\.name))
+        let listed = Set(store.data.shopping)
+        let since = Calendar.current.date(byAdding: .day, value: -21, to: Date()) ?? Date()
+        // в дневнике названия записаны на языке интерфейса — ищем продукт и по английскому, и по переводу
+        let local = Dictionary(store.db.foods.map { (N($0.name), $0.name) }, uniquingKeysWith: { a, _ in a })
+        var counts: [String: Int] = [:]
+        for e in store.data.log where e.date >= since {
+            let raw = e.name.components(separatedBy: " · ").first ?? e.name
+            guard let n = (store.db.byName[raw] != nil ? Optional(raw) : local[raw]),
+                  !have.contains(n), !listed.contains(n) else { continue }
+            counts[n, default: 0] += 1
+        }
+        return counts.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
+            .prefix(8).compactMap { store.db.byName[$0.key] }
+    }
+
+    /// Текст списка для «Поделиться» (мессенджер, Заметки) — на языке приложения.
+    private var shareText: String {
+        ([L("🛒 Shopping list — NutriMate")] + store.data.shopping.map { "• \(store.db.byName[$0]?.emoji ?? "🛒") \(N($0))" })
+            .joined(separator: "\n")
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -670,6 +694,33 @@ struct ShoppingView: View {
                         Button { store.addShopping([f.name]); text = "" } label: {
                             Text("\(f.emoji) \(N(f.name))").foregroundStyle(Color.burgundy)
                         }
+                    }
+                }
+                let sugg = suggestions
+                if !sugg.isEmpty {
+                    Section {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(sugg) { f in
+                                    Button { withAnimation { store.addShopping([f.name]) } } label: {
+                                        HStack(spacing: 4) {
+                                            Text("\(f.emoji) \(N(f.name))").lineLimit(1)
+                                            Image(systemName: "plus").font(.caption.bold())
+                                        }
+                                        .font(.subheadline)
+                                        .foregroundStyle(Color.burgundy)
+                                        .padding(.horizontal, 12).padding(.vertical, 8)
+                                        .background(Color.burgundy.opacity(0.08), in: Capsule())
+                                        .overlay(Capsule().strokeBorder(Color.burgundy.opacity(0.18), lineWidth: 1))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    } header: {
+                        Text(L("You often eat — not in your fridge"))
                     }
                 }
                 Section {
@@ -696,7 +747,15 @@ struct ShoppingView: View {
             .scrollContentBackground(.hidden)
             .background(Color.appBackground)
             .navigationTitle(L("Shopping list"))
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button(L("Done")) { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button(L("Done")) { dismiss() } }
+                ToolbarItem(placement: .topBarLeading) {
+                    if !store.data.shopping.isEmpty {
+                        ShareLink(item: shareText) { Image(systemName: "square.and.arrow.up") }
+                            .accessibilityLabel(L("Share"))
+                    }
+                }
+            }
         }
     }
 

@@ -91,6 +91,7 @@ struct WeekReportView: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) private var dismiss
     @State private var appear = false
+    @State private var sharing = false
 
     var body: some View {
         let s = WeekStats(store: store)
@@ -108,6 +109,13 @@ struct WeekReportView: View {
                     WeekCaloriesChart().glassCard()
                     if !s.topFoods.isEmpty { favorites(s) }
                     if let d = s.weightDelta { weight(d) }
+                    Button { sharing = true } label: {
+                        Label(L("Share my week"), systemImage: "square.and.arrow.up")
+                            .font(.headline).foregroundStyle(Color.cream)
+                            .frame(maxWidth: .infinity).padding(.vertical, 14)
+                            .background(LinearGradient(colors: [.brandLight, .brand], startPoint: .leading, endPoint: .trailing), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
                     Text(L("Compared with the 7 days before. Tip: log meals by long-pressing a product in Search."))
                         .font(.caption).foregroundStyle(.secondary)
                         .padding(.horizontal, 4)
@@ -119,6 +127,7 @@ struct WeekReportView: View {
             .navigationTitle(L("Your week"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(L("Done")) { dismiss() } } }
+            .sheet(isPresented: $sharing) { WeekShareSheet() }
             .onAppear { withAnimation(.spring(response: 0.9, dampingFraction: 0.75).delay(0.15)) { appear = true } }
         }
     }
@@ -206,5 +215,146 @@ struct WeekReportView: View {
             Spacer()
         }
         .glassCard()
+    }
+}
+
+// MARK: - Карточка «Моя неделя» для соцсетей (картинка 1080×1350, как пост в Instagram)
+
+/// Статичная карточка недели: рисуется один раз через ImageRenderer и отправляется через ShareLink.
+/// Цвета фиксированные (бордо/крем), чтобы картинка одинаково выглядела днём и ночью.
+struct WeekShareCard: View {
+    let s: WeekStats
+    private let wine = Color(hex: 0x6A041C)
+    private let wineLight = Color(hex: 0x8E1A33)
+    private let cream = Color(hex: 0xF5F1E5)
+
+    var body: some View {
+        let first = s.days.first?.day ?? Date()
+        let fmt = Date.FormatStyle.dateTime.day().month(.abbreviated).locale(AppLang.current.locale)
+        let range = "\(first.formatted(fmt)) – \(Date().formatted(fmt))"
+        let mood = s.verdict.1
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L("MY WEEK WITH NUTRIMATE")).font(.system(size: 13, weight: .bold)).tracking(1.4)
+                        .foregroundStyle(cream.opacity(0.7))
+                    Text(range).font(.system(size: 26, weight: .bold, design: .serif)).foregroundStyle(cream)
+                }
+                Spacer(minLength: 8)
+                ZStack {
+                    Circle().stroke(cream.opacity(0.22), lineWidth: 9)
+                    Circle().trim(from: 0, to: CGFloat(s.score) / 100)
+                        .stroke(AngularGradient(colors: [Color(hex: 0xFF8F45), .yellow, Color(hex: 0x6CC070)], center: .center),
+                                style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    VStack(spacing: 0) {
+                        Text("\(s.score)").font(.system(size: 26, weight: .bold, design: .rounded)).foregroundStyle(cream)
+                        Text(L("score")).font(.system(size: 10)).foregroundStyle(cream.opacity(0.7))
+                    }
+                }
+                .frame(width: 82, height: 82)
+            }
+            HStack(alignment: .bottom, spacing: 10) {
+                Canvas { ctx, sz in NutrikPainter(t: 0.6, mood: mood).draw(&ctx, sz) }
+                    .frame(width: 96, height: 110)
+                Text(s.verdict.0)
+                    .font(.system(size: 15, weight: .medium)).foregroundStyle(wine)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(12)
+                    .background(cream, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                stat("🦸", "\(s.saved)", L("products saved"))
+                stat("💰", String(format: "$%.2f", s.savedMoney), L("money kept"))
+                stat("🗑️", "\(s.wasted)", L("thrown away"))
+                stat("🎯", "\(s.onTarget)/7", L("days on target"))
+            }
+            HStack {
+                Text("🥗 NutriMate").font(.system(size: 15, weight: .bold, design: .serif)).foregroundStyle(cream)
+                Spacer()
+                Text(L("Eat well · waste less · save the planet")).font(.system(size: 11)).foregroundStyle(cream.opacity(0.75))
+                    .lineLimit(1).minimumScaleFactor(0.7)
+            }
+        }
+        .padding(24)
+        .frame(width: 360, height: 450)
+        .background(
+            ZStack {
+                LinearGradient(colors: [wineLight, wine], startPoint: .topLeading, endPoint: .bottomTrailing)
+                Circle().fill(Color.white.opacity(0.07)).frame(width: 260).offset(x: 140, y: -170)
+                Circle().fill(Color(hex: 0xFFB36B).opacity(0.10)).frame(width: 220).offset(x: -150, y: 190)
+            }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .environment(\.colorScheme, .light)
+    }
+
+    private func stat(_ e: String, _ v: String, _ t: String) -> some View {
+        HStack(spacing: 10) {
+            Text(e).font(.system(size: 24))
+            VStack(alignment: .leading, spacing: 0) {
+                Text(v).font(.system(size: 20, weight: .bold, design: .rounded)).foregroundStyle(cream)
+                    .lineLimit(1).minimumScaleFactor(0.6)
+                Text(t).font(.system(size: 11)).foregroundStyle(cream.opacity(0.75))
+                    .lineLimit(2).minimumScaleFactor(0.8)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, minHeight: 62)
+        .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.white.opacity(0.16), lineWidth: 1))
+    }
+}
+
+/// Лист «Поделиться неделей»: превью карточки + системное меню «Поделиться» (Instagram, Telegram, Фото…).
+struct WeekShareSheet: View {
+    @EnvironmentObject var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var image: UIImage?
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Spacer(minLength: 0)
+                Group {
+                    if let image {
+                        Image(uiImage: image).resizable().scaledToFit()
+                    } else {
+                        ProgressView().frame(height: 300)
+                    }
+                }
+                .frame(maxWidth: 340)
+                .shadow(color: Color.black.opacity(0.25), radius: 18, y: 10)
+                Text(L("Show your friends how much food you rescued this week 🌍"))
+                    .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+                if let image {
+                    let pic = Image(uiImage: image)
+                    ShareLink(item: pic, preview: SharePreview(L("My week with NutriMate"), image: pic)) {
+                        Label(L("Share"), systemImage: "square.and.arrow.up")
+                            .font(.headline).foregroundStyle(Color.cream)
+                            .frame(maxWidth: .infinity).padding(.vertical, 15)
+                            .background(Color.brand, in: Capsule())
+                    }
+                    .padding(.horizontal, 24)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.appBackground)
+            .navigationTitle(L("Share my week"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button(L("Done")) { dismiss() } } }
+            .task { render() }
+        }
+    }
+
+    @MainActor private func render() {
+        guard image == nil else { return }
+        let r = ImageRenderer(content: WeekShareCard(s: WeekStats(store: store)))
+        r.scale = 3   // 360×450 pt → 1080×1350 px
+        image = r.uiImage
     }
 }

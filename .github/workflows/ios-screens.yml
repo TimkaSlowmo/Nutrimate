@@ -89,6 +89,7 @@ jobs:
           shot 16-medals 6 -tab profile -push medals
           shot 17-onboarding-hello 6 -onboarding -obStep 1
           shot 18-recipe 6 -sheet recipe
+          shot 19-week-share 6 -sheet weekcard
           # три языка: ключевые экраны по-русски и по-казахски (ищем обрезанный текст)
           for LG in ru kk; do
             shot $LG-00-onboarding 7 -onboarding -lang $LG
@@ -106,6 +107,7 @@ jobs:
             shot $LG-15-edit-profile 6 -tab profile -push edit -lang $LG
             shot $LG-11-tutorial 6 -tutorial -lang $LG
             shot $LG-18-recipe 6 -sheet recipe -lang $LG
+            shot $LG-19-week-share 6 -sheet weekcard -lang $LG
           done
           # тёмная тема (Profile → Appearance): ищем нечитаемый текст и светлые пятна
           shot dark-00-onboarding 7 -onboarding -dark
@@ -123,6 +125,7 @@ jobs:
           shot dark-12-week 6 -sheet week -dark
           shot dark-15-edit-profile 6 -tab profile -push edit -dark
           shot dark-18-recipe 6 -sheet recipe -dark
+          shot dark-19-week-share 6 -sheet weekcard -dark
           shot dark-ru-01-home 6 -tab home -dark -lang ru
           # замер плавности: приложение само прокручивает экран 6 с и пишет fps в Documents/fps.txt
           : > screens/fps.txt

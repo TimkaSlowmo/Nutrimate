@@ -74,6 +74,10 @@ struct NutrikPainter {
     let mood: NutrikMood
     var food: String? = nil
 
+    init(t: Double, mood: NutrikMood, food: String? = nil) {
+        self.t = t; self.mood = mood; self.food = food
+    }
+
     private let hair = Color(hex: 0x1E1A1D)
     private let skin = Color(hex: 0xFFE6D3)
     private let shirt = Color(hex: 0xE9D7B9)
