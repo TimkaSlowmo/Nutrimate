@@ -93,6 +93,7 @@ jobs:
           shot 20-undo 6 -tab fridge -undo
           shot 21-cook 6 -sheet cook -cookTimer
           shot 22-cook-prep 6 -sheet cook -cookPage 0
+          shot 23-recipe-serves 6 -sheet recipe -serves 3
           # три языка: ключевые экраны по-русски и по-казахски (ищем обрезанный текст)
           for LG in ru kk; do
             shot $LG-00-onboarding 7 -onboarding -lang $LG
@@ -110,6 +111,7 @@ jobs:
             shot $LG-15-edit-profile 6 -tab profile -push edit -lang $LG
             shot $LG-11-tutorial 6 -tutorial -lang $LG
             shot $LG-18-recipe 6 -sheet recipe -lang $LG
+            shot $LG-23-recipe-serves 6 -sheet recipe -serves 3 -lang $LG
             shot $LG-19-week-share 6 -sheet weekcard -lang $LG
             shot $LG-20-undo 6 -tab fridge -undo -lang $LG
             shot $LG-21-cook 6 -sheet cook -cookTimer -lang $LG

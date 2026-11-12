@@ -109,12 +109,22 @@ struct RecipeCard: View, Equatable {
 struct RecipeDetail: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) private var dismiss
-    let recipe: Recipe
+    let base: Recipe
     @State private var portions = 1
     @State private var done = Set<Int>()
     @State private var cooking = false
+    /// На сколько порций готовим: граммы в списке, режиме готовки и списании пересчитываются
+    @State private var serves: Int
+
+    init(recipe: Recipe, serves: Int? = nil) {
+        base = recipe
+        _serves = State(initialValue: min(12, max(1, serves ?? recipe.servings)))
+    }
+
+    private var recipe: Recipe { base.scaled(to: serves) }
 
     var body: some View {
+        let recipe = self.recipe
         let have = store.pantryNames
         let missing = recipe.missing(have)
         ScrollView {
@@ -136,17 +146,12 @@ struct RecipeDetail: View {
                 .buttonStyle(PrimaryButtonStyle())
 
                 VStack(alignment: .leading, spacing: 8) {
-                    SectionTitle(text: L("Ingredients"))
-                    ForEach(recipe.ingredients, id: \.name) { i in
-                        HStack {
-                            Text(store.db.byName[i.name]?.emoji ?? "•")
-                            Text(N(i.name))
-                            Spacer()
-                            Text(L("{0} g", i.g)).foregroundStyle(.secondary)
-                            Image(systemName: have.contains(i.name) ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(have.contains(i.name) ? Color.freshGreen : Color.burgundy.opacity(0.35))
-                        }
+                    HStack {
+                        SectionTitle(text: L("Ingredients"))
+                        Spacer()
+                        ServesStepper(serves: $serves.animation(.snappy))
                     }
+                    IngredientRows(recipe: recipe)
                     Text(L("Also: {0}", recipe.localStaples)).font(.caption).foregroundStyle(.secondary)
                     if !missing.isEmpty {
                         Button { store.addShopping(missing) } label: {
@@ -183,6 +188,7 @@ struct RecipeDetail: View {
 
                 VStack(spacing: 10) {
                     Stepper(L("Portions eaten: {0} · {1} kcal", portions, recipe.kcal * portions), value: $portions, in: 1...max(1, recipe.servings))
+                        .onChange(of: serves) { _, n in portions = min(portions, n) }
                     Button(L("I cooked it! 👩‍🍳")) {
                         store.cook(recipe, portions: portions)
                         dismiss()
@@ -205,6 +211,87 @@ struct RecipeDetail: View {
             }
             .environmentObject(store)
         }
+    }
+}
+
+/// «🍽 4 −/＋» — на сколько порций готовим.
+struct ServesStepper: View {
+    @Binding var serves: Int
+
+    var body: some View {
+        HStack(spacing: 0) {
+            pill("minus", enabled: serves > 1) { serves -= 1 }
+            Text(Lp(serves, "serving|servings"))
+                .font(.footnote.weight(.semibold)).monospacedDigit()
+                .foregroundStyle(Color.burgundy)
+                .lineLimit(1).minimumScaleFactor(0.7)
+                .frame(minWidth: 76)
+                .contentTransition(.numericText())
+            pill("plus", enabled: serves < 12) { serves += 1 }
+        }
+        .padding(3)
+        .background(Capsule().fill(Color.burgundy.opacity(0.08)))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(L("Cooking for {0}", Lp(serves, "serving|servings")))
+        .accessibilityAdjustableAction { d in
+            if d == .increment, serves < 12 { serves += 1 }
+            if d == .decrement, serves > 1 { serves -= 1 }
+        }
+    }
+
+    private func pill(_ icon: String, enabled: Bool, _ act: @escaping () -> Void) -> some View {
+        Button {
+            UISelectionFeedbackGenerator().selectionChanged()
+            act()
+        } label: {
+            Image(systemName: icon).font(.caption.weight(.bold))
+                .frame(width: 30, height: 30)
+                .foregroundStyle(enabled ? Color.cream : Color.burgundy.opacity(0.35))
+                .background(Circle().fill(enabled ? Color.brand : Color.clear))
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+    }
+}
+
+/// Список ингредиентов: граммы, штуки для штучных продуктов и сколько есть дома
+/// (✓ хватает, «1/3» — есть, но мало, ○ — нет).
+struct IngredientRows: View {
+    @EnvironmentObject var store: AppStore
+    let recipe: Recipe
+    var big = false
+
+    var body: some View {
+        ForEach(recipe.ingredients, id: \.name) { i in
+            let have = store.count(of: i.name)
+            let need = max(1, i.pieces ?? 1)
+            let counted = i.pieces != nil
+            HStack(spacing: big ? 10 : 8) {
+                Text(store.db.byName[i.name]?.emoji ?? "•").font(big ? .title3 : .body)
+                Text(N(i.name)).lineLimit(2)
+                Spacer(minLength: 6)
+                Text(amount(i)).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
+                if have == 0 {
+                    Image(systemName: "circle").foregroundStyle(Color.burgundy.opacity(0.35))
+                } else if counted && have < need {
+                    Text("\(have)/\(need)")
+                        .font(.caption2.weight(.bold)).monospacedDigit()
+                        .foregroundStyle(Color.warnOrange)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Capsule().fill(Color.warnOrange.opacity(0.14)))
+                        .accessibilityLabel(L("You have {0} of {1}", have, need))
+                } else {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.freshGreen)
+                }
+            }
+            .contentTransition(.numericText())
+        }
+    }
+
+    private func amount(_ i: Ing) -> String {
+        let g = L("{0} g", i.g)
+        if let p = i.pieces, p >= 1 { return Lp(p, "pc|pcs") + " · " + g }
+        return g
     }
 }
 

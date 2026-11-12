@@ -59,6 +59,41 @@ struct Recipe: Codable, Hashable, Identifiable {
     func missing(_ have: Set<String>) -> [String] {
         ingredients.map(\.name).filter { !have.contains($0) }
     }
+
+    /// Тот же рецепт на `n` порций: граммы пропорционально (до 5 г), ккал на порцию не меняются.
+    func scaled(to n: Int) -> Recipe {
+        let n = max(1, n)
+        guard n != servings else { return self }
+        let f = Double(n) / Double(max(1, servings))
+        let ings = ingredients.map { i -> Ing in
+            let g = Double(i.g) * f
+            let r = g < 20 ? max(1, Int(g.rounded())) : Int((g / 5).rounded()) * 5
+            return Ing(name: i.name, g: r)
+        }
+        return Recipe(name: name, emoji: emoji, time: time, servings: n, ingredients: ings, steps: steps,
+                      staples: staples, zeroWaste: zeroWaste, ru: ru, kk: kk, stepsRu: stepsRu, stepsKk: stepsKk)
+    }
+}
+
+extension Ing {
+    /// Вес одной штуки (г) для продуктов, которые в холодильнике считают штуками.
+    static let pieceGrams: [String: Double] = [
+        "Eggs": 60, "Quail Eggs": 11, "Banana": 120, "Apple": 180, "Pear": 180, "Peach": 150, "Nectarine": 140,
+        "Plum": 65, "Apricot": 40, "Fig": 50, "Kiwi": 75, "Mango": 300, "Avocado": 170, "Orange": 150,
+        "Tangerine": 80, "Clementine": 75, "Grapefruit": 300, "Lemon": 100, "Lime": 65, "Pomegranate": 280,
+        "Persimmon": 200, "Quince": 250, "Plantain": 250, "Tomato": 120, "Cucumber": 200, "Bell Pepper": 150,
+        "Zucchini": 250, "Eggplant": 300, "Onion": 110, "Red Onion": 110, "Shallot": 30, "Garlic": 45,
+        "Leek": 200, "Potato": 170, "Sweet Potato": 200, "Carrot": 70, "Beetroot": 150, "Corn": 250,
+        "Radish": 15, "Fennel": 250, "Artichoke": 300, "Chicken Breast": 200, "Chicken Thighs": 120,
+        "Sausages": 60, "Tortilla": 45, "Bagel": 100, "Croissant": 60, "Burger Bun": 60, "English Muffin": 60,
+        "Naan": 90, "Lavash": 80,
+    ]
+
+    /// Сколько штук нужно (nil — продукт не считают штуками). 0 — берём только часть одной штуки.
+    var pieces: Int? {
+        guard let w = Ing.pieceGrams[name] else { return nil }
+        return Int((Double(g) / w).rounded())
+    }
 }
 
 private struct DBFile: Codable {

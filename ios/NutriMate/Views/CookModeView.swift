@@ -183,16 +183,7 @@ struct CookModeView: View {
                 .frame(maxWidth: .infinity)
                 VStack(alignment: .leading, spacing: 10) {
                     SectionTitle(text: L("Get everything ready"))
-                    ForEach(recipe.ingredients, id: \.name) { i in
-                        HStack(spacing: 10) {
-                            Text(store.db.byName[i.name]?.emoji ?? "•").font(.title3)
-                            Text(N(i.name)).font(.body)
-                            Spacer()
-                            Text(L("{0} g", i.g)).foregroundStyle(.secondary)
-                            Image(systemName: have.contains(i.name) ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(have.contains(i.name) ? Color.freshGreen : Color.burgundy.opacity(0.35))
-                        }
-                    }
+                    IngredientRows(recipe: recipe, big: true)
                     Text(L("Also: {0}", recipe.localStaples)).font(.caption).foregroundStyle(.secondary)
                     if !missing.isEmpty {
                         Button { store.addShopping(missing) } label: {

@@ -69,7 +69,7 @@ struct RootView: View {
             case "recipe":
                 let db = FoodDB.shared
                 if let r = db.recipes.first(where: { $0.name == "Classic Omelette" }) ?? db.recipes.first {
-                    NavigationStack { RecipeDetail(recipe: r) }
+                    NavigationStack { RecipeDetail(recipe: r, serves: Int(UIShot.value("-serves") ?? "")) }
                 }
             default: DiaryView()
             }
@@ -211,7 +211,7 @@ struct GlassTabBar: View {
                             .font(.system(size: 19, weight: .semibold))
                             .scaleEffect(bounce == t ? 1.25 : 1)
                         Text(t.title).font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .lineLimit(1).minimumScaleFactor(0.7)
+                            .lineLimit(1).minimumScaleFactor(0.6).allowsTightening(true)
                             .padding(.horizontal, 5) // длинное «Холодильник» не упирается в края капсулы
                     }
                     .foregroundStyle(selection == t ? Color.cream : Color.burgundy.opacity(0.75))

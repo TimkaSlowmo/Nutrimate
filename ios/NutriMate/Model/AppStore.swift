@@ -94,6 +94,8 @@ final class AppStore: ObservableObject {
     // MARK: - Вычисляемое
 
     var pantryNames: Set<String> { Set(data.pantry.map(\.name)) }
+    /// Сколько штук/упаковок продукта есть дома (все места хранения).
+    func count(of name: String) -> Int { data.pantry.reduce(0) { $0 + ($1.name == name ? $1.qty : 0) } }
     /// Строки холодильника (одинаковые продукты сложены), от ближайшего срока к дальнему.
     var sortedPantry: [PantryGroup] {
         if let c = groupsCache { return c }
@@ -433,10 +435,14 @@ final class AppStore: ObservableObject {
     func cook(_ r: Recipe, portions: Int) {
         remember("frying.pan", L("Cooked: {0}", "\(r.emoji) \(N(r.name))"))
         for ing in r.ingredients {
-            let matches = data.pantry.filter { $0.name == ing.name }.sorted { $0.daysLeft < $1.daysLeft }
-            if let first = matches.first {
-                use(first) // сначала то, что скорее испортится
-                takeOne(first.id)
+            // Штучные продукты (яйца, бананы…) списываются по количеству из рецепта (омлет на двоих — 6 яиц),
+            // остальные — одна упаковка, как раньше. Меньше половины штуки (зубчик чеснока) — головка остаётся.
+            var need = ing.pieces ?? 1
+            var first = true
+            while need > 0, let p = data.pantry.filter({ $0.name == ing.name }).min(by: { $0.expiry < $1.expiry }) {
+                if first { use(p); first = false } // сначала то, что скорее испортится
+                takeOne(p.id)
+                need -= 1
             }
         }
         data.log.append(LogEntry(emoji: r.emoji, name: "\(N(r.name)) ×\(portions)", kcal: r.kcal * portions))
