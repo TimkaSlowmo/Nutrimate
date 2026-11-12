@@ -519,3 +519,10 @@ enum AppAppearance: String, CaseIterable, Identifiable, Codable {
         }
     }
 }
+
+/// Последнее действие, которое можно отменить (плашка «Отменить» над таб-баром).
+struct UndoInfo: Equatable, Identifiable {
+    let id = UUID()
+    let icon: String
+    let text: String
+}

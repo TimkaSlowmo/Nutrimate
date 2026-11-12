@@ -95,6 +95,14 @@ struct RootView: View {
                 NutrikBuddy()
             }
         }
+        .overlay(alignment: .bottomTrailing) {
+            if let u = store.undo {
+                UndoPill(info: u)
+                    .padding(.trailing, 14)
+                    .padding(.bottom, 10)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .overlay {
             if !store.data.profile.tutorialDone {
                 TutorialOverlay(step: $tutorialStep, tab: $tab)
@@ -106,6 +114,51 @@ struct RootView: View {
                 .padding(.horizontal, 14)
                 .padding(.bottom, 2)
         }
+    }
+}
+
+/// Плашка «Съел: 🥚 Яйца · Отменить» — 6 секунд после действия, свайп вниз или ✕ — скрыть.
+struct UndoPill: View {
+    let info: UndoInfo
+    @EnvironmentObject var store: AppStore
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: info.icon)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Color.cream)
+                .frame(width: 28, height: 28)
+                .background(Color.brand, in: Circle())
+            Text(info.text)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.burgundy)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Button {
+                store.performUndo()
+            } label: {
+                Text(L("Undo"))
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Color.cream)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Color.brand, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(L("Brings the product back"))
+        }
+        .padding(.leading, 6)
+        .padding(.trailing, 6)
+        .padding(.vertical, 6)
+        .background(Color.paper, in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.burgundy.opacity(0.12), lineWidth: 1))
+        .shadow(color: .black.opacity(0.14), radius: 12, y: 5)
+        .frame(maxWidth: 340)
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .padding(.leading, 96) // место для Нутрика-помощника слева
+        .gesture(DragGesture(minimumDistance: 12).onEnded { v in
+            if v.translation.height > 10 || abs(v.translation.width) > 40 { store.dismissUndo() }
+        })
     }
 }
 
@@ -153,7 +206,8 @@ struct GlassTabBar: View {
                             .font(.system(size: 19, weight: .semibold))
                             .scaleEffect(bounce == t ? 1.25 : 1)
                         Text(t.title).font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .lineLimit(1).minimumScaleFactor(0.75)
+                            .lineLimit(1).minimumScaleFactor(0.7)
+                            .padding(.horizontal, 5) // длинное «Холодильник» не упирается в края капсулы
                     }
                     .foregroundStyle(selection == t ? Color.cream : Color.burgundy.opacity(0.75))
                     .frame(maxWidth: .infinity)

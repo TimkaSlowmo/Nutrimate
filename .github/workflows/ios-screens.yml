@@ -90,6 +90,7 @@ jobs:
           shot 17-onboarding-hello 6 -onboarding -obStep 1
           shot 18-recipe 6 -sheet recipe
           shot 19-week-share 6 -sheet weekcard
+          shot 20-undo 6 -tab fridge -undo
           # три языка: ключевые экраны по-русски и по-казахски (ищем обрезанный текст)
           for LG in ru kk; do
             shot $LG-00-onboarding 7 -onboarding -lang $LG
@@ -108,6 +109,7 @@ jobs:
             shot $LG-11-tutorial 6 -tutorial -lang $LG
             shot $LG-18-recipe 6 -sheet recipe -lang $LG
             shot $LG-19-week-share 6 -sheet weekcard -lang $LG
+            shot $LG-20-undo 6 -tab fridge -undo -lang $LG
           done
           # тёмная тема (Profile → Appearance): ищем нечитаемый текст и светлые пятна
           shot dark-00-onboarding 7 -onboarding -dark
@@ -127,6 +129,7 @@ jobs:
           shot dark-18-recipe 6 -sheet recipe -dark
           shot dark-19-week-share 6 -sheet weekcard -dark
           shot dark-ru-01-home 6 -tab home -dark -lang ru
+          shot dark-20-undo 6 -tab fridge -undo -dark
           # замер плавности: приложение само прокручивает экран 6 с и пишет fps в Documents/fps.txt
           : > screens/fps.txt
           for T in home fridge search recipes; do
@@ -135,15 +138,6 @@ jobs:
             sleep 11
             C=$(xcrun simctl get_app_container "$UDID" $BID data)
             cat "$C/Documents/fps.txt" >> screens/fps.txt 2>/dev/null || echo "$T no-data" >> screens/fps.txt
-            rm -f "$C/Documents/fps.txt"
-          done
-          # поиск дорогой части Recipes (Home уже 60): то же самое без теней / эмодзи / живого фона
-          for OFF in shadow emoji bg shadow,emoji; do
-            xcrun simctl terminate "$UDID" $BID 2>/dev/null || true
-            xcrun simctl launch "$UDID" $BID -uiShot -fps -tab recipes -perfOff $OFF
-            sleep 11
-            C=$(xcrun simctl get_app_container "$UDID" $BID data)
-            echo "recipes(-$OFF) $(cat "$C/Documents/fps.txt" 2>/dev/null || echo no-data)" >> screens/fps.txt
             rm -f "$C/Documents/fps.txt"
           done
           echo "FPS:"; cat screens/fps.txt

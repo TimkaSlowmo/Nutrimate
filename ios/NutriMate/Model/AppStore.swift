@@ -20,6 +20,9 @@ final class AppStore: ObservableObject {
     @Published var newMedal: Medal?
     /// Сценка Нутрика (выбегает снизу слева, ест / падает / радуется)
     @Published var reaction: NutrikReaction?
+    /// «Отменить» после съел/выбросил/заморозил/поделился/убрал/приготовил (6 секунд).
+    @Published var undo: UndoInfo?
+    private var undoSnapshot: AppData?
 
     private let fileURL: URL
     private var saveWork: DispatchWorkItem?
@@ -35,6 +38,10 @@ final class AppStore: ObservableObject {
             fileURL = dir.appendingPathComponent("nutrimate-uishot.json")
             data = UIShot.demoData()
             AppLang.current = data.language
+            if UIShot.args.contains("-undo"), let p = data.pantry.first {
+                undoSnapshot = data
+                undo = UndoInfo(icon: "trash", text: L("Thrown away: {0}", "\(p.emoji) \(N(p.name))"))
+            }
             return
         }
         fileURL = dir.appendingPathComponent("nutrimate.json")
@@ -160,6 +167,40 @@ final class AppStore: ObservableObject {
         } else {
             say(text)
         }
+    }
+
+    /// Запомнить состояние до действия — кнопка «Отменить» вернёт всё как было (кроме чата и настроек).
+    private func remember(_ icon: String, _ text: String) {
+        undoSnapshot = data
+        let u = UndoInfo(icon: icon, text: text)
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { undo = u }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in
+            guard let self, self.undo?.id == u.id else { return }
+            withAnimation(.easeOut(duration: 0.3)) { self.undo = nil }
+            self.undoSnapshot = nil
+        }
+    }
+
+    func performUndo() {
+        guard var s = undoSnapshot else { return }
+        s.chat = data.chat
+        s.language = data.language
+        s.appearance = data.appearance
+        s.notifications = data.notifications
+        s.nutrikBuddy = data.nutrikBuddy
+        undoSnapshot = nil
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            data = s
+            undo = nil
+            reaction = nil
+        }
+        haptic(.soft)
+        say(L("↩️ Undone — everything is back"))
+    }
+
+    func dismissUndo() {
+        withAnimation(.easeOut(duration: 0.25)) { undo = nil }
+        undoSnapshot = nil
     }
 
     private func haptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .light) {
@@ -292,6 +333,7 @@ final class AppStore: ObservableObject {
 
     func eat(_ id: UUID, grams: Int, finished: Bool) {
         guard let p = oldest(id) else { return }
+        remember("fork.knife", L("Eaten: {0}", "\(p.emoji) \(N(p.name))"))
         if finished {
             use(p)
             takeOne(p.id)
@@ -313,6 +355,7 @@ final class AppStore: ObservableObject {
 
     func throwAway(_ id: UUID, reason: WasteReason) {
         guard let p = oldest(id) else { return }
+        remember("trash", L("Thrown away: {0}", "\(p.emoji) \(N(p.name))"))
         takeOne(p.id)
         data.stats.wasted += 1
         data.stats.wastedMoney += price(p.category)
@@ -327,6 +370,7 @@ final class AppStore: ObservableObject {
     /// Заморозить всю строку (все партии этого продукта из холодильника/шкафа); статистика — по штукам.
     func freeze(_ id: UUID) {
         guard let p = item(id) else { return }
+        remember("snowflake", L("Frozen: {0}", "\(p.emoji) \(N(p.name))"))
         let batch = data.pantry.filter { $0.groupKey == p.groupKey }
         var units = 0
         for b in batch {
@@ -354,6 +398,7 @@ final class AppStore: ObservableObject {
 
     func share(_ id: UUID) {
         guard let p = oldest(id) else { return }
+        remember("hand.raised", L("Shared: {0}", "\(p.emoji) \(N(p.name))"))
         takeOne(p.id)
         data.stats.shared += 1
         data.stats.rescued += 1
@@ -368,6 +413,7 @@ final class AppStore: ObservableObject {
     /// Убрать строку целиком без статистики (ошибся при добавлении).
     func delete(_ id: UUID) {
         guard let p = item(id) else { return }
+        remember("xmark.bin", L("Removed: {0}", "\(p.emoji) \(N(p.name))"))
         data.pantry.removeAll { $0.groupKey == p.groupKey }
     }
 
@@ -385,6 +431,7 @@ final class AppStore: ObservableObject {
     }
 
     func cook(_ r: Recipe, portions: Int) {
+        remember("frying.pan", L("Cooked: {0}", "\(r.emoji) \(N(r.name))"))
         for ing in r.ingredients {
             let matches = data.pantry.filter { $0.name == ing.name }.sorted { $0.daysLeft < $1.daysLeft }
             if let first = matches.first {
