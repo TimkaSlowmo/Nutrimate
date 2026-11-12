@@ -499,8 +499,8 @@ enum AppAppearance: String, CaseIterable, Identifiable, Codable {
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .light: return L("Light")
-        case .dark: return L("Dark")
+        case .light: return L("Day")
+        case .dark: return L("Night")
         case .system: return L("Auto")
         }
     }

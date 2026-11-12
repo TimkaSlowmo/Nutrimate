@@ -34,9 +34,10 @@ extension Color {
     static let sand = dynamic(0xEAE2CF, 0x2C1A1E)
     /// «Бумага» стеклянных карточек и обводок: белая днём, тёплая тёмная ночью.
     static let paper = dynamic(0xFFFFFF, 0x3A2228)
-    static let freshGreen = Color(hex: 0x2E7D32)
-    static let warnOrange = Color(hex: 0xE65100)
-    static let badRed = Color(hex: 0xC62828)
+    // Цвета свежести: в тёмной теме — светлее, чтобы мелкий текст «Use today!» читался на тёмном фоне
+    static let freshGreen = dynamic(0x2E7D32, 0x6CC070)
+    static let warnOrange = dynamic(0xE65100, 0xFF8F45)
+    static let badRed = dynamic(0xC62828, 0xFF6B66)
 
     static func freshness(_ daysLeft: Int) -> Color {
         daysLeft < 0 ? .badRed : daysLeft <= 2 ? .warnOrange : .freshGreen
