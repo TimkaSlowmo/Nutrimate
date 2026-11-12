@@ -1,7 +1,7 @@
 # NutriMate — журнал ночного агента
 
 ## Текущее состояние
-- Веб: **v18** · iOS: **v16** (нумерация продолжает версии из DartPad: v1–v15 были там) · продуктов: **1447** · рецептов: **121** (zero-waste: 49) · переводов ru/kk: **155** названий продуктов
+- Веб: **v18** · iOS: **v16** (нумерация продолжает версии из DartPad: v1–v15 были там) · продуктов: **1447** · рецептов: **121** (zero-waste: 49) · переводов ru/kk: **208** (155 продуктов + 53 рецепта)
 - ИИ-сервер работает (Cloudflare Workers AI, бесплатно); с v10 предлагает действия только структурированно (`actions`), приложение выполняет само.
 - Главная версия — iOS (ios/, журнал ios/NIGHTLY_NOTES_IOS.md, жалобы ios/BUILD_ERRORS.md). Веб — баги и перенос закрытых жалоб.
 - Единая база: `python3 tool/export_data.py` проверяет дубли/ингредиенты и пишет ios/NutriMate/Resources/foods.json.
@@ -15,6 +15,9 @@
   Pluot, Prickly Pear, Yellow Watermelon, Black Sapote, Quark, Mortadella, Monkfish, Pumpernickel, Lupini Beans,
   Monk Fruit Sweetener, Epazote, Summer Savory, Canned Ackee, Barley Tea, Kimbap, Fresh Tortellini, Seaweed Salad.
 - +3 рецепта: Viral Cottage Cheese Flatbread (zw), Smashed Cucumber Salad (zw), Marry Me Chicken.
+- 👀 Симулятор (8f607c2): новый профиль, Edit profile, Medals — без обрезанного текста и наложений, падений нет.
+- ⚡ fps (симулятор, автопрокрутка): Home 21, Fridge 60, Search 60, Recipes 57.5. Эксперимент -perfOff: Home без Нутрика — 60,
+  без фона/теней — по-прежнему ~20 → тормозит именно анимация Нутрика на Home (жалоба 1 фактически не закрыта).
 - Бэклог веба: складывание одинаковых продуктов, три языка (после iOS).
 
 ## 2026-11-12 (утро) · веб v17 · iOS v9
