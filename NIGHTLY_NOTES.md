@@ -7,6 +7,12 @@
 - Единая база: `python3 tool/export_data.py` проверяет дубли/ингредиенты и пишет ios/NutriMate/Resources/foods.json.
 - Локально Flutter недоступен → компиляцию проверяет GitHub Actions.
 
+## 2026-11-12 (ночь на 13.11, второй запуск) · веб v23–v24 · iOS v21
+- **Веб v24**: календарь «Срок на упаковке» и системные кнопки Flutter — на языке приложения (flutter_localizations, ru/kk).
+- Веб v23 / iOS v21: +34 продукта, +4 рецепта (Mentaiko Spaghetti, Orecchiette with Broccoli Rabe (zw), Little Gem Caesar
+  with Stale-Bread Croutons (zw), Roasted Carrots with Pomegranate Molasses (zw)), ru/kk названия и шаги.
+- Бэклог веба: тёмная тема, проверить вёрстку длинных ru/kk строк.
+
 ## 2026-11-12 (ночь на 13.11) · веб v22 · iOS v20
 - iOS v20: тёмная тема (Profile → Оформление: Day / Night / Auto).
 - **Веб v22**: офлайн-ответы Нутрика (MockAiService) — на русском и казахском; понимает вопросы на трёх языках

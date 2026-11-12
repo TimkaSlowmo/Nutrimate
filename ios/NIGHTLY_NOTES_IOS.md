@@ -30,6 +30,17 @@
 - [x] 11. Тёмная тема (v20) — Profile → Appearance
 - [ ] 12+. Улучшения: полировка
 
+## 2026-11-12 (ночь на 13.11, второй запуск) · v21 — данные, разбор Recipes fps
+- База: **1595 продуктов** (+34: Broccoli Rabe, Butter/Little Gem Lettuce, Mache, Yu Choy, Amaranth Leaves, Yacon, Malanga,
+  Hedgehog/Lobster/Cauliflower Mushrooms, Vietnamese Coriander, Mitsuba, Borage, Sumo Citrus, Marionberries, Stilton, Havarti,
+  Jarlsberg, Ricotta Salata, Mimolette, Lardo, Soppressata, Iberico Ham, Turbot, Tobiko, Mentaiko, Abalone, Orecchiette,
+  Shio Koji, Chamoy, Pomegranate Molasses, Baobab/Lucuma Powder), **138 рецептов** (+4: Mentaiko Spaghetti, Orecchiette with
+  Broccoli Rabe ♻️, Little Gem Caesar with Stale-Bread Croutons ♻️, Roasted Carrots with Pomegranate Molasses ♻️); всё ru/kk.
+- fps-эксперименты перенесены с Home (там уже 60) на Recipes: `-perfOff shadow|emoji|bg`. Итог: 55–58 fps при любом варианте —
+  разница в пределах шума, отдельного виновника нет (рывки — создание новых карточек при быстрой автопрокрутке 2400pt).
+- 👀 Симулятор (2de7d52): светлая/тёмная/kk — без обрезаний и наложений, «Search 1595 products», падений нет.
+  ⚡ fps: Home 60.0, Fridge 58.3, Search 58.3, Recipes 57.0.
+
 ## 2026-11-12 (ночь на 13.11) · v20 — тёмная тема
 - **Тёмная тема**: Profile → Оформление → Тема: Day / Night / Auto (как в iPhone). Новое поле `AppData.appearance`
   (мягко; старые сохранения — светлые, как раньше), смена сразу с анимацией. Цвета стали «динамическими»
