@@ -6,6 +6,7 @@ struct SearchView: View {
     @State private var category: String?
     @State private var logFood: Food?
     @State private var addFood: Food?
+    @State private var quickAdd = false
     @FocusState private var focused: Bool
 
     private let suggestions = ["Kurt", "Baursaks", "Kazy", "Shubat", "Kumys", "Irimshik", "Milk", "Eggs", "Banana", "Chicken Breast", "Tomato", "Bread"]
@@ -32,6 +33,7 @@ struct SearchView: View {
             .navigationTitle(L("Search"))
             .sheet(item: $logFood) { f in LogFoodSheet(food: f) }
             .sheet(item: $addFood) { f in AddFoodSheet(food: f) }
+            .sheet(isPresented: $quickAdd) { QuickAddView() }
         }
     }
 
@@ -71,6 +73,7 @@ struct SearchView: View {
 
     private var home: some View {
         VStack(alignment: .leading, spacing: 14) {
+            quickAddCard
             SectionTitle(text: L("Popular in Almaty 🇰🇿"))
             FlowChips(items: suggestions.compactMap { store.db.byName[$0] }) { f in
                 store.add(f)
@@ -90,6 +93,32 @@ struct SearchView: View {
                 }
             }
         }
+    }
+
+    /// Вход в «список или чек» (v30): бордовая карточка как у плана на Рецептах.
+    private var quickAddCard: some View {
+        Button { quickAdd = true } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "doc.text.viewfinder")
+                    .font(.title2).foregroundStyle(Color.cream)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Color.white.opacity(0.14)))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L("Add a list or receipt")).font(.headline).foregroundStyle(Color.cream)
+                    Text(L("Type \"2 eggs, milk, bread\" or snap the receipt — everything goes in at once"))
+                        .font(.caption).foregroundStyle(Color.cream.opacity(0.8)).multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.subheadline.bold()).foregroundStyle(Color.cream.opacity(0.7))
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(LinearGradient(colors: [.brandLight, .brand], startPoint: .topLeading, endPoint: .bottomTrailing))
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private var list: some View {

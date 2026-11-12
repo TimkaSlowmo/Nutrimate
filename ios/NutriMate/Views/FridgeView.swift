@@ -6,6 +6,7 @@ struct FridgeView: View {
     @State private var filter: StorageKind?
     @State private var openItem: PantryGroup?
     @State private var wasteItem: PantryGroup?
+    @State private var quickAdd = false
 
     private var items: [PantryGroup] {
         store.sortedPantry.filter { filter == nil || $0.storage == filter }
@@ -74,10 +75,15 @@ struct FridgeView: View {
             .navigationTitle(L("My Fridge"))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
+                    Button { quickAdd = true } label: { Image(systemName: "doc.text.viewfinder").font(.title3) }
+                        .accessibilityLabel(L("Add a list or receipt"))
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button { withAnimation { tab = .search } } label: { Image(systemName: "plus.circle.fill").font(.title2) }
                 }
             }
             .sheet(item: $openItem) { p in ItemSheet(key: p.id) }
+            .sheet(isPresented: $quickAdd) { QuickAddView() }
             .confirmationDialog(L("Why is it going in the bin?"), isPresented: Binding(get: { wasteItem != nil }, set: { if !$0 { wasteItem = nil } }), titleVisibility: .visible) {
                 ForEach(WasteReason.allCases) { r in
                     Button(L(r.title)) {

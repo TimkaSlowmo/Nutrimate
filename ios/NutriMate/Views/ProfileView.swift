@@ -678,6 +678,7 @@ struct ShoppingView: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
+    @State private var quickAdd = false
 
     private var hints: [Food] {
         text.count < 2 ? [] : Array(store.db.search(text, category: nil).prefix(5))
@@ -766,10 +767,17 @@ struct ShoppingView: View {
                             Button(role: .destructive) { store.removeShopping(n) } label: { Label(L("Delete"), systemImage: "trash") }
                         }
                     }
+                    if !store.data.shopping.isEmpty {
+                        Button { quickAdd = true } label: {
+                            Label(L("Back from the shop? Scan the receipt"), systemImage: "doc.text.viewfinder")
+                                .font(.subheadline.weight(.semibold)).foregroundStyle(Color.burgundy)
+                        }
+                    }
                 } footer: {
                     Text(L("Tap the circle when you bought it — it goes straight into your fridge."))
                 }
             }
+            .sheet(isPresented: $quickAdd) { QuickAddView() }
             .scrollContentBackground(.hidden)
             .background(Color.appBackground)
             .navigationTitle(L("Shopping list"))

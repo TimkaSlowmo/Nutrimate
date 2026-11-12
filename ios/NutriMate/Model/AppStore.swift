@@ -500,6 +500,24 @@ final class AppStore: ObservableObject {
         checkMedals()
     }
 
+    /// Быстрое добавление списком / по чеку (v30): всё одним действием, с «Отменить».
+    /// Продукты из списка покупок считаются купленными и уходят из списка.
+    func addBatch(_ items: [(food: Food, qty: Int, storage: StorageKind)]) {
+        guard !items.isEmpty else { return }
+        let units = items.reduce(0) { $0 + $1.qty }
+        remember("cart.badge.plus", L("Added: {0}", Lp(units, "product|products")))
+        for it in items {
+            add(it.food, storage: it.storage, count: it.qty, quiet: true)
+            if data.shopping.contains(it.food.name) {
+                data.shopping.removeAll { $0 == it.food.name }
+                data.stats.bought += 1
+            }
+        }
+        haptic(.medium)
+        react(.cheer, L("{0} put away — I'll watch the dates 👀", Lp(units, "product|products")), emoji: items.first?.food.emoji)
+        checkMedals()
+    }
+
     func addShopping(_ names: [String]) {
         var added = 0
         for n in names where !data.shopping.contains(n) {

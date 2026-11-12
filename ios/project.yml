@@ -8,8 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "29"
-    CURRENT_PROJECT_VERSION: "29"
+    MARKETING_VERSION: "30"
+    CURRENT_PROJECT_VERSION: "30"
 targets:
   NutriMate:
     type: application
@@ -21,8 +21,8 @@ targets:
       path: NutriMate/Info.plist
       properties:
         CFBundleDisplayName: NutriMate
-        CFBundleShortVersionString: "29"
-        CFBundleVersion: "29"
+        CFBundleShortVersionString: "30"
+        CFBundleVersion: "30"
         LSRequiresIPhoneOS: true
         UILaunchScreen:
           UIColorName: LaunchBackground
@@ -30,6 +30,8 @@ targets:
           - UIInterfaceOrientationPortrait
         UIApplicationSupportsIndirectInputEvents: true
         ITSAppUsesNonExemptEncryption: false
+        # «Сканировать чек» (v30): текст читается на телефоне, фото никуда не отправляется
+        NSCameraUsageDescription: "NutriMate reads your grocery receipt to add products to your fridge. The photo stays on your phone. / NutriMate читает чек, чтобы добавить продукты в холодильник. Фото остаётся на телефоне."
         # ProMotion: разрешаем 120 Гц на iPhone 13 Pro Max и новее
         CADisableMinimumFrameDurationOnPhone: true
     settings:
