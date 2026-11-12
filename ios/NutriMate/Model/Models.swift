@@ -8,6 +8,9 @@ struct Food: Codable, Hashable, Identifiable {
     let kcal: Int      // ккал на 100 г
     let category: String
     let shelf: Int     // срок хранения, дней
+    /// Переводы названия (из tool/translations_src.txt); нет — показываем английское
+    var ru: String? = nil
+    var kk: String? = nil
     var id: String { name }
 }
 
@@ -102,10 +105,11 @@ struct FoodDB {
         if q.isEmpty { return pool }
         var a: [Food] = [], b: [Food] = [], c: [Food] = []
         for f in pool {
-            let n = f.name.lowercased()
-            if n.hasPrefix(q) { a.append(f) }
-            else if n.contains(" " + q) { b.append(f) }
-            else if n.contains(q) || f.category.lowercased().hasPrefix(q) { c.append(f) }
+            // ищем по-английски, по-русски и по-казахски
+            let names = [f.name.lowercased(), f.ru?.lowercased() ?? "", f.kk?.lowercased() ?? ""].filter { !$0.isEmpty }
+            if names.contains(where: { $0.hasPrefix(q) }) { a.append(f) }
+            else if names.contains(where: { $0.contains(" " + q) }) { b.append(f) }
+            else if names.contains(where: { $0.contains(q) }) || f.category.lowercased().hasPrefix(q) { c.append(f) }
         }
         return a.sorted { $0.name.count < $1.name.count } + b + c
     }

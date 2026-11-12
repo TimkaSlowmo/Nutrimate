@@ -38,6 +38,19 @@ for chunk in re.split(r'\n  Recipe\(', block)[1:]:
 tb = src[src.index('const storageTips = {'):]
 tb = tb[:tb.index('\n};')]
 tips = {dstr(a): dstr(b) for a, b in re.findall(STR + r":\s*" + STR, tb)}
+# переводы названий (жалоба 3): tool/translations_src.txt — English|Русский|Қазақша
+tr_path = root / 'tool/translations_src.txt'
+n_tr = 0
+if tr_path.exists():
+    for line in tr_path.read_text(encoding='utf-8').splitlines():
+        if not line.strip() or line.startswith('#'): continue
+        parts = [x.strip() for x in line.split('|')]
+        if len(parts) != 3 or not all(parts): errors.append('bad translation line: ' + line); continue
+        en, ru, kk = parts
+        target = byname.get(en) or next((r for r in recipes if r['name'] == en), None)
+        if target is None: errors.append('translation for unknown product/recipe: ' + en); continue
+        target['ru'], target['kk'] = ru, kk
+        n_tr += 1
 rn = [r['name'].lower() for r in recipes]
 for n in set(rn):
     if rn.count(n) > 1: errors.append('duplicate recipe: ' + n)
@@ -45,7 +58,7 @@ expected = src.count('\n  Recipe(\n')
 if expected != len(recipes): errors.append(f'parsed {len(recipes)} recipes, expected {expected}')
 if errors:
     print('\n'.join(errors)); sys.exit(1)
-print(f'OK: {len(foods)} products, {len(recipes)} recipes ({sum(r["zeroWaste"] for r in recipes)} zero-waste), {len(set(f["category"] for f in foods))} categories, {len(tips)} storage tips')
+print(f'OK: {len(foods)} products, {len(recipes)} recipes ({sum(r["zeroWaste"] for r in recipes)} zero-waste), {len(set(f["category"] for f in foods))} categories, {len(tips)} storage tips, {n_tr} translated names (ru/kk)')
 if '--check' not in sys.argv:
     out = root / 'ios/NutriMate/Resources/foods.json'
     out.parent.mkdir(parents=True, exist_ok=True)
