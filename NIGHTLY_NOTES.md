@@ -1,12 +1,21 @@
 # NutriMate — журнал ночного агента
 
 ## Текущее состояние
-- Веб: **v14** · iOS: **v5** · продуктов: **1326** · рецептов: **106** (zero-waste: 42)
+- Веб: **v15** · iOS: **v6** · продуктов: **1357** · рецептов: **110** (zero-waste: 43)
+- ИИ-сервер: код в server/, деплой — server.yml; ждёт секретов Cloudflare (server/SETUP_RU.md). После деплоя — подключить к веб-чату.
 - Главная версия теперь iOS (папка ios/, журнал ios/NIGHTLY_NOTES_IOS.md). Веб — только баги.
 - Единая база: `python3 tool/export_data.py` проверяет дубли/ингредиенты и пишет ios/NutriMate/Resources/foods.json.
 - Иконки: все продукты показываются 3D-картинками (Fluent 3D + свои). Уникальная иконка: **40 / 1218**.
 - Локально Flutter недоступен (сервер Google заблокирован прокси) → компиляцию проверяет GitHub Actions.
   Неудачная сборка не публикуется, так что сайт остаётся на прошлой версии.
+
+## 2026-11-12 (ночь 6) · веб v15 · iOS v6
+- iOS v6: онлайн-ИИ Нутрик через бесплатный Cloudflare Worker (код готов, ждёт настройки), офлайн — запасной.
+- Веб v15: только данные. +31 продукт: Longan, Salak, Soursop, Lotus Root, Jicama, Bitter Melon, Shimeji/Wood Ear Mushrooms,
+  Thai Basil, Shiso, Galangal, Kaffir Lime/Pandan Leaves, Tapioca Pearls, Panko, Dashi Granules, Red Bean Paste, Ube Powder, Kataifi,
+  Pistachio Cream, Lard, Shortening, Gochugaru, Furikake, Guajillo Chiles, Yakult, Cotija Cheese, Corn Tortillas, Beef Chuck,
+  Chipotle in Adobo, Cannellini Beans. +5 советов хранения.
+- +4 рецепта: Brown Sugar Boba Milk Tea, Dubai Chocolate Bar, Quesabirria Tacos, Viral Baked Feta Pasta (zw). Всего 1357 / 110.
 
 ## 2026-11-11 · симулятор
 - Новый workflow «iOS screenshots (simulator)»: приложение запускается на iPhone 16 Pro Max (iOS 18) с демо-данными,
