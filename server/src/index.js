@@ -1,5 +1,8 @@
 // NutriMate · Nutrik AI — Cloudflare Worker (бесплатный тариф Workers Free + Workers AI).
-// POST /chat  { deviceId, messages: [{role, content}], context: {...} }  →  200 { reply, model }
+// POST /chat  { deviceId, messages: [{role, content}], context: {...}, actions?: true }  →  200 { reply, model, actions? }
+// actions: true — клиент умеет сам выполнять действия: ИИ может ПРЕДЛОЖИТЬ их в структурированном виде
+// [{type: add_fridge|add_freezer|add_shopping|eat|discard|freeze, name, qty}], приложение проверяет имя по базе,
+// выполняет и само пишет подтверждение по факту. Текст ИИ никогда не утверждает, что действие сделано.
 // Любой не-200 ответ (429 лимит, 503 ИИ недоступен, 400 плохой запрос) клиент молча
 // заменяет офлайн-ответом NutrikBrain. Ключей в коде нет: ИИ доступен через привязку env.AI.
 
@@ -26,6 +29,43 @@ Rules:
 - If the question is not about food, cooking, groceries, storage, nutrition or the app, gently bring the talk back to food in one sentence.
 - Never invent the user's data: use only the context below. Do not mention that you got "context".
 - You CANNOT change anything in the app: you cannot add, remove, log, freeze or move food, and you cannot edit the shopping list. Never say "I added", "I logged", "done", "добавил", "записал" or similar. The app does these actions itself when the user writes a command like "add 2 eggs to fridge", "I ate a banana", "threw away kefir", "freeze the chicken", "add milk to shopping list". If the user asks for such an action, say you can't do it from the chat and show the exact command to type.`;
+
+export const ACTIONS_RULE = `
+Actions protocol (the app supports it):
+- If, and only if, the user's LAST message clearly asks to change their data (add food to the fridge/freezer, say they ate or threw away food, freeze food, or add to the shopping list), end your answer with ONE extra line exactly like:
+ACTIONS: [{"type":"add_fridge","name":"Eggs","qty":2}]
+- Allowed types: add_fridge, add_freezer, add_shopping, eat, discard, freeze. "name" is the simple English product name (singular food name like "Eggs", "Milk", "Chicken Breast", "Banana"), "qty" is a whole number (default 1).
+- The app checks the name, does the action itself and tells the user what really happened. So in your text NEVER say it is done (no "added", "logged", "добавил", "қостым"); just write a short friendly line like "Okay, passing it to the app 🐾" or a storage tip.
+- Never output ACTIONS for questions, recipes or advice. Never invent other types.`;
+
+const ACTION_TYPES = new Set(['add_fridge', 'add_freezer', 'add_shopping', 'eat', 'discard', 'freeze']);
+
+// Достаём «ACTIONS: [...]» (или ```json [...]```) из ответа модели, проверяем и убираем из текста.
+export function extractActions(text) {
+  let reply = String(text || '');
+  let raw = null;
+  const line = reply.match(/^[ \t>*`]*ACTIONS?\s*:?\s*(\[[\s\S]*?\])\s*`*\s*$/im);
+  if (line) { raw = line[1]; reply = reply.replace(line[0], ''); }
+  else {
+    const block = reply.match(/```(?:json)?\s*(\[[\s\S]*?"type"[\s\S]*?\])\s*```/i);
+    if (block) { raw = block[1]; reply = reply.replace(block[0], ''); }
+  }
+  let actions = [];
+  if (raw) {
+    try {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        actions = arr.slice(0, 5).map((a) => ({
+          type: String(a?.type || '').toLowerCase().trim(),
+          name: clip(String(a?.name || ''), 40),
+          qty: Math.min(99, Math.max(1, Math.round(Number(a?.qty) || 1))),
+        })).filter((a) => ACTION_TYPES.has(a.type) && /\p{L}/u.test(a.name));
+      }
+    } catch (_) { actions = []; }
+  }
+  reply = reply.replace(/\n{3,}/g, '\n\n').trim();
+  return { reply, actions };
+}
 
 const LANG_NAMES = { en: 'English', ru: 'Russian', kk: 'Kazakh (Cyrillic)' };
 
@@ -188,11 +228,18 @@ export default {
 
     const lang = detectLang(messages[messages.length - 1].content, clip(body?.context?.language, 4));
     const langRule = `\n- Answer in ${LANG_NAMES[lang]}${lang === 'kk' ? ' (Cyrillic script, simple correct Kazakh)' : ''}.`;
-    const system = `${SYSTEM_PROMPT}${langRule}\n\nContext about the user right now:\n${buildContext(body?.context)}`;
+    const canAct = body?.actions === true;
+    const system = `${SYSTEM_PROMPT}${canAct ? ACTIONS_RULE : ''}${langRule}\n\nContext about the user right now:\n${buildContext(body?.context)}`;
     try {
-      const { reply, model } = await runModel(env, [{ role: 'system', content: system }, ...messages]);
-      if (claimsAction(reply)) return json({ reply: HONEST_REPLY[lang], model, guarded: true }, 200, cors);
-      return json({ reply, model }, 200, cors);
+      const out = await runModel(env, [{ role: 'system', content: system }, ...messages]);
+      const { reply, actions } = extractActions(out.reply);
+      const model = out.model;
+      if (canAct && actions.length) {
+        // подтверждение напишет приложение по факту; ложное «добавил» из текста убираем
+        return json({ reply: claimsAction(reply) ? '' : reply, actions, model }, 200, cors);
+      }
+      if (!reply || claimsAction(reply)) return json({ reply: HONEST_REPLY[lang], model, guarded: true, actions: [] }, 200, cors);
+      return json({ reply, model, actions: [] }, 200, cors);
     } catch (e) {
       return json({ error: 'offline', reason: e?.quota ? 'ai_quota' : 'ai_error' }, e?.quota ? 429 : 503, cors);
     }

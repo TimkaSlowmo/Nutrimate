@@ -151,54 +151,107 @@ enum NutrikActions {
                                         "🙈 Бұл өнімді базадан таппадым, сондықтан ештеңе өзгертпедім. ") + tail, mood: .sad)
         }
 
-        var lines: [String] = []
-        for f in p.foods {
-            switch p.kind {
-            case .addFridge:
-                let place = p.place ?? FoodDB.defaultStorage(f)
-                store.add(f, storage: place, count: p.qty, quiet: true)
-                let total = store.data.pantry.filter { $0.name == f.name && $0.storage == place }.reduce(0) { $0 + $1.qty }
-                let where_ = tr(place.title.lowercased(),
-                                place == .fridge ? "холодильник" : place == .freezer ? "морозилку" : "шкаф",
-                                place == .fridge ? "тоңазытқышқа" : place == .freezer ? "мұздатқышқа" : "шкафқа")
-                lines.append(tr("✅ Added \(f.emoji) \(f.name) ×\(p.qty) to your \(where_)", "✅ Добавил \(f.emoji) \(f.name) ×\(p.qty) в \(where_)",
-                                "✅ \(f.emoji) \(f.name) ×\(p.qty) \(where_) қосылды") + (total > p.qty ? tr(" — now ×\(total).", " — теперь ×\(total).", " — енді ×\(total).") : "."))
-            case .eat, .discard, .freeze:
-                let rows = store.sortedPantry.filter { $0.name == f.name && (p.kind != .freeze || $0.storage != .freezer) }
-                guard let g = rows.first else {
-                    lines.append(tr("❌ There's no \(f.emoji) \(f.name) in your fridge — I didn't change anything.",
-                                    "❌ \(f.emoji) \(f.name) нет в холодильнике — я ничего не менял.",
-                                    "❌ Тоңазытқышта \(f.emoji) \(f.name) жоқ — ештеңе өзгертпедім."))
-                    continue
-                }
-                let have = rows.reduce(0) { $0 + $1.qty }
-                switch p.kind {
-                case .eat:
-                    let n = min(p.qty, have)
-                    for _ in 0..<n { if let r = store.sortedPantry.first(where: { $0.name == f.name }) { store.eat(r.first.id, grams: 100, finished: true) } }
-                    lines.append(tr("🍽️ Logged: you ate \(f.emoji) \(f.name) ×\(n) (≈\(f.kcal * n) kcal, 100 g each). ",
-                                    "🍽️ Записал: ты съел \(f.emoji) \(f.name) ×\(n) (≈\(f.kcal * n) ккал, по 100 г). ",
-                                    "🍽️ Жазып қойдым: \(f.emoji) \(f.name) ×\(n) жедің (≈\(f.kcal * n) ккал, әрқайсысы 100 г). ") + left(f, store, tr))
-                case .discard:
-                    let n = min(p.qty, have)
-                    for _ in 0..<n {
-                        if let r = store.sortedPantry.first(where: { $0.name == f.name }) {
-                            store.throwAway(r.first.id, reason: r.daysLeft < 0 ? .expired : .spoiled)
-                        }
+        let lines = p.foods.map { run(p.kind, place: p.place, qty: p.qty, food: $0, lang: L, store: store) }
+        let mood: NutrikMood = p.kind == .discard ? .sad : p.kind == .eat ? .eating : .cheer
+        return NutrikReply(text: lines.joined(separator: "\n"), mood: mood)
+    }
+
+    /// Одно действие с одним продуктом — выполняется по-настоящему, текст пишется по факту.
+    static func run(_ kind: Kind, place: StorageKind?, qty: Int, food f: Food, lang L: Lang, store: AppStore) -> String {
+        func tr(_ en: String, _ ru: String, _ kk: String) -> String { L == .ru ? ru : L == .kk ? kk : en }
+        switch kind {
+        case .addFridge:
+            let place = place ?? FoodDB.defaultStorage(f)
+            store.add(f, storage: place, count: qty, quiet: true)
+            let total = store.data.pantry.filter { $0.name == f.name && $0.storage == place }.reduce(0) { $0 + $1.qty }
+            let where_ = tr(place.title.lowercased(),
+                            place == .fridge ? "холодильник" : place == .freezer ? "морозилку" : "шкаф",
+                            place == .fridge ? "тоңазытқышқа" : place == .freezer ? "мұздатқышқа" : "шкафқа")
+            return (tr("✅ Added \(f.emoji) \(f.name) ×\(qty) to your \(where_)", "✅ Добавил \(f.emoji) \(f.name) ×\(qty) в \(where_)",
+                            "✅ \(f.emoji) \(f.name) ×\(qty) \(where_) қосылды") + (total > qty ? tr(" — now ×\(total).", " — теперь ×\(total).", " — енді ×\(total).") : "."))
+        case .eat, .discard, .freeze:
+            let rows = store.sortedPantry.filter { $0.name == f.name && (kind != .freeze || $0.storage != .freezer) }
+            guard let g = rows.first else {
+                return (tr("❌ There's no \(f.emoji) \(f.name) in your fridge — I didn't change anything.",
+                                "❌ \(f.emoji) \(f.name) нет в холодильнике — я ничего не менял.",
+                                "❌ Тоңазытқышта \(f.emoji) \(f.name) жоқ — ештеңе өзгертпедім."))
+            }
+            let have = rows.reduce(0) { $0 + $1.qty }
+            switch kind {
+            case .eat:
+                let n = min(qty, have)
+                for _ in 0..<n { if let r = store.sortedPantry.first(where: { $0.name == f.name }) { store.eat(r.first.id, grams: 100, finished: true) } }
+                return (tr("🍽️ Logged: you ate \(f.emoji) \(f.name) ×\(n) (≈\(f.kcal * n) kcal, 100 g each). ",
+                                "🍽️ Записал: ты съел \(f.emoji) \(f.name) ×\(n) (≈\(f.kcal * n) ккал, по 100 г). ",
+                                "🍽️ Жазып қойдым: \(f.emoji) \(f.name) ×\(n) жедің (≈\(f.kcal * n) ккал, әрқайсысы 100 г). ") + left(f, store, tr))
+            case .discard:
+                let n = min(qty, have)
+                for _ in 0..<n {
+                    if let r = store.sortedPantry.first(where: { $0.name == f.name }) {
+                        store.throwAway(r.first.id, reason: r.daysLeft < 0 ? .expired : .spoiled)
                     }
-                    lines.append(tr("🗑️ Marked \(f.emoji) \(f.name) ×\(n) as thrown away (oldest first). ",
-                                    "🗑️ Отметил: \(f.emoji) \(f.name) ×\(n) выброшено (сначала старое). ",
-                                    "🗑️ Белгіледім: \(f.emoji) \(f.name) ×\(n) тасталды (алдымен ескісі). ") + left(f, store, tr))
-                default:
-                    let units = rows.filter { $0.storage == g.storage }.reduce(0) { $0 + $1.qty }
-                    store.freeze(g.first.id)
-                    lines.append(tr("❄️ Moved \(f.emoji) \(f.name) ×\(units) to the freezer — good for ~3 months.",
-                                    "❄️ Переложил \(f.emoji) \(f.name) ×\(units) в морозилку — хватит примерно на 3 месяца.",
-                                    "❄️ \(f.emoji) \(f.name) ×\(units) мұздатқышқа салынды — шамамен 3 айға жетеді."))
                 }
+                return (tr("🗑️ Marked \(f.emoji) \(f.name) ×\(n) as thrown away (oldest first). ",
+                                "🗑️ Отметил: \(f.emoji) \(f.name) ×\(n) выброшено (сначала старое). ",
+                                "🗑️ Белгіледім: \(f.emoji) \(f.name) ×\(n) тасталды (алдымен ескісі). ") + left(f, store, tr))
+            default:
+                let units = rows.filter { $0.storage == g.storage }.reduce(0) { $0 + $1.qty }
+                store.freeze(g.first.id)
+                return (tr("❄️ Moved \(f.emoji) \(f.name) ×\(units) to the freezer — good for ~3 months.",
+                                "❄️ Переложил \(f.emoji) \(f.name) ×\(units) в морозилку — хватит примерно на 3 месяца.",
+                                "❄️ \(f.emoji) \(f.name) ×\(units) мұздатқышқа салынды — шамамен 3 айға жетеді."))
             }
         }
-        let mood: NutrikMood = p.kind == .discard ? .sad : p.kind == .eat ? .eating : .cheer
+    }
+
+    // MARK: - Действия, предложенные ИИ-сервером ({type, name, qty}); имя проверяем по базе
+
+    struct ServerAction: Decodable { let type: String; let name: String; let qty: Int? }
+
+    static func resolve(_ name: String, db: FoodDB) -> Food? {
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let f = db.byName[n] { return f }
+        let low = n.lowercased()
+        if let f = db.foods.first(where: { $0.name.lowercased() == low }) { return f }
+        // множественное / единственное число: "egg" → "Eggs", "tomatoes" → "Tomato"
+        for v in [low + "s", low + "es", String(low.dropLast()), String(low.dropLast(2))] where v.count > 2 {
+            if let f = db.foods.first(where: { $0.name.lowercased() == v }) { return f }
+        }
+        return aliasFoods(low, db: db).first ?? NutrikBrain.mentioned(low, db: db).first
+    }
+
+    /// Выполнить действия ИИ. Возвращает честное подтверждение (что реально сделано / что нет).
+    static func perform(_ actions: [ServerAction], userText: String, store: AppStore) -> NutrikReply? {
+        let L = lang(userText.lowercased())
+        func tr(_ en: String, _ ru: String, _ kk: String) -> String { L == .ru ? ru : L == .kk ? kk : en }
+        var lines: [String] = []
+        var kinds: [Kind] = []
+        for a in actions.prefix(5) {
+            let qty = min(99, max(1, a.qty ?? 1))
+            guard let f = resolve(a.name, db: store.db) else {
+                let sugg = store.db.search(a.name, category: nil).prefix(3).map { "\($0.emoji) \($0.name)" }
+                lines.append(tr("🙈 I couldn't find \"\(a.name)\" in my food base, so I didn't change anything.",
+                                "🙈 Не нашёл «\(a.name)» в базе продуктов, поэтому ничего не менял.",
+                                "🙈 «\(a.name)» өнімін базадан таппадым, сондықтан ештеңе өзгертпедім.")
+                             + (sugg.isEmpty ? "" : tr(" Did you mean: ", " Может, это: ", " Мүмкін, мынау: ") + sugg.joined(separator: ", ") + "?"))
+                continue
+            }
+            switch a.type {
+            case "add_fridge": lines.append(run(.addFridge, place: .fridge, qty: qty, food: f, lang: L, store: store)); kinds.append(.addFridge)
+            case "add_freezer": lines.append(run(.addFridge, place: .freezer, qty: qty, food: f, lang: L, store: store)); kinds.append(.addFridge)
+            case "eat": lines.append(run(.eat, place: nil, qty: qty, food: f, lang: L, store: store)); kinds.append(.eat)
+            case "discard": lines.append(run(.discard, place: nil, qty: qty, food: f, lang: L, store: store)); kinds.append(.discard)
+            case "freeze": lines.append(run(.freeze, place: nil, qty: qty, food: f, lang: L, store: store)); kinds.append(.freeze)
+            case "add_shopping":
+                let had = store.data.shopping.contains(f.name)
+                if !had { store.addShopping([f.name]) }
+                lines.append(had ? tr("🛒 \(f.emoji) \(f.name) is already on your shopping list.", "🛒 \(f.emoji) \(f.name) уже есть в списке покупок.", "🛒 \(f.emoji) \(f.name) сатып алу тізімінде бар.")
+                                 : tr("🛒 Added \(f.emoji) \(f.name) to your shopping list.", "🛒 Добавил \(f.emoji) \(f.name) в список покупок.", "🛒 \(f.emoji) \(f.name) сатып алу тізіміне қосылды."))
+            default: continue
+            }
+        }
+        guard !lines.isEmpty else { return nil }
+        let mood: NutrikMood = kinds.contains(.discard) ? .sad : kinds.contains(.eat) ? .eating : .cheer
         return NutrikReply(text: lines.joined(separator: "\n"), mood: mood)
     }
 

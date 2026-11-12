@@ -1,6 +1,6 @@
 // Локальная проверка воркера без Cloudflare: node server/test.mjs
 import assert from 'node:assert/strict';
-import worker, { buildContext, sanitizeMessages, claimsAction, detectLang, HONEST_REPLY } from './src/index.js';
+import worker, { buildContext, sanitizeMessages, claimsAction, detectLang, HONEST_REPLY, extractActions } from './src/index.js';
 
 let calls = 0;
 const env = {
@@ -75,4 +75,43 @@ assert.equal((await worker.fetch(req({ deviceId: 'lang-ru-1', messages: [{ role:
 const kkLang = { AI: { async run(model, input) { assert.match(input.messages[0].content, /Answer in Kazakh/); return { response: 'Омлет жаса 🍳' }; } } };
 assert.equal((await worker.fetch(req({ deviceId: 'lang-kk-1', messages: [{ role: 'user', content: 'hi' }], context: { ...ctx, language: 'kk' } }), kkLang)).status, 200);
 assert.match(buildContext({ fridge: [{ name: 'Eggs', qty: 10, daysLeft: 12 }] }), /Eggs ×10 \(12 days left\)/);
+
+// Структурированные действия: ИИ только предлагает, приложение выполняет и подтверждает
+let e = extractActions('Okay, passing it to the app 🐾\nACTIONS: [{"type":"add_fridge","name":"Eggs","qty":2}]');
+assert.equal(e.reply, 'Okay, passing it to the app 🐾');
+assert.deepEqual(e.actions, [{ type: 'add_fridge', name: 'Eggs', qty: 2 }]);
+e = extractActions('Хорошо!\n```json\n[{"type":"eat","name":"Banana"}]\n```');
+assert.deepEqual(e.actions, [{ type: 'eat', name: 'Banana', qty: 1 }]);
+assert.equal(e.reply, 'Хорошо!');
+e = extractActions('ACTIONS: [{"type":"delete_everything","name":"Eggs"},{"type":"freeze","name":"Chicken Breast","qty":500}]');
+assert.deepEqual(e.actions, [{ type: 'freeze', name: 'Chicken Breast', qty: 99 }]);
+assert.deepEqual(extractActions('ACTIONS: [not json').actions, []);
+assert.deepEqual(extractActions('Try an omelette 🍳').actions, []);
+
+const actor = (answer) => ({ AI: { async run(model, input) {
+  assert.match(input.messages[0].content, /ACTIONS: \[/);
+  return { response: answer(input.messages[input.messages.length - 1].content) };
+} } });
+for (const [msg, deviceId, answer, want] of [
+  ['add 2 eggs to my fridge', 'act-en-1', () => 'Okay 🐾\nACTIONS: [{"type":"add_fridge","name":"Eggs","qty":2}]', [{ type: 'add_fridge', name: 'Eggs', qty: 2 }]],
+  ['добавь 2 яйца в холодильник', 'act-ru-1', () => 'Добавил 2 яйца!\nACTIONS: [{"type":"add_fridge","name":"Eggs","qty":2}]', [{ type: 'add_fridge', name: 'Eggs', qty: 2 }]],
+  ['тоңазытқышқа 2 жұмыртқа қос', 'act-kk-1', () => 'Жарайды 🐾\nACTIONS: [{"type":"add_fridge","name":"Eggs","qty":2}]', [{ type: 'add_fridge', name: 'Eggs', qty: 2 }]],
+  ['купи молоко', 'act-ru-2', () => 'ACTIONS: [{"type":"add_shopping","name":"Milk","qty":1}]', [{ type: 'add_shopping', name: 'Milk', qty: 1 }]],
+]) {
+  const r = await worker.fetch(req({ deviceId, actions: true, messages: [{ role: 'user', content: msg }], context: ctx }), actor(answer));
+  const b = await r.json();
+  assert.equal(r.status, 200, msg);
+  assert.deepEqual(b.actions, want, msg);
+  assert.ok(!claimsAction(b.reply), `reply must not claim: ${b.reply}`);
+  assert.ok(!/ACTIONS/.test(b.reply), msg);
+}
+// без actions — ложное «добавил» заменяется честной подсказкой и в режиме actions
+const liarAct = { AI: { async run() { return { response: 'Готово, добавил 2 яйца!' }; } } };
+const lr = await (await worker.fetch(req({ deviceId: 'act-liar-1', actions: true, messages: [{ role: 'user', content: 'добавь 2 яйца' }], context: ctx }), liarAct)).json();
+assert.equal(lr.guarded, true);
+assert.deepEqual(lr.actions, []);
+assert.equal(lr.reply, HONEST_REPLY.ru);
+// старые клиенты (без actions: true) не получают правила действий
+const old = { AI: { async run(model, input) { assert.doesNotMatch(input.messages[0].content, /ACTIONS: \[/); return { response: 'Hi 🐾' }; } } };
+assert.equal((await worker.fetch(req({ deviceId: 'old-client-1', messages: [{ role: 'user', content: 'hi' }], context: ctx }), old)).status, 200);
 console.log(`server tests passed ✅ (${calls} AI calls)`);

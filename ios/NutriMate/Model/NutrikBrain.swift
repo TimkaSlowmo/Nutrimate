@@ -132,7 +132,7 @@ enum NutrikBrain {
 
         if has(["weight", "weigh", "bmi", "вес"]) {
             let w = store.data.weights.sorted { $0.date < $1.date }
-            guard let last = w.last else { return NutrikReply(text: "No weigh-ins yet. Add one in Profile → Weight ⚖️", mood: .happy) }
+            guard let last = w.last else { return NutrikReply(text: "No weigh-ins yet. Add one in Profile → Edit profile → Weight ⚖️", mood: .happy) }
             let diff = last.kg - (w.first?.kg ?? last.kg)
             let sign = diff > 0 ? "+" : ""
             let trend = abs(diff) < 0.05 ? "stable since your first weigh-in" : sign + String(format: "%.1f", diff) + " kg since your first weigh-in"
@@ -225,6 +225,16 @@ enum NutrikBrain {
             let tip = db.tips[f.name] ?? db.tips[f.category]
             let storeTip = tip.map { ". Store it \($0)" } ?? ""
             return NutrikReply(text: "\(f.emoji) \(f.name): \(f.kcal) kcal per 100 g, keeps about \(f.shelf) day\(f.shelf == 1 ? "" : "s")\(storeTip). Ask \"what can I cook with \(f.name.lowercased())?\"", mood: .happy)
+        }
+        // Похоже на просьбу-действие, но ни ИИ, ни разбор её не поняли — честно, без выдуманного «сделал»
+        let actionHints = ["add ", "put ", "i ate", "threw", "freeze", "remove", "delete", "добав", "полож", "съел", "выбро", "выкин", "замороз", "удали", "убери",
+                           "қос", "жедім", "тастадым", "мұздат"]
+        if has(actionHints) {
+            switch NutrikActions.lang(t) {
+            case .ru: return NutrikReply(text: "🙈 Не получилось понять, что сделать, — я ничего не менял. Попробуй так: «добавь 2 яйца в холодильник», «съел банан», «выбросил кефир», «заморозь курицу» или «добавь молоко в список покупок».", mood: .sad)
+            case .kk: return NutrikReply(text: "🙈 Не істеу керегін түсінбедім — ештеңе өзгертпедім. Былай жазып көр: «тоңазытқышқа 2 жұмыртқа қос», «банан жедім», «кефирді тастадым».", mood: .sad)
+            case .en: return NutrikReply(text: "🙈 I couldn't work out what to do, so I didn't change anything. Try: \"add 2 eggs to fridge\", \"I ate a banana\", \"threw away kefir\", \"freeze the chicken\" or \"add milk to shopping list\".", mood: .sad)
+            }
         }
         return NutrikReply(text: "Hmm, I didn't quite get \"\(message)\" 🙈 Try: \"what can I cook?\", \"what expires soon?\", \"how to store tomatoes\", \"can I freeze bread?\", \"do I have milk?\" or \"help\".", mood: .sad)
     }

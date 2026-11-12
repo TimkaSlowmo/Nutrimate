@@ -19,12 +19,20 @@ enum NutrikAI {
             let kcalGoal: Int
             let dislikes: [String]
             let recipes: [RecipeInfo]
+            let language: String
         }
         let deviceId: String
         let messages: [Msg]
         let context: Context
+        /// Приложение само выполняет действия, предложенные ИИ (структурированно), и пишет подтверждение
+        let actions = true
     }
-    private struct Answer: Decodable { let reply: String }
+    private struct Answer: Decodable {
+        let reply: String
+        let actions: [NutrikActions.ServerAction]?
+        /// Сервер заменил ложное «добавил» подсказкой — лучше ответит офлайн-Нутрик (он честный и знает команды)
+        let guarded: Bool?
+    }
 
     private static func dayKey() -> String {
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: Date())
@@ -41,7 +49,10 @@ enum NutrikAI {
         let history = d.chat.suffix(10).map {
             Payload.Msg(role: $0.fromUser ? "user" : "assistant", content: String($0.text.prefix(600)))
         }
-        guard history.last?.role == "user" else { return nil }
+        guard let lastUser = history.last, lastUser.role == "user" else { return nil }
+        let lang: String = {
+            switch NutrikActions.lang(lastUser.content.lowercased()) { case .ru: return "ru"; case .kk: return "kk"; case .en: return "en" }
+        }()
         let have = store.pantryNames
         let recipes = store.rankedRecipes().prefix(8).map { r in
             Payload.RecipeInfo(name: r.name, kcal: r.kcal, time: r.time,
@@ -54,7 +65,7 @@ enum NutrikAI {
             context: .init(name: d.profile.name,
                            fridge: store.sortedPantry.prefix(40).map { .init(name: $0.name, daysLeft: $0.daysLeft, qty: $0.qty) },
                            kcalToday: store.eatenToday, kcalGoal: store.targetCalories,
-                           dislikes: d.dislikes, recipes: Array(recipes)))
+                           dislikes: d.dislikes, recipes: Array(recipes), language: lang))
 
         var req = URLRequest(url: base.appendingPathComponent("chat"), timeoutInterval: 12)
         req.httpMethod = "POST"
@@ -68,6 +79,11 @@ enum NutrikAI {
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             if code == 429 { pausedDay = dayKey(); return nil }
             guard code == 200, let a = try? JSONDecoder().decode(Answer.self, from: data) else { return nil }
+            // ИИ предложил действия — приложение проверяет продукт по базе, выполняет и само пишет, что реально сделано
+            if let acts = a.actions, !acts.isEmpty {
+                return NutrikActions.perform(acts, userText: lastUser.content, store: store)
+            }
+            if a.guarded == true { return nil }
             let text = a.reply.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { return nil }
             // ИИ не умеет менять данные: если он «отчитался», что что-то добавил/записал/выбросил, —

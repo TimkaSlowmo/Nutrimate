@@ -40,6 +40,8 @@ final class AppStore: ObservableObject {
         // v9: одинаковые продукты складываются в одну строку — мягко объединяем старые сохранения
         let merged = AppStore.normalized(data.pantry)
         if merged.count != data.pantry.count { data.pantry = merged }
+        // v10: дата начала для профиля — один раз берём самую раннюю запись
+        if data.profile.registered && data.profile.joined == nil { data.profile.joined = joinedDate }
         if data.notifications { Reminders.reschedule(data) }
     }
 
@@ -429,6 +431,7 @@ final class AppStore: ObservableObject {
         data.profile.goal = min(1, max(-1, goal))
         data.weights = [WeightEntry(date: Date(), kg: weight)]
         data.stats.streakStart = Date()
+        data.profile.joined = Date()
         if demo { loadDemo() }
         withAnimation(.easeInOut(duration: 0.5)) { data.profile.registered = true }
         saveNow()
@@ -445,6 +448,29 @@ final class AppStore: ObservableObject {
             if let f = db.byName[n] { add(f, days: d, quiet: true) }
         }
         say("🧺 Demo products added")
+    }
+
+    /// Дата начала: сохранённая или самая ранняя запись (мягкая миграция старых сохранений)
+    var joinedDate: Date {
+        if let j = data.profile.joined { return j }
+        let dates = data.weights.map(\.date) + data.log.map(\.date) + data.events.map(\.date)
+            + data.pantry.map(\.added) + [data.stats.streakStart]
+        return dates.min() ?? Date()
+    }
+    var daysWithUs: Int { max(1, daysBetween(joinedDate, Date()) + 1) }
+
+    /// Очки опыта и уровень — за полезные действия, не за отходы
+    var xp: Int {
+        let s = data.stats
+        return s.consumed * 2 + s.rescued * 10 + s.cooked * 15 + s.frozen * 5 + s.shared * 10 + s.bought * 3 + data.unlocked.count * 25
+    }
+    var level: (n: Int, title: String, progress: Double, toNext: Int) {
+        // порог уровня n: 50·(n−1)²  → 0, 50, 200, 450, 800…
+        var n = 1
+        while 50 * n * n <= xp { n += 1 }
+        let lo = 50 * (n - 1) * (n - 1), hi = 50 * n * n
+        let titles = ["Sprout", "Saver", "Rescuer", "Eco Hero", "Zero-Waste Pro", "Planet Keeper", "Legend"]
+        return (n, titles[min(n - 1, titles.count - 1)], Double(xp - lo) / Double(hi - lo), hi - xp)
     }
 
     func eraseAll() {

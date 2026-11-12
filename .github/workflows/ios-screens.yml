@@ -84,6 +84,9 @@ jobs:
           shot 11-tutorial 6 -tutorial
           shot 12-week 6 -sheet week
           shot 13-onboarding-goal 6 -onboarding -obStep 3
+          shot 14-profile-bottom 6 -tab profile -scrollBottom
+          shot 15-edit-profile 6 -tab profile -push edit
+          shot 16-medals 6 -tab profile -push medals
           # замер плавности: приложение само прокручивает экран 6 с и пишет fps в Documents/fps.txt
           : > screens/fps.txt
           for T in home fridge search recipes; do

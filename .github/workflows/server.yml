@@ -94,6 +94,21 @@ jobs:
           if [ "$CODE" = "200" ] && python3 -c "import json,re,sys; r=json.load(open('act.json')); sys.exit(0 if r.get('guarded') or not re.search('(добавил|добавила|записал|положил)', r['reply'].lower()) else 1)"; then
             echo "✅ honest about actions"
           elif [ "$CODE" = "200" ]; then echo "::error::AI claimed it did an action"; exit 1; fi
+          # структурированные действия (клиент с actions:true): ИИ предлагает, приложение выполняет
+          for MSG in "add 2 eggs to my fridge" "тоңазытқышқа 2 жұмыртқа қос"; do
+            CODE=$(curl -sS -o act2.json -w '%{http_code}' -X POST "$URL/chat" \
+              -H 'content-type: application/json' -H 'x-nutrimate-client: ios-ci' \
+              -d '{"deviceId":"ci-smoke-act2-'"$GITHUB_RUN_ID"'","actions":true,"messages":[{"role":"user","content":"'"$MSG"'"}],"context":{"name":"CI","fridge":[],"kcalToday":500,"kcalGoal":2100}}' || echo 000)
+            echo "Structured action ($MSG) HTTP $CODE"; cat act2.json; echo
+            [ "$CODE" = "200" ] || continue
+            python3 -c "
+          import json,re,sys
+          r=json.load(open('act2.json'))
+          if re.search(r\"(i've added|i added|добавил|қостым)\", r.get('reply','').lower()): print('::error::reply claims an action'); sys.exit(1)
+          a=r.get('actions') or []
+          print('✅ actions:', a) if a else print('::warning::model returned no actions — the app falls back to its local command parser')
+          "
+          done
 
       - name: Put worker URL into the iOS app
         if: steps.url.outputs.url != ''

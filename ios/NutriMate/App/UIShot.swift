@@ -36,6 +36,7 @@ enum UIShot {
         d.profile.weight = 52
         d.profile.activity = 1
         d.notifications = false
+        d.profile.joined = Calendar.current.date(byAdding: .day, value: -34, to: Date())
         if onboarding { return d }
         let db = FoodDB.shared
         let now = Date()

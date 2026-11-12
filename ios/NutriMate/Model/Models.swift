@@ -299,11 +299,17 @@ struct Profile: Codable {
     var activity = 1
     /// Цель: -1 похудеть, 0 держать вес, 1 набрать
     var goal = 0
+    /// Когда начал пользоваться (для «с нами N дней»); у старых сохранений нет — берём самую раннюю запись
+    var joined: Date? = nil
+    /// Аватар: "" — Нутрик, "initials" — инициалы, иначе эмодзи
+    var avatar = ""
 
     init() {}
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = Profile()
+        joined = try? c.decodeIfPresent(Date.self, forKey: .joined)
+        avatar = (try? c.decodeIfPresent(String.self, forKey: .avatar)) ?? d.avatar
         registered = (try? c.decodeIfPresent(Bool.self, forKey: .registered)) ?? d.registered
         tutorialDone = (try? c.decodeIfPresent(Bool.self, forKey: .tutorialDone)) ?? d.tutorialDone
         name = (try? c.decodeIfPresent(String.self, forKey: .name)) ?? d.name
