@@ -38,7 +38,7 @@ struct ProfileView: View {
                     HStack {
                         Text("Weight: \(store.data.profile.weight, specifier: "%.1f") kg")
                         Spacer()
-                        TextField("new", text: $newWeight)
+                        TextField("kg", text: $newWeight)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 70)
@@ -124,6 +124,15 @@ struct ProfileView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("🐾 Nutrik reacts")
                             Text("Runs in when you eat, cook, freeze or bin food").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Toggle(isOn: $store.data.smartNutrik) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("✨ Smart Nutrik (online AI)")
+                            Text(NutrikAI.isConfigured
+                                 ? "Free AI answers in chat. AI answers can be wrong. Sends only your name, fridge, today's kcal and the last messages."
+                                 : "AI answers can be wrong. The AI server isn't connected yet — Nutrik answers offline for now.")
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                     }
                     Button("💬 Chat with Nutrik") { showChat = true }

@@ -61,12 +61,15 @@ struct ChatView: View {
         .tint(Color.burgundy)
     }
 
+    private var aiOn: Bool { store.data.smartNutrik && NutrikAI.isConfigured }
+    private var statusLine: String { aiOn ? "Smart AI · online ✨" : "Your zero-waste buddy · works offline" }
+
     private var header: some View {
         HStack(spacing: 12) {
             NutrikView(mood: typing ? .talk : mood, size: 58)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Nutrik").font(.headline).foregroundStyle(Color.burgundy)
-                Text(typing ? "typing…" : "Your zero-waste buddy · works offline")
+                Text(typing ? "typing…" : statusLine)
                     .font(.caption).foregroundStyle(.secondary)
                     .contentTransition(.opacity)
             }
@@ -86,6 +89,11 @@ struct ChatView: View {
                     .font(.callout)
                     .foregroundStyle(m.fromUser ? Color.cream : Color.burgundy)
                     .fixedSize(horizontal: false, vertical: true)
+                if m.ai == true {
+                    Text("✨ AI · can be wrong")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Color.burgundy.opacity(0.45))
+                }
                 if let name = m.recipe, let r = store.db.recipes.first(where: { $0.name == name }) {
                     NavigationLink(value: r) {
                         Label("Open recipe", systemImage: "book.fill")
@@ -161,13 +169,22 @@ struct ChatView: View {
             store.data.chat.append(ChatMessage(text: text, fromUser: true))
             typing = true
         }
-        let delay = 0.55 + Double.random(in: 0...0.4)
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            let r = NutrikBrain.reply(to: text, store: store)
+        let started = Date()
+        Task { @MainActor in
+            // Команды (покупки, «не люблю») — локально; остальное — онлайн-ИИ, при любой проблеме — офлайн-Нутрик.
+            var r: NutrikReply? = nil
+            var fromAI = false
+            if !NutrikBrain.isLocalCommand(text), let ai = await NutrikAI.ask(store: store) {
+                r = ai; fromAI = true
+            }
+            let minDelay = 0.55 + Double.random(in: 0...0.4)
+            let wait = minDelay - Date().timeIntervalSince(started)
+            if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }
+            let reply = r ?? NutrikBrain.reply(to: text, store: store)
             withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                 typing = false
-                mood = r.mood == .talk ? .happy : r.mood
-                store.data.chat.append(ChatMessage(text: r.text, fromUser: false, recipe: r.recipe))
+                mood = reply.mood == .talk ? .happy : reply.mood
+                store.data.chat.append(ChatMessage(text: reply.text, fromUser: false, recipe: reply.recipe, ai: fromAI ? true : nil))
                 if store.data.chat.count > 80 { store.data.chat.removeFirst(store.data.chat.count - 80) }
             }
             UIImpactFeedbackGenerator(style: .light).impactOccurred()

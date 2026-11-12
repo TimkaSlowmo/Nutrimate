@@ -5,7 +5,7 @@ import SwiftUI
 extension BMICategory {
     var color: Color {
         switch self {
-        case .under: return Color(hex: 0x4DA3FF)
+        case .under: return Color(hex: 0x7CC4FF)
         case .normal: return Color(hex: 0x3CCB6C)
         case .over: return Color(hex: 0xFFB020)
         case .obese: return Color(hex: 0xFF4D4D)

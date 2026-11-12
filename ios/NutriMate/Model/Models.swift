@@ -188,6 +188,8 @@ struct ChatMessage: Codable, Identifiable, Hashable {
     var fromUser: Bool
     var recipe: String? = nil
     var date: Date = Date()
+    /// Ответ от онлайн-ИИ (nil в старых сохранениях = офлайн)
+    var ai: Bool? = nil
 }
 
 struct WeightEntry: Codable, Identifiable, Hashable {
@@ -349,6 +351,10 @@ struct AppData: Codable {
     var chat: [ChatMessage] = []
     /// Какой по счёту рецепт предлагать на «another»
     var suggestIndex = 0
+    /// Онлайн-ИИ в чате (Cloudflare Workers AI), можно выключить в Profile
+    var smartNutrik = true
+    /// Случайный id устройства — только для дневного лимита ИИ на сервере
+    var deviceId = UUID().uuidString
 
     init() {}
     init(from decoder: Decoder) throws {
@@ -368,6 +374,8 @@ struct AppData: Codable {
         nutrikBuddy = (try? c.decodeIfPresent(Bool.self, forKey: .nutrikBuddy)) ?? true
         chat = (try? c.decodeIfPresent([ChatMessage].self, forKey: .chat)) ?? []
         suggestIndex = (try? c.decodeIfPresent(Int.self, forKey: .suggestIndex)) ?? 0
+        smartNutrik = (try? c.decodeIfPresent(Bool.self, forKey: .smartNutrik)) ?? true
+        deviceId = (try? c.decodeIfPresent(String.self, forKey: .deviceId)) ?? UUID().uuidString
     }
 }
 

@@ -58,6 +58,16 @@ enum NutrikBrain {
         return soft
     }
 
+    /// Команды, которые меняют данные или читают список покупок, — всегда локально (не тратят лимит ИИ).
+    static func isLocalCommand(_ message: String) -> Bool {
+        let t = message.lowercased()
+        func has(_ words: [String]) -> Bool { words.contains { t.contains($0) } }
+        if t.range(of: #"(don't like|dont like|do not like|hate|allergic to|не люблю|без)\s+([^\s,.!?]+)"#, options: .regularExpression) != nil { return true }
+        if t.range(of: #"i (like|love) ([^\s,.!?]+) again"#, options: .regularExpression) != nil { return true }
+        if has(["shopping", "to buy", "need to buy", "купить", "add "]) && has(["shopping list", "list", "buy", "купить"]) { return true }
+        return false
+    }
+
     static func reply(to message: String, store: AppStore) -> NutrikReply {
         let t = message.lowercased()
         let db = store.db

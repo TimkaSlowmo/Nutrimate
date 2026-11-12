@@ -77,6 +77,9 @@ enum UIShot {
             ChatMessage(text: "What can I cook?", fromUser: true),
             ChatMessage(text: "🍳 Rescue omelette — 310 kcal per serving, 10 min. ♻️ Zero-waste! You have everything! Say \"another\" for more ideas.",
                         fromUser: false, recipe: db.recipes.first?.name),
+            ChatMessage(text: "My spinach looks sad. Ideas?", fromUser: true),
+            ChatMessage(text: "Don't bin it yet! 🥬 Wilted spinach is perfect cooked: toss it into an omelette with your eggs and cheddar, or blend it into a smoothie with the banana that needs eating today 🍌",
+                        fromUser: false, ai: true),
         ]
         return d
     }
