@@ -42,6 +42,8 @@ struct RecipesView: View {
                     .background(Color.glassFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                     let items = list
+                    let have = store.pantryNames
+                    let urgent = Set(store.toRescue.map(\.name))
                     if items.isEmpty {
                         VStack(spacing: 10) {
                             NutrikView(mood: .sad, size: 100)
@@ -51,7 +53,7 @@ struct RecipesView: View {
                         .frame(maxWidth: .infinity).padding(.top, 20)
                     }
                     ForEach(items) { r in
-                        NavigationLink(value: r) { RecipeCard(recipe: r) }
+                        NavigationLink(value: r) { RecipeCard(recipe: r, have: have, urgent: urgent) }
                             .buttonStyle(.plain)
                     }
                 }
@@ -66,13 +68,14 @@ struct RecipesView: View {
     }
 }
 
-struct RecipeCard: View {
-    @EnvironmentObject var store: AppStore
+/// Карточка рецепта — без доступа к store: множества «есть в холодильнике» и «спасти» считаются
+/// один раз на весь список (раньше — заново в каждой карточке на каждом кадре прокрутки).
+struct RecipeCard: View, Equatable {
     let recipe: Recipe
+    let have: Set<String>
+    let urgent: Set<String>
 
     var body: some View {
-        let have = store.pantryNames
-        let urgent = Set(store.toRescue.map(\.name))
         let haveCount = recipe.ingredients.filter { have.contains($0.name) }.count
         let rescues = recipe.ingredients.filter { urgent.contains($0.name) }.count
         HStack(spacing: 12) {
@@ -147,7 +150,7 @@ struct RecipeDetail: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     SectionTitle(text: L("Steps"))
-                    ForEach(Array(recipe.steps.enumerated()), id: \.offset) { n, s in
+                    ForEach(Array(recipe.localizedSteps.enumerated()), id: \.offset) { n, s in
                         Button {
                             UISelectionFeedbackGenerator().selectionChanged()
                             if done.contains(n) { done.remove(n) } else { done.insert(n) }

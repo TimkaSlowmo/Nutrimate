@@ -52,6 +52,17 @@ if tr_path.exists():
         if not targets: errors.append('translation for unknown product/recipe: ' + en); continue
         for target in targets: target['ru'], target['kk'] = ru, kk
         n_tr += 1
+# шаги рецептов на ru/kk: tool/recipe_steps_l10n.json — {name: {ru:[...], kk:[...]}}
+st_path = root / 'tool/recipe_steps_l10n.json'
+n_st = 0
+if st_path.exists():
+    rb = {r['name']: r for r in recipes}
+    for name, t in json.loads(st_path.read_text(encoding='utf-8')).items():
+        r = rb.get(name)
+        if not r: errors.append('steps translation for unknown recipe: ' + name); continue
+        if len(t.get('ru', [])) != len(r['steps']) or len(t.get('kk', [])) != len(r['steps']):
+            print('warning: step count differs, skipped:', name); continue
+        r['stepsRu'], r['stepsKk'] = t['ru'], t['kk']; n_st += 1
 rn = [r['name'].lower() for r in recipes]
 for n in set(rn):
     if rn.count(n) > 1: errors.append('duplicate recipe: ' + n)
@@ -59,7 +70,7 @@ expected = src.count('\n  Recipe(\n')
 if expected != len(recipes): errors.append(f'parsed {len(recipes)} recipes, expected {expected}')
 if errors:
     print('\n'.join(errors)); sys.exit(1)
-print(f'OK: {len(foods)} products, {len(recipes)} recipes ({sum(r["zeroWaste"] for r in recipes)} zero-waste), {len(set(f["category"] for f in foods))} categories, {len(tips)} storage tips, {n_tr} translated names (ru/kk)')
+print(f'OK: {len(foods)} products, {len(recipes)} recipes ({sum(r["zeroWaste"] for r in recipes)} zero-waste), {len(set(f["category"] for f in foods))} categories, {len(tips)} storage tips, {n_tr} translated names (ru/kk), {n_st} recipes with translated steps')
 if '--check' not in sys.argv:
     out = root / 'ios/NutriMate/Resources/foods.json'
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -524,6 +524,7 @@ struct EditProfileView: View {
             .listRowBackground(Color.white.opacity(0.6))
         }
         .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, 100, for: .scrollContent) // последняя подпись не уходит под таб-бар
         .scrollDismissesKeyboard(.immediately)
         .background(Color.cream.ignoresSafeArea())
         .navigationTitle(L("Edit profile"))
@@ -620,6 +621,7 @@ struct DislikesView: View {
             .listRowBackground(Color.white.opacity(0.6))
         }
         .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, 100, for: .scrollContent)
         .background(Color.cream.ignoresSafeArea())
         .navigationTitle(L("Skipped in recipes"))
         .navigationBarTitleDisplayMode(.inline)

@@ -30,7 +30,22 @@ struct Recipe: Codable, Hashable, Identifiable {
     let zeroWaste: Bool
     var ru: String? = nil
     var kk: String? = nil
+    /// шаги на русском/казахском (tool/recipe_steps_l10n.json → foods.json); нет перевода — английские
+    var stepsRu: [String]? = nil
+    var stepsKk: [String]? = nil
     var id: String { name }
+
+    /// шаги на языке приложения
+    var localizedSteps: [String] {
+        let t: [String]?
+        switch AppLang.current {
+        case .ru: t = stepsRu
+        case .kk: t = stepsKk
+        case .en: t = nil
+        }
+        if let t, t.count == steps.count { return t }
+        return steps
+    }
 
     /// ккал на порцию
     var kcal: Int {
