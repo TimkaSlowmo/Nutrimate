@@ -111,6 +111,8 @@ const lr = await (await worker.fetch(req({ deviceId: 'act-liar-1', actions: true
 assert.equal(lr.guarded, true);
 assert.deepEqual(lr.actions, []);
 assert.equal(lr.reply, HONEST_REPLY.ru);
+const mixup = { AI: { async run() { return { response: 'Жарайды!\nACTIONS: [{"type":"add_freezer","name":"Eggs","qty":2}]' }; } } };
+assert.equal((await (await worker.fetch(req({ deviceId: 'act-mixup-1', actions: true, messages: [{ role: 'user', content: 'тоңазытқышқа 2 жұмыртқа қос' }], context: ctx }), mixup)).json()).actions[0].type, 'add_fridge');
 const promise = { AI: { async run() { return { response: 'Okay, passing it to the app 🐾' }; } } };
 assert.equal((await (await worker.fetch(req({ deviceId: 'act-promise-1', actions: true, messages: [{ role: 'user', content: 'add eggs' }], context: ctx }), promise)).json()).guarded, true);
 // старые клиенты (без actions: true) не получают правила действий

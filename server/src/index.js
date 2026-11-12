@@ -246,6 +246,13 @@ export default {
     try {
       const out = await runModel(env, [{ role: 'system', content: system }, ...messages]);
       const { reply, actions } = extractActions(out.reply);
+      // маленькая модель путает «тоңазытқыш» (холодильник) и «мұздатқыш» (морозилка) — поправляем по словам пользователя
+      const last = messages[messages.length - 1].content.toLowerCase();
+      const saysFridge = /fridge|холодильник|тоңазытқыш/.test(last), saysFreezer = /freezer|морозил|мұздатқыш/.test(last);
+      for (const a of actions) {
+        if (a.type === 'add_freezer' && saysFridge && !saysFreezer) a.type = 'add_fridge';
+        if (a.type === 'add_fridge' && saysFreezer && !saysFridge) a.type = 'add_freezer';
+      }
       const model = out.model;
       if (canAct && actions.length) {
         // подтверждение напишет приложение по факту; ложное «добавил» из текста убираем
