@@ -94,6 +94,15 @@ jobs:
             cat "$C/Documents/fps.txt" >> screens/fps.txt 2>/dev/null || echo "$T no-data" >> screens/fps.txt
             rm -f "$C/Documents/fps.txt"
           done
+          # поиск дорогой части Home: то же самое с отключённым Нутриком / фоном / тенями
+          for OFF in nutrik bg shadow nutrik,bg,shadow; do
+            xcrun simctl terminate "$UDID" $BID 2>/dev/null || true
+            xcrun simctl launch "$UDID" $BID -uiShot -fps -tab home -perfOff $OFF
+            sleep 11
+            C=$(xcrun simctl get_app_container "$UDID" $BID data)
+            echo "home(-$OFF) $(cat "$C/Documents/fps.txt" 2>/dev/null || echo no-data)" >> screens/fps.txt
+            rm -f "$C/Documents/fps.txt"
+          done
           echo "FPS:"; cat screens/fps.txt
           # короткое видео: Home и анимации Нутрика
           xcrun simctl terminate "$UDID" $BID 2>/dev/null || true

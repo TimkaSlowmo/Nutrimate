@@ -38,7 +38,7 @@ struct GlassCard: ViewModifier {
                 shape
                     .fill(LinearGradient(colors: [Color.white.opacity(0.72), Color(hex: 0xFBF8F1, opacity: 0.58)],
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .shadow(color: Color.burgundy.opacity(0.07), radius: 10, x: 0, y: 5)
+                    .shadow(color: Color.burgundy.opacity(UIShot.perfOff.contains("shadow") ? 0 : 0.07), radius: 10, x: 0, y: 5)
             }
             .overlay(
                 shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.9), .white.opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
@@ -95,7 +95,7 @@ struct LiveBackground: View {
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
-        .onAppear { if !reduceMotion { drift = true } }
+        .onAppear { if !reduceMotion && !UIShot.perfOff.contains("bg") { drift = true } }
     }
 }
 

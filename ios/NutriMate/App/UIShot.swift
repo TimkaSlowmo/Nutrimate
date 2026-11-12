@@ -20,6 +20,8 @@ enum UIShot {
         }
     }
     static var sheet: String? { value("-sheet") }
+    /// Эксперименты с плавностью: `-perfOff nutrik,bg,shadow` отключает части экрана, чтобы найти дорогую.
+    static let perfOff: Set<String> = enabled ? Set((value("-perfOff") ?? "").split(separator: ",").map(String.init)) : []
 
     /// Правдоподобный пользователь: продукты разной свежести, дневник, вес, статистика, чат.
     static func demoData() -> AppData {

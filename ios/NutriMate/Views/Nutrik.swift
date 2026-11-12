@@ -24,7 +24,7 @@ struct NutrikView: View {
         // Спокойные настроения — 30 кадров (мультяшно и дёшево), бег/падение/радость/еда — 60.
         // Canvas рисуется асинхронно, вне главного потока: прокрутка экрана не ждёт Нутрика.
         let fast = ([.run, .fall, .cheer, .eating] as [NutrikMood]).contains(shown)
-        TimelineView(.animation(minimumInterval: fast ? 1.0 / 60.0 : 1.0 / 30.0, paused: !visible || scenePhase != .active)) { tl in
+        TimelineView(.animation(minimumInterval: fast ? 1.0 / 60.0 : 1.0 / 30.0, paused: !visible || scenePhase != .active || UIShot.perfOff.contains("nutrik"))) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
             Canvas(rendersAsynchronously: true) { ctx, sz in
                 NutrikPainter(t: t, mood: shown, food: food).draw(&ctx, sz)
