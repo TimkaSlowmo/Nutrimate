@@ -31,7 +31,25 @@
 - [x] 12. «Отменить» после действий с продуктами (v23)
 - [x] 13. Режим готовки по шагам с таймерами (v24)
 - [x] 14. Рецепт на 1–12 порций, списание штучных продуктов по количеству (v25)
-- [ ] 15+. Улучшения: полировка
+- [x] 15. Валюта ₸/$/€/₽ (v26)
+- [ ] 16+. Улучшения: полировка
+
+## 2026-11-12 (седьмой запуск) · v26 — валюта
+- **Деньги в тенге** (или $, €, ₽): все суммы — «спасено», «под угрозой», Eco Impact, недельный отчёт и его картинка, профиль,
+  офлайн-ответ Нутрика про эко-вклад — через `Money(usd)` / `AppCurrency` (L10n.swift). Внутри по-прежнему доллары, курс
+  примерный (520 ₸ / 0.86 € / 80 ₽ за $), тенге и рубли без копеек, крупные суммы в тенге округлены до 10. По умолчанию — ₸,
+  если регион телефона Казахстан или язык ru/kk, иначе $. Profile → «Язык и валюта» → Валюта. Поле `currency` мягкое (nil = авто).
+- Офлайн-Нутрик: «быстрые рецепты» больше не включают «15 min + 3 h» / «5 min + night».
+- База: **1751 продукт** (+35: Komatsuna, Kalettes, Ridge Gourd, Moringa Pods, Hatch Chile, Ghost Pepper, Naranjilla, Einkorn Flour,
+  Sago Pearls, Paccheri, Arepa Flour, Cassava Flour, Konjac Rice, Zhoug, Shichimi Togarashi, Comte Cheese, Cultured Butter, Cashew
+  Cheese, Aquafaba, Rice Malt Syrup, Panela, Genmaicha, Chai Concentrate, Grouper, Soft Shell Crab, Bottarga, Bison, Pheasant,
+  Flank/Skirt Steak, Picanha, Lamb Shanks, Paratha, Injera, Panettone), **160 рецептов** (+5: Feta Fried Eggs, Cottage Cheese
+  Ice Cream ♻️, Crispy Rice Salad ♻️, Cabbage Okonomiyaki ♻️, Flank Steak Tacos with Zhoug); всё ru/kk, шаги тоже.
+- 👀 Симулятор (снимки v25 перед работой): без поломок, обрезанного текста не нашёл.
+- 👀 После (af7ac2e): ru/kk — «11 180 ₸ сэкономлено», «8 680 ₸ под угрозой», Eco/неделя/картинка недели в тенге, строка
+  «Валюта · ₸ Тенге» в профиле; en — «$ US dollar»; ничего не обрезано, падений нет.
+  ⚡ fps: Home 59.7, Fridge 59.3, Search 59.8, Recipes 57.3.
+- Бэклог: веб — тёмная тема, «поделиться неделей», «шт.» в ингредиентах; Recipes — убрать 12 подтормаживаний при прокрутке.
 
 ## 2026-11-12 (шестой запуск) · v25 — рецепт на любое число порций
 - **«На сколько порций готовим»**: в рецепте рядом с «Ингредиенты» — переключатель «− 3 порции ＋» (1–12). Граммы
