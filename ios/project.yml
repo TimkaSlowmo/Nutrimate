@@ -8,8 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "27"
-    CURRENT_PROJECT_VERSION: "27"
+    MARKETING_VERSION: "28"
+    CURRENT_PROJECT_VERSION: "28"
 targets:
   NutriMate:
     type: application
@@ -21,8 +21,8 @@ targets:
       path: NutriMate/Info.plist
       properties:
         CFBundleDisplayName: NutriMate
-        CFBundleShortVersionString: "27"
-        CFBundleVersion: "27"
+        CFBundleShortVersionString: "28"
+        CFBundleVersion: "28"
         LSRequiresIPhoneOS: true
         UILaunchScreen:
           UIColorName: LaunchBackground

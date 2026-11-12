@@ -61,6 +61,7 @@ struct RootView: View {
             case "shopping": ShoppingView()
             case "week": WeekReportView()
             case "weekcard": WeekShareSheet()
+            case "item": ItemSheet(key: "\(UIShot.value("-item") ?? "Milk")|fridge")
             case "cook":
                 let db = FoodDB.shared
                 if let r = db.recipes.first(where: { $0.name == "Savory Bread Strata" }) ?? db.recipes.first {

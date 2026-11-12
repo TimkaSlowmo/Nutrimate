@@ -218,7 +218,7 @@ final class AppStore: ObservableObject {
         let exp = Calendar.current.date(byAdding: .day, value: days ?? f.shelf, to: now) ?? now
         let n = max(1, count)
         // та же партия (тот же продукт, место и срок ±1 день) → просто +n; иначе новая партия в той же строке
-        if let i = data.pantry.firstIndex(where: { $0.name == f.name && !$0.leftover && $0.storage == place && abs(daysBetween($0.expiry, exp)) <= 1 }) {
+        if let i = data.pantry.firstIndex(where: { $0.name == f.name && !$0.leftover && $0.opened == nil && $0.storage == place && abs(daysBetween($0.expiry, exp)) <= 1 }) {
             data.pantry[i].qty += n
         } else {
             data.pantry.append(PantryItem(name: f.name, emoji: f.emoji, category: f.category, kcal: f.kcal,
@@ -394,6 +394,7 @@ final class AppStore: ObservableObject {
         for i in pantry.indices where pantry[i].groupKey == p.groupKey {
             pantry[i].storage = .freezer
             pantry[i].expiry = exp
+            pantry[i].opened = nil   // в морозилке «открытая» и целая упаковка — одно и то же
         }
         data.pantry = AppStore.normalized(pantry)
         haptic()
@@ -413,6 +414,31 @@ final class AppStore: ObservableObject {
         haptic(.medium)
         react(.cheer, L("🤝 Shared! That's real zero waste"))
         checkMedals()
+    }
+
+    /// «Открыл(а)» (v28): одна штука из самой старой партии становится открытой — отдельной строкой со сроком
+    /// «после вскрытия» (молоко ~5 дней, консервы 3); из шкафа переезжает в холодильник. Возвращает срок в днях.
+    @discardableResult
+    func open(_ id: UUID) -> Int? {
+        guard let p = oldest(id), p.opened == nil, p.storage != .freezer, !p.leftover,
+              let days = FoodDB.openedDays(p.food) else { return nil }
+        remember("lock.open", L("Opened: {0}", "\(p.emoji) \(N(p.name))"))
+        takeOne(p.id)
+        let now = Date()
+        var o = p
+        o.id = UUID()
+        o.qty = 1
+        o.opened = now
+        o.added = now
+        o.expiry = min(p.expiry, Calendar.current.date(byAdding: .day, value: days, to: now) ?? now)
+        let moved = o.storage == .pantry && FoodDB.fridgeWhenOpened(p.food)
+        if moved { o.storage = .fridge }
+        data.pantry.append(o)
+        haptic()
+        let left = max(1, o.daysLeft)
+        say(moved ? L("🔓 {0} opened and moved to the fridge — use within {1}", "\(p.emoji) \(N(p.name))", Lp(left, "day|days"))
+                  : L("🔓 {0} opened — use within {1}", "\(p.emoji) \(N(p.name))", Lp(left, "day|days")))
+        return days
     }
 
     /// Убрать строку целиком без статистики (ошибся при добавлении).

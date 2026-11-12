@@ -282,6 +282,9 @@ struct PantryRow: View {
                     if item.isLeftover {
                         Text(L("· 🥡 leftovers")).font(.caption).foregroundStyle(.secondary)
                     }
+                    if item.opened != nil {
+                        Text(L("· 🔓 opened")).font(.caption).foregroundStyle(.secondary)
+                    }
                     if item.batches.count > 1 {
                         Text("· " + Lp(item.batches.count, "batch|batches")).font(.caption).foregroundStyle(.secondary)
                     }

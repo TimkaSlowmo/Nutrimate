@@ -161,6 +161,7 @@ struct ItemSheet: View {
                                     }
                                 }
                             }
+                            openRow(g)
                             DatePicker(g.batches.count > 1 ? L("Oldest batch best before") : L("Best before"),
                                        selection: Binding(get: { p.expiry }, set: { store.setExpiry(id, $0) }), displayedComponents: .date)
                             Picker(L("Stored in"), selection: Binding(get: { g.storage }, set: { s in
@@ -225,6 +226,42 @@ struct ItemSheet: View {
             }
         }
         .presentationDetents([.large])
+    }
+
+    /// «Открыл(а)» (v28): после вскрытия срок короче — молоко ~5 дней, консервы 3, сок неделя.
+    @ViewBuilder private func openRow(_ g: PantryGroup) -> some View {
+        if let o = g.opened {
+            let ago = daysBetween(o, Date())
+            HStack(spacing: 8) {
+                Image(systemName: "lock.open.fill").foregroundStyle(Color.warnOrange)
+                Text(ago <= 0 ? L("Opened today") : L("Opened {0} ago", Lp(ago, "day|days")))
+                    .font(.subheadline.weight(.semibold))
+                Spacer(minLength: 0)
+                if let d = FoodDB.openedDays(g.food) {
+                    Text(L("keeps ~{0} once open", Lp(d, "day|days"))).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        } else if g.storage != .freezer, !g.isLeftover, let d = FoodDB.openedDays(g.food) {
+            Button {
+                store.open(g.first.id)
+                dismiss() // открытая штука стала своей строкой со своим сроком
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "lock.open").font(.headline)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(g.qty > 1 ? L("I opened one") : L("I opened it")).font(.subheadline.weight(.bold))
+                        Text(L("Once open it keeps ~{0} — I'll shorten the date", Lp(d, "day|days")))
+                            .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(Color.burgundy.opacity(0.4))
+                }
+                .foregroundStyle(Color.burgundy)
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.burgundy.opacity(0.07)))
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     private func qtyButton(_ icon: String, _ action: @escaping () -> Void) -> some View {

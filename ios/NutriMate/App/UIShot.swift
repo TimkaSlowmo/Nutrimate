@@ -69,6 +69,11 @@ enum UIShot {
             d.pantry.append(PantryItem(name: milk.name, emoji: milk.emoji, category: milk.category, kcal: milk.kcal,
                                        added: now, expiry: day(7), storage: .fridge, qty: 2))
         }
+        // открытая упаковка (v28): томатная паста, открыта 2 дня назад — срок 5 дней
+        if let tp = db.byName["Tomato Paste"] {
+            d.pantry.append(PantryItem(name: tp.name, emoji: tp.emoji, category: tp.category, kcal: tp.kcal,
+                                       added: day(-2), expiry: day(5), storage: .fridge, qty: 1, opened: day(-2)))
+        }
         // остатки приготовленного (v27): 2 порции карри со вчера
         if let r = db.recipeByName["Chicken Curry"] {
             d.pantry.append(PantryItem(name: r.name, emoji: r.emoji, category: "Ready Meals", kcal: r.kcalPer100,

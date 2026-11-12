@@ -164,6 +164,66 @@ struct FoodDB {
 
     static func canFreeze(_ f: Food) -> Bool { freezable.contains(f.category) && !noFreeze.contains(f.name) }
 
+    /// Сколько дней продукт хранится ПОСЛЕ вскрытия упаковки (v28) — по типичным рекомендациям
+    /// (молоко и йогурт ~5 дней, мягкий сыр 4, твёрдый месяц, сок неделя, консервы 3 дня, колбаса 4).
+    /// nil — вскрытие на срок не влияет (овощи, крупы, специи, шоколад) или срок и так короче.
+    static func openedDays(_ f: Food) -> Int? {
+        let n = f.name.lowercased(), c = f.category
+        func has(_ k: String...) -> Bool { k.contains { n.contains($0) } }
+        let words = Set(n.split(separator: " ").map(String.init))
+        let drink = c == "Drinks"
+        var d: Int?
+        if c == "Baby Food" { d = has("formula", "cereal", "biscuit") ? 30 : 2 }
+        else if c == "Canned" { d = has("olive", "pickled", "caperberr", "giardiniera", "jalape") ? 30 : 3 }
+        else if has("ice cream", "gelato", "sorbet", "popsicle", "egg white") { d = has("egg white") ? 3 : nil }
+        else if has("egg", "ghee", "margarine", "lard", "kurt", "irimshik", "sary mai") || (has("butter") && !has("buttermilk")) { d = nil }
+        else if has("cream cheese", "mascarpone", "sour cream", "creme fraiche", "crème") { d = 7 }
+        else if has("condensed milk") { d = 10 }
+        else if has("coconut milk", "coconut cream", "evaporated milk") { d = 4 }
+        else if has("cream") && (c == "Dairy" || c == "Plant-Based") { d = 4 }
+        else if has("burrata", "stracciatella", "mozzarella", "ricotta", "cottage", "quark", "paneer", "tvorog",
+                    "queso fresco", "labneh", "cheese curds", "adyghe") { d = 4 }
+        else if has("parmesan", "pecorino", "manchego", "comt", "gruyere", "asiago", "mimolette") { d = 30 }
+        else if has("cheese", "cheddar", "gouda", "edam", "emmental", "provolone", "havarti", "jarlsberg", "halloumi",
+                    "fontina", "feta", "brie", "camembert", "gorgonzola", "roquefort", "stilton", "taleggio", "raclette",
+                    "scamorza", "suluguni", "sulguni", "brynza", "bryndza", "cotija") { d = 14 }
+        else if c != "Sweets" && c != "Frozen" && has("milk", "kefir", "yogurt", "ayran", "skyr", "buttermilk", "ryazhenka", "matsoni", "katyk",
+                    "prostokvasha", "varenets", "lassi", "kumys", "shubat", "yakult", "snezhok") {
+            d = has("oat", "soy", "almond", "rice", "pea ", "cashew", "hemp", "hazelnut", "lactose") ? 7 : 5
+        }
+        else if has("juice", "nectar") { d = 7 }
+        else if drink && has("champagne", "sparkling", "cola", "soda", "lemonade", "tonic", "ginger ale", "root beer",
+                    "flavored water", "energy drink", "sports drink", "iced tea") { d = 3 }
+        else if drink && has("beer") { d = 1 }
+        else if drink && has("wine", "sangria", "cider", "sake") { d = 4 }
+        else if has("kombucha", "cold brew", "chai concentrate", "water kefir", "coconut water") { d = 5 }
+        else if c == "Meat" && has("salami", "chorizo", "pepperoni", "prosciutto", "soppressata", "bresaola", "basturma", "iberico",
+                    "cervelat", "lap cheong", "pancetta", "guanciale", "lardo", "nduja", "kazy", "shuzhuk", "sur et",
+                    "chuchuk", "smoked sausage") { d = 14 }
+        else if (c == "Meat" || c == "Plant-Based") && (!words.isDisjoint(with: ["ham", "bacon"]) || has("sausage", "frankfurter", "hot dog", "bratwurst", "kielbasa", "mortadella",
+                    "pastrami", "roast beef", "corned beef", "smoked chicken", "pate", "doktorskaya")) { d = 4 }
+        else if has("smoked salmon", "salted salmon", "kippers", "smoked mackerel", "caviar", "roe", "tobiko",
+                    "mentaiko", "crab sticks", "salted herring", "pickled herring") { d = 3 }
+        else if has("anchov") { d = 14 }
+        else if has("tofu", "tempeh", "seitan", "yuba") { d = 4 }
+        else if has("hummus", "guacamole", "tzatziki", "pesto", "apple sauce", "broth", "red bean paste", "queso dip",
+                    "fresh tortellini", "pasta sauce", "tomato sauce", "enchilada sauce", "sea moss") { d = 4 }
+        else if has("tomato paste", "tomato puree", "tahini sauce") { d = 7 }
+        else if has("mayo", "dressing", "tartar", "garlic sauce", "salsa", "horseradish", "ketchup", "bbq sauce",
+                    "sweet chili", "adjika", "tkemali", "cranberry sauce", "chipotle") { d = 30 }
+        else if c == "Pantry" && has("jam", "marmalade", "jelly", "curd", "dulce de leche", "spread", "pistachio cream") { d = 30 }
+        else if has("jerky", "biltong") { d = 7 }
+        else if c == "Snacks" && f.shelf > 30 && !has("bar", "pastr", "microwave", "fruit snacks", "fruit leather", "cookies") { d = 14 }
+        else if has("tortilla", "wrappers", "bao bun", "puff pastry", "phyllo", "pizza dough", "kataifi", "tteok") { d = 4 }
+        else if c == "Plant-Based" && f.shelf <= 60 { d = 5 }
+        else if c == "Dairy" && f.shelf <= 30 { d = 5 }
+        guard let d, d < f.shelf else { return nil }
+        return d
+    }
+
+    /// Открытое из шкафа переезжает в холодильник (консервы, соусы, сок); чипсы и хлеб остаются на месте.
+    static func fridgeWhenOpened(_ f: Food) -> Bool { !["Snacks", "Bakery", "Sweets"].contains(f.category) }
+
     /// Поиск: сначала совпадение с начала названия, потом с начала слова, потом где угодно.
     func search(_ query: String, category: String?) -> [Food] {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
@@ -236,6 +296,8 @@ struct PantryItem: Codable, Identifiable, Hashable {
     var qty: Int = 1
     /// Остатки приготовленного блюда (v27): name — рецепт, qty — порции. В старых сохранениях нет → false.
     var leftover: Bool = false
+    /// Когда открыли упаковку (v28): срок сокращён до «после вскрытия». В старых сохранениях нет → nil.
+    var opened: Date? = nil
 
     var food: Food { FoodDB.shared.byName[name] ?? Food(emoji: emoji, name: name, kcal: kcal, category: category, shelf: 7) }
     var daysLeft: Int { daysBetween(Date(), expiry) }
@@ -262,13 +324,15 @@ extension PantryItem {
         storage = (try? c.decodeIfPresent(StorageKind.self, forKey: .storage)) ?? .fridge
         qty = max(1, (try? c.decodeIfPresent(Int.self, forKey: .qty)) ?? 1)
         leftover = (try? c.decodeIfPresent(Bool.self, forKey: .leftover)) ?? false
+        opened = try? c.decodeIfPresent(Date.self, forKey: .opened)
     }
 
     var isLeftover: Bool { leftover }
 
     /// Ключ строки в холодильнике: одинаковый продукт в одном месте хранения складывается
     /// (остатки «Chicken Curry» не смешиваются с купленным готовым карри).
-    var groupKey: String { "\(name)|\(storage.rawValue)\(leftover ? "|leftover" : "")" }
+    /// Открытая упаковка — отдельная строка: у неё свой, короткий срок.
+    var groupKey: String { "\(name)|\(storage.rawValue)\(leftover ? "|leftover" : "")\(opened != nil ? "|opened" : "")" }
 }
 
 /// Одна строка холодильника: «🥚 Eggs ×3» — все партии одного продукта в одном месте.
@@ -290,6 +354,7 @@ struct PantryGroup: Identifiable, Hashable {
     var status: String { first.status }
     var title: String { qty > 1 ? "\(N(name)) ×\(qty)" : N(name) }
     var isLeftover: Bool { first.isLeftover }
+    var opened: Date? { first.opened }
     /// «Съел» по умолчанию: 100 г продукта или одна порция остатков
     var defaultGrams: Int { isLeftover ? (FoodDB.shared.recipeByName[name]?.portionGrams ?? 100) : 100 }
 
