@@ -110,7 +110,7 @@ struct HomeView: View {
         Button { showChat = true } label: {
             HStack(spacing: 12) {
                 ZStack {
-                    Circle().fill(LinearGradient(colors: [.burgundyLight, .burgundy], startPoint: .top, endPoint: .bottom))
+                    Circle().fill(LinearGradient(colors: [.brandLight, .brand], startPoint: .top, endPoint: .bottom))
                     Image(systemName: "bubble.left.and.bubble.right.fill").foregroundStyle(Color.cream).font(.system(size: 17, weight: .semibold))
                 }
                 .frame(width: 44, height: 44)
@@ -136,7 +136,7 @@ struct HomeView: View {
                 Circle().stroke(Color.burgundy.opacity(0.1), lineWidth: 12)
                 Circle()
                     .trim(from: 0, to: frac)
-                    .stroke(AngularGradient(colors: [.burgundyLight, .burgundy, .burgundyLight], center: .center),
+                    .stroke(AngularGradient(colors: [.brandLight, .brand, .brandLight], center: .center),
                             style: StrokeStyle(lineWidth: 12, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .animation(.spring(response: 0.8, dampingFraction: 0.8), value: frac)
@@ -192,7 +192,7 @@ struct HomeView: View {
             NavigationLink(value: r) {
                 HStack(spacing: 12) {
                     Text(r.emoji).font(.system(size: 40)).frame(width: 62, height: 62)
-                        .background(Circle().fill(Color.white.opacity(0.65)))
+                        .background(Circle().fill(Color.paper.opacity(0.65)))
                     VStack(alignment: .leading, spacing: 4) {
                         Text(rescues.isEmpty ? L("RECIPE OF THE DAY") : L("RESCUE RECIPE OF THE DAY"))
                             .font(.caption2.weight(.heavy)).foregroundStyle(rescues.isEmpty ? Color.burgundy.opacity(0.6) : Color.warnOrange)
@@ -272,7 +272,7 @@ struct PantryRow: View {
                             .font(.caption.weight(.bold).monospacedDigit())
                             .foregroundStyle(Color.cream)
                             .padding(.horizontal, 7).padding(.vertical, 2)
-                            .background(Capsule().fill(Color.burgundy))
+                            .background(Capsule().fill(Color.brand))
                     }
                     Spacer()
                     Text(item.storage.emoji).font(.caption)
@@ -334,7 +334,7 @@ struct DiaryView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(Color.cream)
+            .background(Color.appBackground)
             .navigationTitle(L("Food diary"))
             .sheet(isPresented: $showWeek) { WeekReportView() }
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(L("Done")) { dismiss() } } }

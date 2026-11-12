@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 extension Color {
     init(hex: UInt32, opacity: Double = 1) {
@@ -8,11 +9,31 @@ extension Color {
                   blue: Double(hex & 0xFF) / 255,
                   opacity: opacity)
     }
-    // Фирменные цвета NutriMate — не менять
-    static let burgundy = Color(hex: 0x6A041C)
-    static let burgundyLight = Color(hex: 0x8E1230)
+    /// Цвет, который сам меняется в тёмной теме (Profile → Appearance).
+    static func dynamic(_ light: UInt32, _ dark: UInt32) -> Color {
+        func ui(_ hex: UInt32) -> UIColor {
+            UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
+                    blue: CGFloat(hex & 0xFF) / 255, alpha: 1)
+        }
+        let l = ui(light), d = ui(dark)
+        return Color(UIColor { $0.userInterfaceStyle == .dark ? d : l })
+    }
+
+    // Фирменные цвета NutriMate — не менять.
+    /// Бордовый как цвет текста, иконок и тонких оттенков. В тёмной теме — светлый розово-бордовый,
+    /// чтобы текст читался на тёмном фоне.
+    static let burgundy = dynamic(0x6A041C, 0xEDB3C0)
+    /// Бордовый как заливка (кнопки, выбранные чипы, таб-бар, пузыри) — под кремовым текстом, в обеих темах.
+    static let brand = dynamic(0x6A041C, 0x7A0824)
+    static let brandLight = dynamic(0x8E1230, 0xA3183E)
+    static let burgundyLight = brandLight
+    /// Кремовый — всегда светлый (текст на бордовом). Для фона экранов — `appBackground`.
     static let cream = Color(hex: 0xF5F1E5)
-    static let sand = Color(hex: 0xEAE2CF)
+    /// Фон экранов: кремовый днём, тёмный винный ночью.
+    static let appBackground = dynamic(0xF5F1E5, 0x160A0D)
+    static let sand = dynamic(0xEAE2CF, 0x2C1A1E)
+    /// «Бумага» стеклянных карточек и обводок: белая днём, тёплая тёмная ночью.
+    static let paper = dynamic(0xFFFFFF, 0x3A2228)
     static let freshGreen = Color(hex: 0x2E7D32)
     static let warnOrange = Color(hex: 0xE65100)
     static let badRed = Color(hex: 0xC62828)
@@ -36,19 +57,19 @@ struct GlassCard: ViewModifier {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 shape
-                    .fill(LinearGradient(colors: [Color.white.opacity(0.72), Color(hex: 0xFBF8F1, opacity: 0.58)],
+                    .fill(LinearGradient(colors: [Color.paper.opacity(0.72), Color.dynamic(0xFBF8F1, 0x2A171C).opacity(0.58)],
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .shadow(color: Color.burgundy.opacity(UIShot.perfOff.contains("shadow") ? 0 : 0.07), radius: 10, x: 0, y: 5)
+                    .shadow(color: Color.brand.opacity(UIShot.perfOff.contains("shadow") ? 0 : 0.07), radius: 10, x: 0, y: 5)
             }
             .overlay(
-                shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.9), .white.opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
+                shape.strokeBorder(LinearGradient(colors: [Color.paper.opacity(0.9), Color.paper.opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
             )
     }
 }
 
 /// Дешёвая «стеклянная» заливка для строк списков и чипов (вместо Material).
 extension Color {
-    static let glassFill = Color.white.opacity(0.62)
+    static let glassFill = Color.paper.opacity(0.62)
 }
 
 extension View {
@@ -71,15 +92,15 @@ struct LiveBackground: View {
     private static let blobs: [Blob] = [
         Blob(color: Color.burgundy.opacity(0.11), x: 0.20, y: 0.15, size: 0.95, dx: 0.10, dy: 0.06, scale: 1.10, duration: 9),
         Blob(color: Color.sand, x: 0.85, y: 0.30, size: 1.05, dx: -0.09, dy: 0.07, scale: 0.92, duration: 13),
-        Blob(color: Color(hex: 0xE9B8A8).opacity(0.38), x: 0.30, y: 0.75, size: 1.00, dx: 0.09, dy: -0.06, scale: 1.08, duration: 11),
-        Blob(color: Color(hex: 0xC9D8B6).opacity(0.42), x: 0.80, y: 0.85, size: 0.90, dx: -0.08, dy: -0.05, scale: 1.12, duration: 15),
+        Blob(color: Color.dynamic(0xE9B8A8, 0x5C2232).opacity(0.38), x: 0.30, y: 0.75, size: 1.00, dx: 0.09, dy: -0.06, scale: 1.08, duration: 11),
+        Blob(color: Color.dynamic(0xC9D8B6, 0x24331F).opacity(0.42), x: 0.80, y: 0.85, size: 0.90, dx: -0.08, dy: -0.05, scale: 1.12, duration: 15),
     ]
 
     var body: some View {
         GeometryReader { g in
             let w = g.size.width, h = g.size.height
             ZStack {
-                Color.cream
+                Color.appBackground
                 ForEach(0..<Self.blobs.count, id: \.self) { i in
                     let b = Self.blobs[i]
                     let d = w * b.size
@@ -123,8 +144,8 @@ struct EmojiBadge: View {
         Text(emoji)
             .font(.system(size: size * 0.58))
             .frame(width: size, height: size)
-            .background(Circle().fill(Color.white.opacity(0.65)))
-            .overlay(Circle().strokeBorder(Color.white, lineWidth: 1))
+            .background(Circle().fill(Color.paper.opacity(0.65)))
+            .overlay(Circle().strokeBorder(Color.paper, lineWidth: 1))
     }
 }
 
@@ -138,9 +159,9 @@ struct Chip: View {
             .padding(.vertical, 8)
             .foregroundStyle(selected ? Color.cream : Color.burgundy)
             .background(
-                Capsule().fill(selected ? Color.burgundy : Color.glassFill)
+                Capsule().fill(selected ? Color.brand : Color.glassFill)
             )
-            .overlay(Capsule().strokeBorder(Color.white.opacity(selected ? 0.25 : 0.8), lineWidth: 1))
+            .overlay(Capsule().strokeBorder(selected ? Color.white.opacity(0.25) : Color.paper.opacity(0.8), lineWidth: 1))
     }
 }
 
@@ -153,10 +174,10 @@ struct PrimaryButtonStyle: ButtonStyle {
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(LinearGradient(colors: [.burgundyLight, .burgundy], startPoint: .top, endPoint: .bottom))
+                    .fill(LinearGradient(colors: [.brandLight, .brand], startPoint: .top, endPoint: .bottom))
             )
             .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.white.opacity(0.2), lineWidth: 1))
-            .shadow(color: Color.burgundy.opacity(0.3), radius: 10, y: 5)
+            .shadow(color: Color.brand.opacity(0.3), radius: 10, y: 5)
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .animation(.spring(response: 0.3, dampingFraction: 0.5), value: configuration.isPressed)
     }

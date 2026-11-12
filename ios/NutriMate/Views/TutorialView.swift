@@ -119,13 +119,13 @@ struct TutorialOverlay: View {
                     .foregroundStyle(Color.cream)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
-                    .background(Capsule().fill(LinearGradient(colors: [.burgundyLight, .burgundy], startPoint: .top, endPoint: .bottom)))
+                    .background(Capsule().fill(LinearGradient(colors: [.brandLight, .brand], startPoint: .top, endPoint: .bottom)))
             }
         }
         .padding(16)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(Color.cream.opacity(0.5)))
-        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.white.opacity(0.9), lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(Color.appBackground.opacity(0.5)))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.paper.opacity(0.9), lineWidth: 1))
         .shadow(color: .black.opacity(0.18), radius: 20, y: 8)
         .animation(.spring(response: 0.45, dampingFraction: 0.75), value: step)
     }

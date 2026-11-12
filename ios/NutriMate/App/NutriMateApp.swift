@@ -11,7 +11,7 @@ struct NutriMateApp: App {
                 .environmentObject(store)
                 .fontDesign(.serif)
                 .tint(.burgundy)
-                .preferredColorScheme(.light)
+                .preferredColorScheme(store.data.appearance.scheme)
                 .onAppear { FPSProbe.shared.startLater() }
         }
         .onChange(of: scenePhase) { _, phase in

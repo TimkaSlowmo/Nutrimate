@@ -25,7 +25,7 @@ struct NutrikBuddy: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 9)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.white.opacity(0.9), lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.paper.opacity(0.9), lineWidth: 1))
                     .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
                     .padding(.leading, 30)
                     .transition(.scale(scale: 0.6, anchor: .bottomLeading).combined(with: .opacity))

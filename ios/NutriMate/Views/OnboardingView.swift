@@ -107,10 +107,10 @@ struct OnboardingView: View {
                     }
                     .foregroundStyle(Color.burgundy)
                     .padding(.horizontal, 16).padding(.vertical, 14)
-                    .background(on ? Color.burgundy.opacity(0.10) : Color.white.opacity(0.7),
+                    .background(on ? Color.burgundy.opacity(0.10) : Color.paper.opacity(0.7),
                                 in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(on ? Color.burgundy.opacity(0.55) : Color.white.opacity(0.9), lineWidth: on ? 1.5 : 1))
+                        .strokeBorder(on ? Color.burgundy.opacity(0.55) : Color.paper.opacity(0.9), lineWidth: on ? 1.5 : 1))
                     .scaleEffect(on ? 1.02 : 1)
                 }
                 .buttonStyle(.plain)

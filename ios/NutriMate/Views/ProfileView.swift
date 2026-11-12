@@ -37,7 +37,7 @@ struct ProfileView: View {
                     }
 
                     SettingsGroup(title: L("Progress")) {
-                        SettingsRow(icon: "chart.bar.xaxis", tint: .burgundyLight, title: L("Weekly report"),
+                        SettingsRow(icon: "chart.bar.xaxis", tint: .brandLight, title: L("Weekly report"),
                                     value: L("score {0}", WeekStats(store: store).score)) { showWeek = true }
                         RowDivider()
                         SettingsRow(icon: "leaf.fill", tint: .freshGreen, title: L("Eco impact"),
@@ -63,6 +63,22 @@ struct ProfileView: View {
                                     value: store.data.dislikes.isEmpty ? L("none") : "\(store.data.dislikes.count)") { path.append(.dislikes) }
                         RowDivider()
                         SettingsRow(icon: "graduationcap.fill", tint: Color(hex: 0x00897B), title: L("Replay tutorial"), chevron: false) { store.replayTutorial() }
+                    }
+
+                    SettingsGroup(title: L("Appearance")) {
+                        HStack(spacing: 12) {
+                            SettingsIcon(name: store.data.appearance.icon, tint: Color(hex: 0x5E35B1))
+                            Text(L("Theme")).foregroundStyle(.primary).lineLimit(1).minimumScaleFactor(0.8)
+                            Spacer(minLength: 6)
+                            Picker(L("Theme"), selection: Binding(
+                                get: { store.data.appearance },
+                                set: { v in withAnimation(.easeInOut(duration: 0.35)) { store.data.appearance = v } })) {
+                                ForEach(AppAppearance.allCases) { a in Text(a.title).tag(a) }
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(maxWidth: 230)
+                        }
+                        .padding(.horizontal, 14).padding(.vertical, 9)
                     }
 
                     SettingsGroup(title: L("Language")) {
@@ -134,7 +150,7 @@ struct ProfileView: View {
             .sheet(isPresented: $showBody) { BodyView() }
             .sheet(isPresented: $showWeek) { WeekReportView() }
             .sheet(isPresented: $showAvatar) {
-                AvatarPicker().presentationDetents([.medium]).presentationBackground(Color.cream)
+                AvatarPicker().presentationDetents([.medium]).presentationBackground(Color.appBackground)
             }
             .alert(L("Erase all data?"), isPresented: $confirmErase) {
                 Button(L("Erase"), role: .destructive) { store.eraseAll() }
@@ -156,7 +172,7 @@ struct ProfileView: View {
                         Image(systemName: "pencil.circle.fill")
                             .font(.system(size: 28))
                             .symbolRenderingMode(.palette)
-                            .foregroundStyle(Color.cream, Color.burgundy)
+                            .foregroundStyle(Color.cream, Color.brand)
                             .background(Circle().fill(Color.cream).padding(3))
                     }
             }
@@ -217,8 +233,8 @@ struct ProfileView: View {
                     ForEach(got.suffix(5)) { m in
                         Text(m.emoji).font(.system(size: 22))
                             .frame(width: 38, height: 38)
-                            .background(Circle().fill(Color.cream))
-                            .overlay(Circle().strokeBorder(Color.white, lineWidth: 2))
+                            .background(Circle().fill(Color.appBackground))
+                            .overlay(Circle().strokeBorder(Color.paper, lineWidth: 2))
                     }
                     if got.isEmpty {
                         Text(L("Earn your first one 🍽️")).font(.caption).foregroundStyle(.secondary)
@@ -244,7 +260,7 @@ struct AvatarView: View {
     var body: some View {
         let a = store.data.profile.avatar
         ZStack {
-            Circle().fill(LinearGradient(colors: [Color(hex: 0xFFF7EA), Color.sand], startPoint: .top, endPoint: .bottom))
+            Circle().fill(LinearGradient(colors: [Color.dynamic(0xFFF7EA, 0x4A2A31), Color.sand], startPoint: .top, endPoint: .bottom))
             if a.isEmpty {
                 NutrikView(mood: .wave, size: size * 0.92, clumsy: false).offset(y: size * 0.04)
             } else if a == "initials" {
@@ -255,7 +271,7 @@ struct AvatarView: View {
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
-        .overlay(Circle().strokeBorder(LinearGradient(colors: [.burgundyLight, .burgundy], startPoint: .top, endPoint: .bottom), lineWidth: 3))
+        .overlay(Circle().strokeBorder(LinearGradient(colors: [.brandLight, .brand], startPoint: .top, endPoint: .bottom), lineWidth: 3))
         .shadow(color: Color.burgundy.opacity(0.18), radius: 8, y: 4)
     }
 
@@ -296,9 +312,9 @@ struct AvatarPicker: View {
         } label: {
             content()
                 .frame(width: 66, height: 66)
-                .background(Circle().fill(Color.white.opacity(0.8)))
+                .background(Circle().fill(Color.paper.opacity(0.8)))
                 .clipShape(Circle())
-                .overlay(Circle().strokeBorder(sel ? Color.burgundy : Color.white, lineWidth: sel ? 3 : 1))
+                .overlay(Circle().strokeBorder(sel ? Color.burgundy : Color.paper, lineWidth: sel ? 3 : 1))
         }
         .buttonStyle(.plain)
     }
@@ -324,7 +340,7 @@ struct ProgressBar: View {
         GeometryReader { g in
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.burgundy.opacity(0.1))
-                Capsule().fill(LinearGradient(colors: [.burgundyLight, .burgundy], startPoint: .leading, endPoint: .trailing))
+                Capsule().fill(LinearGradient(colors: [.brandLight, .brand], startPoint: .leading, endPoint: .trailing))
                     .frame(width: max(8, g.size.width * min(1, max(0, value))))
             }
         }
@@ -465,7 +481,7 @@ struct EditProfileView: View {
                     .textInputAutocapitalization(.words)
                     .focused($focused)
             }
-            .listRowBackground(Color.white.opacity(0.6))
+            .listRowBackground(Color.paper.opacity(0.6))
 
             Section(L("Body")) {
                 Picker(L("Sex"), selection: $store.data.profile.isMan) {
@@ -476,7 +492,7 @@ struct EditProfileView: View {
                 Stepper(value: $store.data.profile.age, in: 10...100) { valueRow(L("Age"), "\(store.data.profile.age)") }
                 Stepper(value: $store.data.profile.height, in: 120...220, step: 1) { valueRow(L("Height"), L("{0} cm", Int(store.data.profile.height))) }
             }
-            .listRowBackground(Color.white.opacity(0.6))
+            .listRowBackground(Color.paper.opacity(0.6))
 
             Section {
                 valueRow(L("Current"), L("{0} kg", String(format: "%.1f", store.data.profile.weight)))
@@ -496,7 +512,7 @@ struct EditProfileView: View {
             } footer: {
                 Text(L("Log your weight once a week — Nutrik keeps the history and the trend."))
             }
-            .listRowBackground(Color.white.opacity(0.6))
+            .listRowBackground(Color.paper.opacity(0.6))
 
             Section {
                 Picker(L("Activity"), selection: $store.data.profile.activity) {
@@ -521,12 +537,12 @@ struct EditProfileView: View {
             } footer: {
                 Text(L("Base metabolism {0} kcal × activity, ± goal. Losing never goes below your base metabolism.", store.data.profile.bmr))
             }
-            .listRowBackground(Color.white.opacity(0.6))
+            .listRowBackground(Color.paper.opacity(0.6))
         }
         .scrollContentBackground(.hidden)
         .contentMargins(.bottom, 100, for: .scrollContent) // последняя подпись не уходит под таб-бар
         .scrollDismissesKeyboard(.immediately)
-        .background(Color.cream.ignoresSafeArea())
+        .background(Color.appBackground.ignoresSafeArea())
         .navigationTitle(L("Edit profile"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -536,7 +552,7 @@ struct EditProfileView: View {
             }
         }
         .sheet(isPresented: $showAvatar) {
-            AvatarPicker().presentationDetents([.medium]).presentationBackground(Color.cream)
+            AvatarPicker().presentationDetents([.medium]).presentationBackground(Color.appBackground)
         }
         .onDisappear {
             let n = store.data.profile.name.trimmingCharacters(in: .whitespaces)
@@ -618,11 +634,11 @@ struct DislikesView: View {
             } footer: {
                 if !store.data.dislikes.isEmpty { Text(L("Swipe left to like a product again.")) }
             }
-            .listRowBackground(Color.white.opacity(0.6))
+            .listRowBackground(Color.paper.opacity(0.6))
         }
         .scrollContentBackground(.hidden)
         .contentMargins(.bottom, 100, for: .scrollContent)
-        .background(Color.cream.ignoresSafeArea())
+        .background(Color.appBackground.ignoresSafeArea())
         .navigationTitle(L("Skipped in recipes"))
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -678,7 +694,7 @@ struct ShoppingView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(Color.cream)
+            .background(Color.appBackground)
             .navigationTitle(L("Shopping list"))
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button(L("Done")) { dismiss() } } }
         }

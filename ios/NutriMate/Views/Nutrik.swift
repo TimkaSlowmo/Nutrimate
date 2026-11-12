@@ -376,8 +376,8 @@ struct NutrikSays: View {
                 .font(.callout)
                 .foregroundStyle(Color.burgundy)
                 .padding(12)
-                .background(Color.white.opacity(0.8), in: BubbleShape())
-                .overlay(BubbleShape().stroke(Color.white.opacity(0.9), lineWidth: 1))
+                .background(Color.paper.opacity(0.8), in: BubbleShape())
+                .overlay(BubbleShape().stroke(Color.paper.opacity(0.9), lineWidth: 1))
                 .id(text)
                 .transition(.asymmetric(insertion: .scale(scale: 0.85, anchor: .leading).combined(with: .opacity), removal: .opacity))
                 .onTapGesture { onTap?() }

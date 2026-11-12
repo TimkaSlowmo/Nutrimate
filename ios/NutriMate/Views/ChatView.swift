@@ -78,7 +78,7 @@ struct ChatView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
         .background(.ultraThinMaterial)
-        .overlay(alignment: .bottom) { Rectangle().fill(Color.white.opacity(0.7)).frame(height: 1) }
+        .overlay(alignment: .bottom) { Rectangle().fill(Color.paper.opacity(0.7)).frame(height: 1) }
     }
 
     @ViewBuilder private func bubble(_ m: ChatMessage) -> some View {
@@ -110,10 +110,10 @@ struct ChatView: View {
             .background {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(m.fromUser
-                          ? AnyShapeStyle(LinearGradient(colors: [.burgundyLight, .burgundy], startPoint: .top, endPoint: .bottom))
-                          : AnyShapeStyle(Color.white.opacity(0.82)))
+                          ? AnyShapeStyle(LinearGradient(colors: [.brandLight, .brand], startPoint: .top, endPoint: .bottom))
+                          : AnyShapeStyle(Color.paper.opacity(0.82)))
             }
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.white.opacity(m.fromUser ? 0.25 : 0.9), lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(m.fromUser ? Color.white.opacity(0.25) : Color.paper.opacity(0.9), lineWidth: 1))
             .textSelection(.enabled)
             if !m.fromUser { Spacer(minLength: 50) }
         }
@@ -142,14 +142,14 @@ struct ChatView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Color.white.opacity(0.9), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Color.paper.opacity(0.9), lineWidth: 1))
             Button { send(input) } label: {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(Color.cream)
                     .frame(width: 40, height: 40)
-                    .background(Circle().fill(LinearGradient(colors: [.burgundyLight, .burgundy], startPoint: .top, endPoint: .bottom)))
-                    .shadow(color: Color.burgundy.opacity(0.3), radius: 6, y: 3)
+                    .background(Circle().fill(LinearGradient(colors: [.brandLight, .brand], startPoint: .top, endPoint: .bottom)))
+                    .shadow(color: Color.brand.opacity(0.3), radius: 6, y: 3)
             }
             .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || typing)
             .opacity(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
@@ -216,8 +216,8 @@ struct TypingDots: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 13)
-            .background(Color.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.white.opacity(0.9), lineWidth: 1))
+            .background(Color.paper.opacity(0.82), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.paper.opacity(0.9), lineWidth: 1))
         }
     }
 }

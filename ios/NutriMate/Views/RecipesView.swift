@@ -80,7 +80,7 @@ struct RecipeCard: View, Equatable {
         let rescues = recipe.ingredients.filter { urgent.contains($0.name) }.count
         HStack(spacing: 12) {
             Text(recipe.emoji).font(.system(size: 38)).frame(width: 58, height: 58)
-                .background(Circle().fill(Color.white.opacity(0.6)))
+                .background(Circle().fill(Color.paper.opacity(0.6)))
             VStack(alignment: .leading, spacing: 4) {
                 Text(N(recipe.name)).font(.headline).foregroundStyle(Color.burgundy).lineLimit(2)
                 Text(L("⏱ {0} · {1} kcal/serving", recipe.localTime, recipe.kcal)).font(.caption).foregroundStyle(.secondary)
@@ -160,7 +160,7 @@ struct RecipeDetail: View {
                                     .font(.subheadline.bold())
                                     .foregroundStyle(Color.cream)
                                     .frame(width: 26, height: 26)
-                                    .background(Circle().fill(done.contains(n) ? Color.freshGreen : Color.burgundy))
+                                    .background(Circle().fill(done.contains(n) ? Color.freshGreen : Color.brand))
                                 Text(s)
                                     .strikethrough(done.contains(n))
                                     .foregroundStyle(done.contains(n) ? Color.secondary : Color.primary)

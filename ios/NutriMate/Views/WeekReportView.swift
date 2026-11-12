@@ -150,10 +150,10 @@ struct WeekReportView: View {
         }
         .padding(18)
         .background(
-            LinearGradient(colors: [.burgundyLight, .burgundy], startPoint: .topLeading, endPoint: .bottomTrailing),
+            LinearGradient(colors: [.brandLight, .brand], startPoint: .topLeading, endPoint: .bottomTrailing),
             in: RoundedRectangle(cornerRadius: 24, style: .continuous)
         )
-        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(.white.opacity(0.25), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(Color.white.opacity(0.25), lineWidth: 1))
         .shadow(color: Color.burgundy.opacity(0.25), radius: 14, y: 8)
     }
 
@@ -168,7 +168,7 @@ struct WeekReportView: View {
                         .font(.caption2.bold())
                         .foregroundStyle(good == nil ? Color.secondary : good! ? Color.freshGreen : Color.badRed)
                         .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Color.white.opacity(0.6), in: Capsule())
+                        .background(Color.paper.opacity(0.6), in: Capsule())
                 }
             }
             Text(value).font(.system(size: 26, weight: .bold, design: .rounded)).foregroundStyle(Color.burgundy)

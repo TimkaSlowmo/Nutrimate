@@ -48,7 +48,7 @@ struct SearchView: View {
         }
         .padding(14)
         .background(Color.glassFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.white.opacity(0.85), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.paper.opacity(0.85), lineWidth: 1))
     }
 
     private var categories: some View {
@@ -137,7 +137,7 @@ struct FoodRow: View {
                     .font(.headline)
                     .foregroundStyle(Color.cream)
                     .frame(width: 36, height: 36)
-                    .background(Circle().fill(Color.burgundy))
+                    .background(Circle().fill(Color.brand))
                     .scaleEffect(pressed ? 0.7 : 1)
             }
             .buttonStyle(.plain)
@@ -269,7 +269,7 @@ struct AddFoodSheet: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(Color.cream)
+            .background(Color.appBackground)
             .navigationTitle(L("Add product"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button(L("Cancel")) { dismiss() } } }

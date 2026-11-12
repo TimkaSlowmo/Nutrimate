@@ -107,6 +107,23 @@ jobs:
             shot $LG-11-tutorial 6 -tutorial -lang $LG
             shot $LG-18-recipe 6 -sheet recipe -lang $LG
           done
+          # тёмная тема (Profile → Appearance): ищем нечитаемый текст и светлые пятна
+          shot dark-00-onboarding 7 -onboarding -dark
+          shot dark-01-home 6 -tab home -dark
+          shot dark-02-fridge 5 -tab fridge -dark
+          shot dark-03-search 5 -tab search -dark
+          shot dark-04-recipes 5 -tab recipes -dark
+          shot dark-05-profile 5 -tab profile -dark
+          shot dark-14-profile-bottom 6 -tab profile -scrollBottom -dark
+          shot dark-06-body 6 -sheet body -dark
+          shot dark-07-chat 5 -sheet chat -dark
+          shot dark-08-eco 5 -sheet eco -dark
+          shot dark-10-shopping 5 -sheet shopping -dark
+          shot dark-11-tutorial 6 -tutorial -dark
+          shot dark-12-week 6 -sheet week -dark
+          shot dark-15-edit-profile 6 -tab profile -push edit -dark
+          shot dark-18-recipe 6 -sheet recipe -dark
+          shot dark-ru-01-home 6 -tab home -dark -lang ru
           # замер плавности: приложение само прокручивает экран 6 с и пишет fps в Documents/fps.txt
           : > screens/fps.txt
           for T in home fridge search recipes; do

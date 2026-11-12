@@ -1,7 +1,7 @@
 import Foundation
 
 /// Режим скриншотов для CI (симулятор): запуск с аргументами
-/// `-uiShot` (демо-данные, ничего не сохраняет), `-tab fridge`, `-sheet body`, `-onboarding`, `-tutorial`, `-lang ru|kk|en`.
+/// `-uiShot` (демо-данные, ничего не сохраняет), `-tab fridge`, `-sheet body`, `-onboarding`, `-tutorial`, `-lang ru|kk|en`, `-dark`.
 /// На телефоне владельца эти аргументы никогда не передаются, поэтому режим не мешает обычной работе.
 enum UIShot {
     static let args = ProcessInfo.processInfo.arguments
@@ -32,6 +32,7 @@ enum UIShot {
         d.profile.name = "Alex"
         d.language = AppLang(rawValue: value("-lang") ?? "") ?? .en
         AppLang.current = d.language   // демо-тексты ниже — уже на выбранном языке
+        if args.contains("-dark") { d.appearance = .dark }
         d.profile.isMan = true
         d.profile.age = 19
         d.profile.height = 176

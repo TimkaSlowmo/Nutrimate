@@ -46,7 +46,7 @@ struct RootView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .background(.regularMaterial, in: Capsule())
-                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.9), lineWidth: 1))
+                    .overlay(Capsule().strokeBorder(Color.paper.opacity(0.9), lineWidth: 1))
                     .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
                     .padding(.top, 6)
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -160,12 +160,12 @@ struct GlassTabBar: View {
                     .background {
                         if selection == t {
                             Capsule()
-                                .fill(LinearGradient(colors: [.burgundyLight, .burgundy], startPoint: .top, endPoint: .bottom))
+                                .fill(LinearGradient(colors: [.brandLight, .brand], startPoint: .top, endPoint: .bottom))
                                 .overlay(Capsule().strokeBorder(Color.white.opacity(0.28), lineWidth: 1))
                                 .overlay(alignment: .top) {
                                     Capsule().fill(Color.white.opacity(0.22)).frame(height: 8).padding(.horizontal, 10).padding(.top, 3)
                                 }
-                                .shadow(color: Color.burgundy.opacity(0.35), radius: 8, y: 4)
+                                .shadow(color: Color.brand.opacity(0.35), radius: 8, y: 4)
                                 .scaleEffect(x: squishX, y: 2 - squishX)
                                 .matchedGeometryEffect(id: "pill", in: ns)
                         }
@@ -178,9 +178,9 @@ struct GlassTabBar: View {
         }
         .padding(6)
         .background(.ultraThinMaterial, in: Capsule())
-        .background(Capsule().fill(Color.cream.opacity(0.35)))
+        .background(Capsule().fill(Color.appBackground.opacity(0.35)))
         .overlay(
-            Capsule().strokeBorder(LinearGradient(colors: [.white.opacity(0.95), .white.opacity(0.15)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
+            Capsule().strokeBorder(LinearGradient(colors: [Color.paper.opacity(0.95), Color.paper.opacity(0.15)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.14), radius: 18, y: 8)
     }

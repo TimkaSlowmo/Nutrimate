@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - База продуктов и рецептов (генерируется из lib/main.dart скриптом tool/export_data.py)
 
@@ -442,6 +443,8 @@ struct AppData: Codable {
     var deviceId = UUID().uuidString
     /// Язык интерфейса (en/ru/kk); для старых сохранений — язык системы
     var language: AppLang = AppLang.system
+    /// Оформление: светлое (фирменное, по умолчанию), тёмное или как в системе
+    var appearance: AppAppearance = .light
 
     init() {}
     init(from decoder: Decoder) throws {
@@ -464,6 +467,7 @@ struct AppData: Codable {
         smartNutrik = (try? c.decodeIfPresent(Bool.self, forKey: .smartNutrik)) ?? true
         deviceId = (try? c.decodeIfPresent(String.self, forKey: .deviceId)) ?? UUID().uuidString
         language = (try? c.decodeIfPresent(AppLang.self, forKey: .language)) ?? AppLang.system
+        appearance = (try? c.decodeIfPresent(AppAppearance.self, forKey: .appearance)) ?? .light
     }
 }
 
@@ -487,4 +491,31 @@ struct Medal: Identifiable {
         Medal(id: "cleanfridge", emoji: "✨", title: LK("Clean Fridge"), desc: LK("5+ products and nothing expired")),
         Medal(id: "chatty", emoji: "💬", title: LK("Chatterbox"), desc: LK("Ask Nutrik 5 questions")),
     ]
+}
+
+/// Оформление приложения (Profile → Appearance). Новое поле — мягко: старые сохранения остаются светлыми.
+enum AppAppearance: String, CaseIterable, Identifiable, Codable {
+    case light, dark, system
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .light: return L("Light")
+        case .dark: return L("Dark")
+        case .system: return L("Auto")
+        }
+    }
+    var icon: String {
+        switch self {
+        case .light: return "sun.max.fill"
+        case .dark: return "moon.stars.fill"
+        case .system: return "iphone"
+        }
+    }
+    var scheme: ColorScheme? {
+        switch self {
+        case .light: return .light
+        case .dark: return .dark
+        case .system: return nil
+        }
+    }
 }
