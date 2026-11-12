@@ -116,7 +116,7 @@ enum NutrikBrain {
             return NutrikReply(text: "I'm Nutrik! A small, slightly messy food buddy with very short legs 🐾 I watch your fridge, cook ideas from leftovers and cheer every time you save food from the bin.", mood: .wave)
         }
         if has(["help", "what can you do", "помощь", "помоги"]) {
-            return NutrikReply(text: "I can:\n• suggest recipes from your fridge (\"what can I cook?\", \"another\")\n• tell what expires soon\n• explain how to store or freeze food\n• count calories (\"calories in banana\")\n• check your fridge (\"do I have milk?\")\n• really add, eat, bin or freeze food: "add 2 eggs to fridge", "I ate a banana"\n• add to the shopping list\n• show your eco impact and weight\n• remember what you don't like", mood: .happy)
+            return NutrikReply(text: "I can:\n• suggest recipes from your fridge (\"what can I cook?\", \"another\")\n• tell what expires soon\n• explain how to store or freeze food\n• count calories (\"calories in banana\")\n• check your fridge (\"do I have milk?\")\n• really add, eat, bin or freeze food: \"add 2 eggs to fridge\", \"I ate a banana\"\n• add to the shopping list\n• show your eco impact and weight\n• remember what you don't like", mood: .happy)
         }
 
         if has(["calorie", "kcal", "калор"]) {
