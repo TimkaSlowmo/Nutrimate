@@ -1,11 +1,22 @@
 # NutriMate — журнал ночного агента
 
 ## Текущее состояние
-- Веб: **v18** · iOS: **v16** (нумерация продолжает версии из DartPad: v1–v15 были там) · продуктов: **1447** · рецептов: **121** (zero-waste: 49) · переводов ru/kk: **208** (155 продуктов + 53 рецепта)
+- Веб: **v19** · iOS: **v17** (нумерация продолжает версии из DartPad: v1–v15 были там) · продуктов: **1473** · рецептов: **124** (zero-waste: 51) · переводов названий ru/kk: **653** (529 продуктов + 124 рецепта) · строк интерфейса iOS: **540**
 - ИИ-сервер работает (Cloudflare Workers AI, бесплатно); с v10 предлагает действия только структурированно (`actions`), приложение выполняет само.
 - Главная версия — iOS (ios/, журнал ios/NIGHTLY_NOTES_IOS.md, жалобы ios/BUILD_ERRORS.md). Веб — баги и перенос закрытых жалоб.
 - Единая база: `python3 tool/export_data.py` проверяет дубли/ингредиенты и пишет ios/NutriMate/Resources/foods.json.
 - Локально Flutter недоступен → компиляцию проверяет GitHub Actions.
+
+## 2026-11-12 (ночь) · веб v19 · iOS v17
+- iOS v17: три языка EN/RU/KK во всём приложении (жалоба 3 — все жалобы 12.11 закрыты), Home 21 → 60 fps (Нутрик замирает при прокрутке).
+- Сервер: язык приложения в промпте; метка ACTIONS кириллицей больше не теряет действие (казахский smoke-тест ✅).
+- Веб v19 (только данные): +25 продуктов — Watermelon Radish, Dandelion Greens, Purslane, Persian Cucumbers, Tatsoi,
+  Anaheim Pepper, Mini Sweet Peppers, Cremini Mushrooms, Escarole, Matsutake, Holy Basil, Cara Cara Orange, Cotton Candy
+  Grapes, Red Banana, Tayberry, Stracciatella, Oaxaca Cheese, Langoustines, Bucatini, Pappardelle, Fonio, Milk Bread,
+  Calabrian Chili Paste, Coconut Aminos, Preserved Lemons, Aleppo Pepper; +3 рецепта: Viral Pasta alla Vodka,
+  Stracciatella Tomato Toast (zw), Clean-Out Egg Muffins (zw). Переводы: +374 продукта, все рецепты.
+  export_data.py: рецепт с тем же названием, что и продукт, теперь тоже получает перевод.
+- Бэклог веба: складывание одинаковых продуктов, три языка интерфейса.
 
 ## 2026-11-12 (день) · веб v18 · iOS v16 (бывшая v10)
 - iOS v16 (бывшая v10): новый профиль (жалоба 4), структурированные действия ИИ (жалоба 5 закрыта), переводы 155 названий + поиск на 3 языках.
