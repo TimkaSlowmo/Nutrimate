@@ -28,6 +28,8 @@ struct Recipe: Codable, Hashable, Identifiable {
     let steps: [String]
     let staples: String
     let zeroWaste: Bool
+    var ru: String? = nil
+    var kk: String? = nil
     var id: String { name }
 
     /// ккал на порцию

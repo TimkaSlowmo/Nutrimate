@@ -1,11 +1,21 @@
 # NutriMate — журнал ночного агента
 
 ## Текущее состояние
-- Веб: **v17** · iOS: **v9** · продуктов: **1424** · рецептов: **118** (zero-waste: 47) · переводов ru/kk: 0 (начнутся с жалобы 3)
-- ИИ-сервер работает (Cloudflare Workers AI, бесплатно); с 12.11 честен о действиях (тест + smoke-тест).
+- Веб: **v18** · iOS: **v10** · продуктов: **1447** · рецептов: **121** (zero-waste: 49) · переводов ru/kk: **155** названий продуктов
+- ИИ-сервер работает (Cloudflare Workers AI, бесплатно); с v10 предлагает действия только структурированно (`actions`), приложение выполняет само.
 - Главная версия — iOS (ios/, журнал ios/NIGHTLY_NOTES_IOS.md, жалобы ios/BUILD_ERRORS.md). Веб — баги и перенос закрытых жалоб.
 - Единая база: `python3 tool/export_data.py` проверяет дубли/ингредиенты и пишет ios/NutriMate/Resources/foods.json.
 - Локально Flutter недоступен → компиляцию проверяет GitHub Actions.
+
+## 2026-11-12 (день) · веб v18 · iOS v10
+- iOS v10: новый профиль (жалоба 4), структурированные действия ИИ (жалоба 5 закрыта), переводы 155 названий + поиск на 3 языках.
+- Сервер: протокол `ACTIONS` с примерами EN/RU/KK, opt-in `actions:true`, правка холодильник/морозилка, +тесты, smoke-тест.
+- Веб v18: честные команды в чате на 3 языках (добавь N в холодильник/морозилку, съел, выбросил, заморозил) + действия ИИ
+  выполняются и подтверждаются приложением. +23 продукта: Frisée, Mizuna, Gai Lan, Purple Yam, Beet Greens, Romano Beans,
+  Pluot, Prickly Pear, Yellow Watermelon, Black Sapote, Quark, Mortadella, Monkfish, Pumpernickel, Lupini Beans,
+  Monk Fruit Sweetener, Epazote, Summer Savory, Canned Ackee, Barley Tea, Kimbap, Fresh Tortellini, Seaweed Salad.
+- +3 рецепта: Viral Cottage Cheese Flatbread (zw), Smashed Cucumber Salad (zw), Marry Me Chicken.
+- Бэклог веба: складывание одинаковых продуктов, три языка (после iOS).
 
 ## 2026-11-12 (утро) · веб v17 · iOS v9
 - iOS v9: плавность (жалоба 1), складывание одинаковых продуктов (жалоба 2), честные команды-действия в чате на 3 языках (жалоба 5, частично).

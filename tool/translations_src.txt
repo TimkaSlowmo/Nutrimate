@@ -154,3 +154,57 @@ Cherry Tomato|Помидоры черри|Шие қызанақ
 Sun-Dried Tomatoes|Вяленые томаты|Кептірілген қызанақ
 Ginger|Имбирь|Зімбір
 Leek|Лук-порей|Порей пиязы
+# Рецепты
+Classic Omelette|Классический омлет|Классикалық омлет
+Creamy Cheese Pasta|Паста со сливочным сыром|Кілегейлі ірімшік қосылған паста
+Fresh Summer Salad|Свежий летний салат|Жаздық балғын салат
+Mashed Potatoes with Chicken|Пюре с курицей|Тауық еті қосылған картоп езбесі
+Fruit Yogurt Bowl|Йогурт с фруктами|Жеміс қосылған йогурт
+Buckwheat with Chicken|Гречка с курицей|Тауық етімен қарақұмық
+Syrniki (Cottage Cheese Pancakes)|Сырники|Сырники (сүзбе құймақтары)
+Classic Borscht|Классический борщ|Классикалық борщ
+Pelmeni with Sour Cream|Пельмени со сметаной|Қаймақпен тұшпара
+Baked Salmon with Potatoes|Запечённый лосось с картофелем|Картоппен пісірілген албырт
+Olivier Salad|Салат оливье|Оливье салаты
+Beef Plov|Плов с говядиной|Сиыр етімен палау
+Overripe Banana Bread|Банановый хлеб из спелых бананов|Пісіп кеткен банан наны
+Leftover Fried Rice|Жареный рис из остатков|Қалған күріштен қуырылған күріш
+Fridge-Clearing Frittata|Фриттата из остатков|Тоңазытқыш қалдықтарынан фриттата
+Everything Veggie Soup|Суп из всех овощей|Барлық көкөністен сорпа
+Rescue Smoothie|Смузи-спасатель|Құтқарушы смузи
+Stale Bread Croutons|Сухарики из чёрствого хлеба|Қатқан наннан кептірме
+Kefir Pancakes (Oladyi)|Оладьи на кефире|Кефирлі құймақ
+Shakshuka|Шакшука|Шакшука
+Apple Crumble|Яблочный крамбл|Алма крамблы
+Tomato Bruschetta|Брускетта с помидорами|Қызанақ брускеттасы
+Greek Salad|Греческий салат|Грек салаты
+Chicken Caesar Salad|Цезарь с курицей|Тауық етімен Цезарь салаты
+Chicken Noodle Soup|Куриный суп с лапшой|Кеспе қосылған тауық сорпасы
+Spaghetti Bolognese|Спагетти болоньезе|Болоньез спагеттиі
+Pasta Carbonara|Паста карбонара|Карбонара пастасы
+Pesto Pasta|Паста с песто|Песто пастасы
+Homemade Mac and Cheese|Домашние макароны с сыром|Үй жағдайындағы ірімшікті макарон
+Chicken Stir-Fry|Курица стир-фрай|Тауық стир-фрай
+Beef Stroganoff|Бефстроганов|Бефстроганов
+Chicken Curry|Курица карри|Тауық карри
+Red Lentil Soup|Суп из красной чечевицы|Қызыл жасымық сорпасы
+Chili Con Carne|Чили кон карне|Чили кон карне
+Mushroom Risotto|Ризотто с грибами|Саңырауқұлақ ризоттосы
+Tuna Pasta Salad|Салат с пастой и тунцом|Тунец қосылған паста салаты
+Stuffed Peppers|Фаршированные перцы|Толтырылған бұрыш
+Golubtsy (Cabbage Rolls)|Голубцы|Голубцы (қырыққабат орамы)
+Overnight Oats|Ленивая овсянка|Түнгі сұлы ботқасы
+Fluffy Pancakes|Пышные панкейки|Үлпілдек панкейк
+Russian Blini|Русские блины|Орыс құймағы
+Draniki (Potato Pancakes)|Драники|Драники (картоп құймағы)
+Okroshka|Окрошка|Окрошка
+Vinegret Salad|Винегрет|Винегрет
+Classic Guacamole|Классический гуакамоле|Классикалық гуакамоле
+Homemade Hummus|Домашний хумус|Үй хумусы
+Pumpkin Soup|Тыквенный суп|Асқабақ сорпасы
+Creamy Mushroom Soup|Грибной крем-суп|Саңырауқұлақ крем-сорпасы
+Buckwheat with Mushrooms|Гречка с грибами|Саңырауқұлақпен қарақұмық
+Grilled Cheese Sandwich|Горячий бутерброд с сыром|Ыстық ірімшікті сэндвич
+Smashed Cucumber Salad|Салат из битых огурцов|Езілген қияр салаты
+Marry Me Chicken|Курица «Выходи за меня»|«Маған тұрмысқа шық» тауығы
+Viral Cottage Cheese Flatbread|Лепёшка из творога|Сүзбеден жасалған жалпақ нан

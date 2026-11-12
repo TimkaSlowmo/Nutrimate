@@ -12,7 +12,14 @@ struct RecipesView: View {
         if mode == 2 { r = r.filter(\.zeroWaste) }
         let q = query.lowercased().trimmingCharacters(in: .whitespaces)
         if !q.isEmpty {
-            r = r.filter { $0.name.lowercased().contains(q) || $0.ingredients.contains { $0.name.lowercased().contains(q) } }
+            // по-английски, по-русски и по-казахски (название рецепта и ингредиентов)
+            func hit(_ names: String?...) -> Bool { names.contains { ($0 ?? "").lowercased().contains(q) } }
+            r = r.filter { rec in
+                hit(rec.name, rec.ru, rec.kk) || rec.ingredients.contains { i in
+                    let f = store.db.byName[i.name]
+                    return hit(i.name, f?.ru, f?.kk)
+                }
+            }
         }
         return r
     }
