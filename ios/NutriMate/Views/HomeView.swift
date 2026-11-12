@@ -197,7 +197,7 @@ struct HomeView: View {
                         Text(rescues.isEmpty ? L("RECIPE OF THE DAY") : L("RESCUE RECIPE OF THE DAY"))
                             .font(.caption2.weight(.heavy)).foregroundStyle(rescues.isEmpty ? Color.burgundy.opacity(0.6) : Color.warnOrange)
                         Text(N(r.name)).font(.headline).foregroundStyle(Color.burgundy).lineLimit(2)
-                        Text(rescues.isEmpty ? L("⏱ {0} · {1} kcal/serving", r.time, r.kcal) : L("Uses {0} before it spoils", rescues.prefix(3).map { N($0) }.joined(separator: ", ")))
+                        Text(rescues.isEmpty ? L("⏱ {0} · {1} kcal/serving", r.localTime, r.kcal) : L("Uses {0} before it spoils", rescues.prefix(3).map { N($0) }.joined(separator: ", ")))
                             .font(.caption).foregroundStyle(.secondary).lineLimit(2)
                     }
                     Spacer(minLength: 0)

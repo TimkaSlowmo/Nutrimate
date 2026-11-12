@@ -88,6 +88,7 @@ jobs:
           shot 15-edit-profile 6 -tab profile -push edit
           shot 16-medals 6 -tab profile -push medals
           shot 17-onboarding-hello 6 -onboarding -obStep 1
+          shot 18-recipe 6 -sheet recipe
           # три языка: ключевые экраны по-русски и по-казахски (ищем обрезанный текст)
           for LG in ru kk; do
             shot $LG-00-onboarding 7 -onboarding -lang $LG
@@ -104,6 +105,7 @@ jobs:
             shot $LG-14-profile-bottom 6 -tab profile -scrollBottom -lang $LG
             shot $LG-15-edit-profile 6 -tab profile -push edit -lang $LG
             shot $LG-11-tutorial 6 -tutorial -lang $LG
+            shot $LG-18-recipe 6 -sheet recipe -lang $LG
           done
           # замер плавности: приложение само прокручивает экран 6 с и пишет fps в Documents/fps.txt
           : > screens/fps.txt

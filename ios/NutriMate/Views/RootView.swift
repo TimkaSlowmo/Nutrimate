@@ -60,6 +60,11 @@ struct RootView: View {
             case "eco": EcoImpactView()
             case "shopping": ShoppingView()
             case "week": WeekReportView()
+            case "recipe":
+                let db = FoodDB.shared
+                if let r = db.recipes.first(where: { $0.name == "Classic Omelette" }) ?? db.recipes.first {
+                    NavigationStack { RecipeDetail(recipe: r) }
+                }
             default: DiaryView()
             }
         }

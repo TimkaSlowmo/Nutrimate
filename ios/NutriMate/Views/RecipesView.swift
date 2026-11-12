@@ -138,7 +138,7 @@ struct RecipeDetail: View {
                                 .foregroundStyle(have.contains(i.name) ? Color.freshGreen : Color.burgundy.opacity(0.35))
                         }
                     }
-                    Text(L("Also: {0}", recipe.staples)).font(.caption).foregroundStyle(.secondary)
+                    Text(L("Also: {0}", recipe.localStaples)).font(.caption).foregroundStyle(.secondary)
                     if !missing.isEmpty {
                         Button { store.addShopping(missing) } label: {
                             Label(L("Add {0} missing to shopping list", missing.count), systemImage: "cart.badge.plus")
@@ -206,4 +206,34 @@ extension Recipe {
             }
         }.joined(separator: " ")
     }
+
+    /// «salt, pepper, oil» → «соль, перец, масло» (незнакомые слова остаются как есть).
+    var localStaples: String {
+        guard AppLang.current != .en else { return staples }
+        let i = AppLang.current == .ru ? 0 : 1
+        return staples.split(separator: ",").map { part -> String in
+            var core = part.trimmingCharacters(in: .whitespaces)
+            var prefix = ""
+            if core.lowercased().hasPrefix("optional: ") {
+                core = String(core.dropFirst(10))
+                prefix = i == 0 ? "по желанию: " : "қаласаңыз: "
+            }
+            return prefix + (Recipe.stapleNames[core.lowercased()]?[i] ?? core)
+        }.joined(separator: ", ")
+    }
+
+    static let stapleNames: [String: [String]] = [
+        "salt": ["соль", "тұз"], "pepper": ["перец", "бұрыш"], "black pepper": ["чёрный перец", "қара бұрыш"],
+        "oil": ["масло", "май"], "bay leaf": ["лавровый лист", "лавр жапырағы"], "cumin": ["зира", "зире"],
+        "paprika": ["паприка", "паприка"], "cinnamon": ["корица", "даршын"], "water": ["вода", "су"],
+        "oregano": ["орегано", "орегано"], "lemon": ["лимон", "лимон"], "chili": ["чили", "чили"],
+        "chili flakes": ["хлопья чили", "чили үгіндісі"], "vanilla": ["ваниль", "ваниль"], "baking soda": ["сода", "сода"],
+        "sesame seeds": ["кунжут", "күнжіт"], "dill": ["укроп", "аскөк"], "thyme": ["тимьян", "тимьян"],
+        "nutmeg": ["мускатный орех", "мускат жаңғағы"], "vinegar": ["уксус", "сірке суы"],
+        "pinch of salt": ["щепотка соли", "бір шымшым тұз"], "herbs": ["зелень", "көк шөп"],
+        "dried herbs": ["сушёные травы", "кептірілген шөптер"], "mustard": ["горчица", "қыша"], "stock": ["бульон", "сорпа"],
+        "baking powder": ["разрыхлитель", "қопсытқыш"], "garlic": ["чеснок", "сарымсақ"], "sugar": ["сахар", "қант"],
+        "soy sauce": ["соевый соус", "соя соусы"], "oil for frying": ["масло для жарки", "қуыруға май"],
+        "ice": ["лёд", "мұз"], "nothing else": ["больше ничего", "басқа ештеңе"],
+    ]
 }
