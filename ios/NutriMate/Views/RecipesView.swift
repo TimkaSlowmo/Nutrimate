@@ -85,7 +85,7 @@ struct RecipeCard: View, Equatable {
             .frame(width: 58, height: 58)
             .background(Circle().fill(Color.paper.opacity(0.6)))
             VStack(alignment: .leading, spacing: 4) {
-                Text(N(recipe.name)).font(.headline).foregroundStyle(Color.burgundy).lineLimit(2)
+                Text(N(recipe.name)).font(.headline).foregroundStyle(Color.burgundy).lineLimit(3)
                 Text(L("⏱ {0} · {1} kcal/serving", recipe.localTime, recipe.kcal)).font(.caption).foregroundStyle(.secondary)
                 HStack(spacing: 6) {
                     tag(L("{0}/{1} in fridge", haveCount, recipe.ingredients.count), haveCount == recipe.ingredients.count ? .freshGreen : .burgundy)
@@ -112,6 +112,7 @@ struct RecipeDetail: View {
     let recipe: Recipe
     @State private var portions = 1
     @State private var done = Set<Int>()
+    @State private var cooking = false
 
     var body: some View {
         let have = store.pantryNames
@@ -128,6 +129,11 @@ struct RecipeDetail: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
+
+                Button { cooking = true } label: {
+                    Label(L("Cook with Nutrik — step by step"), systemImage: "play.fill").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(PrimaryButtonStyle())
 
                 VStack(alignment: .leading, spacing: 8) {
                     SectionTitle(text: L("Ingredients"))
@@ -192,6 +198,13 @@ struct RecipeDetail: View {
         }
         .background(LiveBackground())
         .navigationBarTitleDisplayMode(.inline)
+        .fullScreenCover(isPresented: $cooking) {
+            CookModeView(recipe: recipe) {
+                // приготовлено в режиме готовки — закрываем и экран рецепта
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { dismiss() }
+            }
+            .environmentObject(store)
+        }
     }
 }
 

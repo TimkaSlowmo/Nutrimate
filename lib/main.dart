@@ -19,7 +19,7 @@ Future<void> main() async {
 }
 
 // Номер версии: ночной агент увеличивает его на 1 при каждом обновлении.
-const appVersion = 26;
+const appVersion = 27;
 
 const burgundy = Color(0xFF6A041C);
 const cream = Color(0xFFF5F1E5);
@@ -136,22 +136,22 @@ class Recipe {
 // Формат: Категория|эмодзи Название,ккал на 100 г,дней хранения;...
 
 const _raw = '''
-Vegetables|🍅 Tomato,18,7;🥒 Cucumber,15,7;🥔 Potato,77,30;🍠 Sweet Potato,86,21;🥕 Carrot,41,21;🧅 Onion,40,30;🧄 Garlic,149,60;🥬 Cabbage,25,21;🥦 Broccoli,34,5;🥬 Spinach,23,4;🫑 Bell Pepper,31,7;🍆 Eggplant,25,7;🥒 Zucchini,17,6;🎃 Pumpkin,26,30;🌽 Corn,86,5;🥬 Lettuce,15,5;🍄 Mushrooms,22,5;🌿 Dill,43,5;🌿 Parsley,36,6;🟣 Beetroot,43,21;🫛 Green Peas,81,5;🥦 Cauliflower,25,6;🥬 Celery,16,10;🌶️ Chili Pepper,40,7;⚪ Radish,16,8;🫛 Green Beans,31,5;🌱 Asparagus,20,4;🫚 Ginger,80,21;🥬 Leek,61,10;⚪ Turnip,28,20;🥬 Arugula,25,4;🥬 Bok Choy,13,5;🥬 Brussels Sprouts,43,7;🌿 Artichoke,47,5;🌿 Fennel,31,7;🥬 Kohlrabi,27,10;🧅 Spring Onion,32,7;🥬 Red Cabbage,31,21;🌶️ Jalapeno,29,7;🌿 Horseradish,48,30;🥒 Okra,33,5;🎃 Butternut Squash,45,30;🥕 Parsnip,75,20;🌿 Sorrel,22,4;🌿 Cilantro,23,5;🌿 Basil,23,5;🌿 Mint,70,5;🧅 Shallot,72,30;🧅 Red Onion,40,30;🍅 Cherry Tomato,18,7;🥒 Pattypan Squash,16,6;⚪ Daikon,18,14;🫛 Edamame,121,5;🥬 Salad Mix,17,4;🥬 Swiss Chard,19,5;🥬 Watercress,11,3;🍄 Champignons,22,5;🍄 Oyster Mushrooms,33,5;🍄 Porcini Mushrooms,34,4;🥔 Red Potato,70,30;🥬 Chinese Cabbage,16,10;🥬 Romaine Lettuce,17,5;🥬 Kale,49,5;🥬 Collard Greens,32,5;🫑 Red Bell Pepper,31,7;🫑 Yellow Bell Pepper,27,7;🫑 Green Bell Pepper,20,7;🥕 Baby Carrots,35,14;🥔 New Potatoes,70,14;🥒 Gherkins,12,7;🌽 Baby Corn,26,5;🥬 Iceberg Lettuce,14,7;🥬 Endive,17,6;🥬 Radicchio,23,7;🌿 Chives,30,5;🌿 Tarragon,50,5;🌿 Lemongrass,99,14;🌱 Microgreens,25,4;🌱 Bean Sprouts,30,3;🌱 Alfalfa Sprouts,23,4;🍄 Shiitake Mushrooms,34,6;🍄 Chanterelles,38,4;🍄 Enoki Mushrooms,37,6;🍄 King Oyster Mushrooms,35,6;🍄 Portobello,22,5;🍠 Yam,118,21;🥔 Jerusalem Artichoke,73,14;🥕 Purple Carrot,41,21;🫛 Snow Peas,42,5;🫛 Sugar Snap Peas,42,5;🥬 Mustard Greens,27,4;🧄 Wild Garlic,35,4;🧅 Pearl Onions,40,30;🥒 Chayote,19,14;🍅 Plum Tomatoes,18,7;🍅 Heirloom Tomatoes,18,6;🍅 Green Tomatoes,23,10;🥦 Broccolini,35,5;🥦 Romanesco,31,6;🎃 Acorn Squash,40,30;🎃 Spaghetti Squash,31,30;🥕 Rutabaga,37,30;🌿 Rhubarb,21,7;🥔 Celery Root,42,30;🥬 Savoy Cabbage,27,14;🥔 Taro,112,14;🌶️ Habanero,40,10;🌶️ Serrano Pepper,32,7;🌶️ Poblano Pepper,20,7;🍆 Baby Eggplant,25,6;🪷 Lotus Root,74,10;🥔 Jicama,38,14;🥒 Bitter Melon,17,5;🍄 Shimeji Mushrooms,39,6;🍄 Wood Ear Mushrooms,25,5;🌿 Thai Basil,23,5;🌿 Shiso,37,4;🫚 Galangal,71,14;🍃 Kaffir Lime Leaves,50,10;🍃 Pandan Leaves,35,7;🍠 Cassava,160,7;🌿 Curry Leaves,108,10;🌿 Chervil,37,5;🍄 Morels,31,3;🎃 Kabocha Squash,34,60;🎃 Delicata Squash,40,30;🥬 Celtuce,18,7;🥕 Salsify,82,14;🌿 Fiddlehead Ferns,34,3;🌿 Ramps,42,5;🌵 Nopales,16,7;🍅 Tomatillo,32,14;🫑 Shishito Peppers,25,7;🫑 Padron Peppers,24,7;🌿 Samphire,20,5;🧄 Garlic Scapes,30,10;🌱 Pea Shoots,30,4;🍠 Purple Sweet Potato,86,21;🍄 Maitake,31,5;🍄 Lion's Mane Mushroom,35,5;🍄 Black Trumpet Mushrooms,35,4;🌿 Lovage,20,5;🌿 Culantro,31,7;🌿 Lemon Verbena,50,5;🥬 Frisée,17,4;🥬 Mizuna,21,4;🥦 Gai Lan,22,4;🍠 Purple Yam,118,21;🥬 Beet Greens,22,3;🫛 Romano Beans,31,5;🥗 Watermelon Radish,20,14;🥬 Dandelion Greens,45,3;🌿 Purslane,20,3;🥒 Persian Cucumbers,12,7;🥬 Tatsoi,22,4;🌶️ Anaheim Pepper,20,7;🫑 Mini Sweet Peppers,27,10;🍄 Cremini Mushrooms,22,7;🥬 Escarole,17,5;🍄 Matsutake,22,4;🌿 Holy Basil,23,4;🌿 Nettles,42,3;🍄 Beech Mushrooms,35,7;🌿 Sea Grapes,4,3;🌱 Burdock Root,72,14;🫛 Yardlong Beans,47,5;🥬 Water Spinach,19,3;🥒 Luffa,20,7;🌿 Garlic Chives,30,5;🌿 Lemon Balm,44,5;⚫ Black Truffle,51,7;🍄 Nameko Mushrooms,20,5;🍄 Chicken of the Woods,33,4;🥬 Cardoon,17,7;🥬 Puntarelle,20,5;🌿 Agretti,17,4;🥬 Choy Sum,15,4;🥔 Oca,61,30;🎃 Hubbard Squash,40,60;🥒 Snake Gourd,18,5;🥒 Tindora,18,5;🌽 Huitlacoche,30,3;🌶️ Scotch Bonnet,40,10;🌶️ Bird's Eye Chili,40,10;🥦 Broccoli Rabe,22,4;🥬 Butter Lettuce,13,5;🥬 Little Gem Lettuce,15,6;🥬 Mache,21,4;🥬 Yu Choy,20,4;🥬 Amaranth Leaves,23,3;🍠 Yacon,54,14;🥔 Malanga,98,14;🍄 Hedgehog Mushrooms,22,5;🍄 Lobster Mushrooms,38,5;🍄 Cauliflower Mushroom,30,4;🌿 Vietnamese Coriander,30,5;🌿 Mitsuba,15,5;🌿 Borage,21,3;🥕 Carrot Tops,23,3;🌱 Radish Greens,20,3;🥬 Turnip Greens,32,3;🥬 Cavolo Nero,49,6;🥦 Purple Cauliflower,25,6;🌶️ Banana Peppers,27,7;🫑 Cubanelle Peppers,20,7;🌶️ Fresno Chili,40,10;🍆 Chinese Eggplant,25,6;🫛 Winged Beans,49,4;🧄 Green Garlic,40,7;🧅 Sweet Onion,32,30
-Fruits|🍎 Apple,52,14;🍌 Banana,89,4;🍊 Orange,47,10;🍋 Lemon,29,14;🍐 Pear,57,7;🍇 Grapes,69,7;🍑 Peach,39,4;🍒 Cherry,50,4;🍍 Pineapple,50,5;🥭 Mango,60,5;🍉 Watermelon,30,5;🍈 Melon,34,5;🥝 Kiwi,61,7;🥑 Avocado,160,4;🍑 Apricot,48,4;🍑 Plum,46,5;🍊 Tangerine,53,10;🔴 Pomegranate,83,30;🍊 Grapefruit,42,14;🥭 Papaya,43,5;🍈 Fig,74,3;🌴 Dates,282,180;🍋 Lime,30,14;🍑 Nectarine,44,5;🍊 Persimmon,70,7;🍈 Guava,68,5;🍈 Passion Fruit,97,7;🐉 Dragon Fruit,60,5;🍈 Lychee,66,5;🍐 Quince,57,14;🥥 Coconut,354,30;🍇 Raisins,299,365;🍑 Dried Apricots,241,365;🍑 Prunes,240,365;🍈 Dried Figs,249,365;🍊 Pomelo,38,14;🍏 Green Apple,52,14;🍌 Plantain,122,5;🍍 Dried Pineapple,340,180;🍈 Cantaloupe,34,5;🍐 Asian Pear,42,10;🍊 Clementine,47,10;🍋 Yuzu,30,10;🥭 Dried Mango,319,180;🍒 Dried Cherries,333,180;🍌 Baby Bananas,89,4;🍋 Bergamot,30,10;🍊 Kumquat,71,14;🍊 Blood Orange,50,10;🍈 Honeydew Melon,36,7;🍈 Jackfruit,95,5;🍈 Durian,147,4;🍈 Rambutan,82,5;🍈 Mangosteen,73,5;🍈 Feijoa,61,7;🍈 Kiwano,44,14;⭐ Star Fruit,31,7;🍑 Loquat,47,4;🍈 Cherimoya,75,4;🍇 Green Grapes,69,7;🍇 Red Grapes,69,7;🍇 Black Grapes,69,7;🍑 Flat Peach,39,4;🍑 Mirabelle Plum,60,5;🍎 Crab Apples,76,14;🍋 Meyer Lemon,29,14;🥥 Young Coconut,354,14;🍇 Sultanas,299,365;🌴 Medjool Dates,277,180;🍎 Dried Apples,243,365;🍐 Dried Pears,262,365;🍌 Dried Bananas,346,180;🍈 Dried Melon,341,180;🍏 Granny Smith Apple,58,21;🍎 Gala Apple,57,14;🍐 Conference Pear,57,7;🍎 Aport Apple,50,30;🫒 Jida Berries,330,180;🍒 Alycha Cherry Plum,34,7;🟤 Longan,60,5;🍓 Salak,82,7;🍈 Soursop,66,3;🍅 Tamarillo,31,10;🍈 Breadfruit,103,3;🍐 Sapodilla,83,5;🍇 Jabuticaba,45,3;🍒 Acerola,32,4;🫐 Camu Camu,25,5;🥥 Cupuacu,49,5;🥭 Mamey Sapote,124,4;🍐 Medlar,47,10;🥭 Pawpaw,80,3;🍋 Calamansi,25,14;🍋 Buddha's Hand,30,14;🍋 Finger Lime,30,14;🍊 Ugli Fruit,47,14;🍑 Pluot,57,5;🌵 Prickly Pear,41,7;🍉 Yellow Watermelon,30,5;🍫 Black Sapote,130,4;🍊 Cara Cara Orange,45,14;🍇 Cotton Candy Grapes,69,7;🍌 Red Banana,90,5;🍏 Sugar Apple,94,4;🍋 Sudachi,25,14;🍑 Greengage,46,5;🍑 Damson,50,5;🟤 Jujube,79,10;🍎 Wax Apple,25,5;🍈 Pepino Melon,25,7;🥚 Canistel,138,5;🍇 Langsat,57,5;🍊 Sumo Citrus,55,14;🍎 Honeycrisp Apple,52,30;🍎 Pink Lady Apple,55,30;🥭 Ataulfo Mango,60,5;🥝 Golden Kiwi,63,10;🍊 Satsuma,45,10;🍊 Tangelo,47,14;🍈 Atemoya,94,4;🐉 Yellow Dragon Fruit,60,5;🍑 Santol,48,7;🍏 Marula,50,4
-Berries|🍓 Strawberry,32,3;🫐 Blueberry,57,5;🍇 Raspberry,52,3;🫐 Blackberry,43,3;🍒 Cranberry,46,10;🍇 Gooseberry,44,4;🍒 Lingonberry,43,7;🍊 Sea Buckthorn,82,5;🍇 Mulberry,43,3;🍒 Goji Berries,349,180;🍒 Sweet Cherry,63,4;🍒 Sour Cherry,50,4;🍇 Black Currant,63,4;🍇 Red Currant,56,4;🌹 Rosehip,162,30;🍓 Wild Strawberry,32,3;🫐 Bilberry,44,4;🍒 Cloudberry,51,4;🍇 Elderberry,73,3;🫐 Honeyberry,55,4;🍇 Boysenberry,50,3;🍇 Loganberry,55,3;🍒 Dried Barberry,316,180;🫐 Aronia,47,10;🍒 Viburnum,26,10;🍇 White Currant,56,4;🫐 Dried Blueberries,317,180;🍒 Dried Cranberries,308,180;🍓 Freeze-Dried Strawberries,350,365;🫐 Acai Berries,70,2;🍒 Physalis,53,10;🍇 Dewberry,43,3;🍓 Garden Strawberry,32,3;🍒 Rowan Berry,50,10;🫐 Huckleberries,37,7;🍓 Tayberry,40,3;🫐 Sloe Berries,50,5;🥝 Kiwiberries,61,10;🫐 Saskatoon Berries,85,5;🫐 Haskap Berries,51,5;🫐 Marionberries,52,4;🍇 Golden Raspberries,52,3;🫐 Black Raspberries,70,3;🍇 Wineberries,40,3
+Vegetables|🍅 Tomato,18,7;🥒 Cucumber,15,7;🥔 Potato,77,30;🍠 Sweet Potato,86,21;🥕 Carrot,41,21;🧅 Onion,40,30;🧄 Garlic,149,60;🥬 Cabbage,25,21;🥦 Broccoli,34,5;🥬 Spinach,23,4;🫑 Bell Pepper,31,7;🍆 Eggplant,25,7;🥒 Zucchini,17,6;🎃 Pumpkin,26,30;🌽 Corn,86,5;🥬 Lettuce,15,5;🍄 Mushrooms,22,5;🌿 Dill,43,5;🌿 Parsley,36,6;🟣 Beetroot,43,21;🫛 Green Peas,81,5;🥦 Cauliflower,25,6;🥬 Celery,16,10;🌶️ Chili Pepper,40,7;⚪ Radish,16,8;🫛 Green Beans,31,5;🌱 Asparagus,20,4;🫚 Ginger,80,21;🥬 Leek,61,10;⚪ Turnip,28,20;🥬 Arugula,25,4;🥬 Bok Choy,13,5;🥬 Brussels Sprouts,43,7;🌿 Artichoke,47,5;🌿 Fennel,31,7;🥬 Kohlrabi,27,10;🧅 Spring Onion,32,7;🥬 Red Cabbage,31,21;🌶️ Jalapeno,29,7;🌿 Horseradish,48,30;🥒 Okra,33,5;🎃 Butternut Squash,45,30;🥕 Parsnip,75,20;🌿 Sorrel,22,4;🌿 Cilantro,23,5;🌿 Basil,23,5;🌿 Mint,70,5;🧅 Shallot,72,30;🧅 Red Onion,40,30;🍅 Cherry Tomato,18,7;🥒 Pattypan Squash,16,6;⚪ Daikon,18,14;🫛 Edamame,121,5;🥬 Salad Mix,17,4;🥬 Swiss Chard,19,5;🥬 Watercress,11,3;🍄 Champignons,22,5;🍄 Oyster Mushrooms,33,5;🍄 Porcini Mushrooms,34,4;🥔 Red Potato,70,30;🥬 Chinese Cabbage,16,10;🥬 Romaine Lettuce,17,5;🥬 Kale,49,5;🥬 Collard Greens,32,5;🫑 Red Bell Pepper,31,7;🫑 Yellow Bell Pepper,27,7;🫑 Green Bell Pepper,20,7;🥕 Baby Carrots,35,14;🥔 New Potatoes,70,14;🥒 Gherkins,12,7;🌽 Baby Corn,26,5;🥬 Iceberg Lettuce,14,7;🥬 Endive,17,6;🥬 Radicchio,23,7;🌿 Chives,30,5;🌿 Tarragon,50,5;🌿 Lemongrass,99,14;🌱 Microgreens,25,4;🌱 Bean Sprouts,30,3;🌱 Alfalfa Sprouts,23,4;🍄 Shiitake Mushrooms,34,6;🍄 Chanterelles,38,4;🍄 Enoki Mushrooms,37,6;🍄 King Oyster Mushrooms,35,6;🍄 Portobello,22,5;🍠 Yam,118,21;🥔 Jerusalem Artichoke,73,14;🥕 Purple Carrot,41,21;🫛 Snow Peas,42,5;🫛 Sugar Snap Peas,42,5;🥬 Mustard Greens,27,4;🧄 Wild Garlic,35,4;🧅 Pearl Onions,40,30;🥒 Chayote,19,14;🍅 Plum Tomatoes,18,7;🍅 Heirloom Tomatoes,18,6;🍅 Green Tomatoes,23,10;🥦 Broccolini,35,5;🥦 Romanesco,31,6;🎃 Acorn Squash,40,30;🎃 Spaghetti Squash,31,30;🥕 Rutabaga,37,30;🌿 Rhubarb,21,7;🥔 Celery Root,42,30;🥬 Savoy Cabbage,27,14;🥔 Taro,112,14;🌶️ Habanero,40,10;🌶️ Serrano Pepper,32,7;🌶️ Poblano Pepper,20,7;🍆 Baby Eggplant,25,6;🪷 Lotus Root,74,10;🥔 Jicama,38,14;🥒 Bitter Melon,17,5;🍄 Shimeji Mushrooms,39,6;🍄 Wood Ear Mushrooms,25,5;🌿 Thai Basil,23,5;🌿 Shiso,37,4;🫚 Galangal,71,14;🍃 Kaffir Lime Leaves,50,10;🍃 Pandan Leaves,35,7;🍠 Cassava,160,7;🌿 Curry Leaves,108,10;🌿 Chervil,37,5;🍄 Morels,31,3;🎃 Kabocha Squash,34,60;🎃 Delicata Squash,40,30;🥬 Celtuce,18,7;🥕 Salsify,82,14;🌿 Fiddlehead Ferns,34,3;🌿 Ramps,42,5;🌵 Nopales,16,7;🍅 Tomatillo,32,14;🫑 Shishito Peppers,25,7;🫑 Padron Peppers,24,7;🌿 Samphire,20,5;🧄 Garlic Scapes,30,10;🌱 Pea Shoots,30,4;🍠 Purple Sweet Potato,86,21;🍄 Maitake,31,5;🍄 Lion's Mane Mushroom,35,5;🍄 Black Trumpet Mushrooms,35,4;🌿 Lovage,20,5;🌿 Culantro,31,7;🌿 Lemon Verbena,50,5;🥬 Frisée,17,4;🥬 Mizuna,21,4;🥦 Gai Lan,22,4;🍠 Purple Yam,118,21;🥬 Beet Greens,22,3;🫛 Romano Beans,31,5;🥗 Watermelon Radish,20,14;🥬 Dandelion Greens,45,3;🌿 Purslane,20,3;🥒 Persian Cucumbers,12,7;🥬 Tatsoi,22,4;🌶️ Anaheim Pepper,20,7;🫑 Mini Sweet Peppers,27,10;🍄 Cremini Mushrooms,22,7;🥬 Escarole,17,5;🍄 Matsutake,22,4;🌿 Holy Basil,23,4;🌿 Nettles,42,3;🍄 Beech Mushrooms,35,7;🌿 Sea Grapes,4,3;🌱 Burdock Root,72,14;🫛 Yardlong Beans,47,5;🥬 Water Spinach,19,3;🥒 Luffa,20,7;🌿 Garlic Chives,30,5;🌿 Lemon Balm,44,5;⚫ Black Truffle,51,7;🍄 Nameko Mushrooms,20,5;🍄 Chicken of the Woods,33,4;🥬 Cardoon,17,7;🥬 Puntarelle,20,5;🌿 Agretti,17,4;🥬 Choy Sum,15,4;🥔 Oca,61,30;🎃 Hubbard Squash,40,60;🥒 Snake Gourd,18,5;🥒 Tindora,18,5;🌽 Huitlacoche,30,3;🌶️ Scotch Bonnet,40,10;🌶️ Bird's Eye Chili,40,10;🥦 Broccoli Rabe,22,4;🥬 Butter Lettuce,13,5;🥬 Little Gem Lettuce,15,6;🥬 Mache,21,4;🥬 Yu Choy,20,4;🥬 Amaranth Leaves,23,3;🍠 Yacon,54,14;🥔 Malanga,98,14;🍄 Hedgehog Mushrooms,22,5;🍄 Lobster Mushrooms,38,5;🍄 Cauliflower Mushroom,30,4;🌿 Vietnamese Coriander,30,5;🌿 Mitsuba,15,5;🌿 Borage,21,3;🥕 Carrot Tops,23,3;🌱 Radish Greens,20,3;🥬 Turnip Greens,32,3;🥬 Cavolo Nero,49,6;🥦 Purple Cauliflower,25,6;🌶️ Banana Peppers,27,7;🫑 Cubanelle Peppers,20,7;🌶️ Fresno Chili,40,10;🍆 Chinese Eggplant,25,6;🫛 Winged Beans,49,4;🧄 Green Garlic,40,7;🧅 Sweet Onion,32,30;🫚 Fresh Turmeric Root,80,21;🌱 White Asparagus,20,4;🫛 Runner Beans,31,5;🟡 Golden Beets,43,21;⚫ Black Radish,36,30;🎋 Fresh Bamboo Shoots,27,3;🍄 King Trumpet Mushrooms,35,7
+Fruits|🍎 Apple,52,14;🍌 Banana,89,4;🍊 Orange,47,10;🍋 Lemon,29,14;🍐 Pear,57,7;🍇 Grapes,69,7;🍑 Peach,39,4;🍒 Cherry,50,4;🍍 Pineapple,50,5;🥭 Mango,60,5;🍉 Watermelon,30,5;🍈 Melon,34,5;🥝 Kiwi,61,7;🥑 Avocado,160,4;🍑 Apricot,48,4;🍑 Plum,46,5;🍊 Tangerine,53,10;🔴 Pomegranate,83,30;🍊 Grapefruit,42,14;🥭 Papaya,43,5;🍈 Fig,74,3;🌴 Dates,282,180;🍋 Lime,30,14;🍑 Nectarine,44,5;🍊 Persimmon,70,7;🍈 Guava,68,5;🍈 Passion Fruit,97,7;🐉 Dragon Fruit,60,5;🍈 Lychee,66,5;🍐 Quince,57,14;🥥 Coconut,354,30;🍇 Raisins,299,365;🍑 Dried Apricots,241,365;🍑 Prunes,240,365;🍈 Dried Figs,249,365;🍊 Pomelo,38,14;🍏 Green Apple,52,14;🍌 Plantain,122,5;🍍 Dried Pineapple,340,180;🍈 Cantaloupe,34,5;🍐 Asian Pear,42,10;🍊 Clementine,47,10;🍋 Yuzu,30,10;🥭 Dried Mango,319,180;🍒 Dried Cherries,333,180;🍌 Baby Bananas,89,4;🍋 Bergamot,30,10;🍊 Kumquat,71,14;🍊 Blood Orange,50,10;🍈 Honeydew Melon,36,7;🍈 Jackfruit,95,5;🍈 Durian,147,4;🍈 Rambutan,82,5;🍈 Mangosteen,73,5;🍈 Feijoa,61,7;🍈 Kiwano,44,14;⭐ Star Fruit,31,7;🍑 Loquat,47,4;🍈 Cherimoya,75,4;🍇 Green Grapes,69,7;🍇 Red Grapes,69,7;🍇 Black Grapes,69,7;🍑 Flat Peach,39,4;🍑 Mirabelle Plum,60,5;🍎 Crab Apples,76,14;🍋 Meyer Lemon,29,14;🥥 Young Coconut,354,14;🍇 Sultanas,299,365;🌴 Medjool Dates,277,180;🍎 Dried Apples,243,365;🍐 Dried Pears,262,365;🍌 Dried Bananas,346,180;🍈 Dried Melon,341,180;🍏 Granny Smith Apple,58,21;🍎 Gala Apple,57,14;🍐 Conference Pear,57,7;🍎 Aport Apple,50,30;🫒 Jida Berries,330,180;🍒 Alycha Cherry Plum,34,7;🟤 Longan,60,5;🍓 Salak,82,7;🍈 Soursop,66,3;🍅 Tamarillo,31,10;🍈 Breadfruit,103,3;🍐 Sapodilla,83,5;🍇 Jabuticaba,45,3;🍒 Acerola,32,4;🫐 Camu Camu,25,5;🥥 Cupuacu,49,5;🥭 Mamey Sapote,124,4;🍐 Medlar,47,10;🥭 Pawpaw,80,3;🍋 Calamansi,25,14;🍋 Buddha's Hand,30,14;🍋 Finger Lime,30,14;🍊 Ugli Fruit,47,14;🍑 Pluot,57,5;🌵 Prickly Pear,41,7;🍉 Yellow Watermelon,30,5;🍫 Black Sapote,130,4;🍊 Cara Cara Orange,45,14;🍇 Cotton Candy Grapes,69,7;🍌 Red Banana,90,5;🍏 Sugar Apple,94,4;🍋 Sudachi,25,14;🍑 Greengage,46,5;🍑 Damson,50,5;🟤 Jujube,79,10;🍎 Wax Apple,25,5;🍈 Pepino Melon,25,7;🥚 Canistel,138,5;🍇 Langsat,57,5;🍊 Sumo Citrus,55,14;🍎 Honeycrisp Apple,52,30;🍎 Pink Lady Apple,55,30;🥭 Ataulfo Mango,60,5;🥝 Golden Kiwi,63,10;🍊 Satsuma,45,10;🍊 Tangelo,47,14;🍈 Atemoya,94,4;🐉 Yellow Dragon Fruit,60,5;🍑 Santol,48,7;🍏 Marula,50,4;🍈 Mamoncillo,58,5;🍇 Muscadine Grapes,57,5;🍇 Concord Grapes,67,5;🍇 Champagne Grapes,70,4
+Berries|🍓 Strawberry,32,3;🫐 Blueberry,57,5;🍇 Raspberry,52,3;🫐 Blackberry,43,3;🍒 Cranberry,46,10;🍇 Gooseberry,44,4;🍒 Lingonberry,43,7;🍊 Sea Buckthorn,82,5;🍇 Mulberry,43,3;🍒 Goji Berries,349,180;🍒 Sweet Cherry,63,4;🍒 Sour Cherry,50,4;🍇 Black Currant,63,4;🍇 Red Currant,56,4;🌹 Rosehip,162,30;🍓 Wild Strawberry,32,3;🫐 Bilberry,44,4;🍒 Cloudberry,51,4;🍇 Elderberry,73,3;🫐 Honeyberry,55,4;🍇 Boysenberry,50,3;🍇 Loganberry,55,3;🍒 Dried Barberry,316,180;🫐 Aronia,47,10;🍒 Viburnum,26,10;🍇 White Currant,56,4;🫐 Dried Blueberries,317,180;🍒 Dried Cranberries,308,180;🍓 Freeze-Dried Strawberries,350,365;🫐 Acai Berries,70,2;🍒 Physalis,53,10;🍇 Dewberry,43,3;🍓 Garden Strawberry,32,3;🍒 Rowan Berry,50,10;🫐 Huckleberries,37,7;🍓 Tayberry,40,3;🫐 Sloe Berries,50,5;🥝 Kiwiberries,61,10;🫐 Saskatoon Berries,85,5;🫐 Haskap Berries,51,5;🫐 Marionberries,52,4;🍇 Golden Raspberries,52,3;🫐 Black Raspberries,70,3;🍇 Wineberries,40,3;🌹 Rose Hips,162,7;🍒 Hawthorn Berries,101,7;🍒 Miracle Berries,40,3
 Dairy|🥛 Milk,60,5;🥛 Kefir,51,7;🥛 Ryazhenka,67,7;🥛 Yogurt,61,7;🥛 Sour Cream,206,7;🧈 Butter,717,30;🧀 Cheddar Cheese,403,21;🧀 Mozzarella,280,10;🧀 Parmesan,431,60;🧀 Feta,264,14;🧀 Cream Cheese,342,10;🧀 Cottage Cheese,98,5;🧀 Processed Cheese,300,30;🥚 Eggs,143,21;🥛 Heavy Cream,340,7;🥛 Oat Milk,45,7;🧀 Ricotta,174,7;🧀 Gouda,356,30;🧀 Brie,334,14;🧀 Swiss Cheese,380,30;🧀 Brynza,260,14;🧀 Suluguni,290,14;🧀 Blue Cheese,353,30;🧀 Goat Cheese,364,14;🥛 Light Cream,205,7;🥛 Whipped Cream,257,5;🧈 Margarine,717,60;🥛 Ayran,40,7;🥛 Soy Milk,33,7;🥛 Almond Milk,24,7;🥛 Greek Yogurt,97,10;🥛 Skyr,63,10;🧈 Ghee,900,90;🥚 Quail Eggs,158,21;🧀 Mascarpone,429,10;🧀 Halloumi,321,30;🧀 Camembert,300,14;🥛 Coconut Milk,230,5;🥛 Lactose-Free Milk,45,7;🥛 Drinking Yogurt,72,10;🧀 Cheese Curds,98,5;🧀 Provolone,351,30;🧀 Edam,357,30;🧀 Emmental,380,30;🧀 Gruyere,413,60;🧀 Manchego,390,60;🧀 Pecorino,387,60;🧀 Roquefort,369,30;🧀 Gorgonzola,353,21;🧀 Burrata,330,4;🧀 Paneer,321,7;🧀 Smoked Cheese,330,30;🧀 String Cheese,300,30;🧀 Cheese Slices,330,30;🧀 Grated Cheese,400,14;🧀 Adyghe Cheese,240,7;🥛 Buttermilk,40,10;🥛 Chocolate Milk,83,7;🥛 Baked Milk,67,7;🥛 Skim Milk,34,7;🥛 Whole Milk,64,7;🥛 Goat Milk,69,7;🥛 Evaporated Milk,134,180;🥛 Matsoni,63,7;🥛 Fruit Yogurt,85,14;🥛 Vanilla Yogurt,95,14;🥛 Low-Fat Kefir,40,7;🍫 Glazed Curd Bar,407,14;🧈 Salted Butter,717,45;🥛 Creme Fraiche,292,14;🥛 Clotted Cream,586,7;🥚 Egg Whites,52,7;🥚 Duck Eggs,185,21;🥛 Prostokvasha,58,5;🧀 Tvorog 9%,159,5;🧀 Kurt,340,180;🧀 Irimshik,380,60;🥛 Katyk,60,7;🥛 Baby Yogurt,90,7;🧀 Suzbe,260,14;🥛 Kaymak,330,7;🍯 Balkaymak,420,10;🧀 Sulguni,286,21;🧀 American Cheese,371,60;🧀 Pimento Cheese,350,14;🧈 Sary Mai,876,180;🥛 Varenets,53,5;🥣 Suzma,160,10;🥛 Snezhok,82,7;🧀 Bryndza,260,30;🥛 Yakult,63,30;🧀 Cotija Cheese,366,30;🥛 Labneh,160,14;🥛 Quark,67,10;🧀 Stracciatella,250,4;🧀 Oaxaca Cheese,330,21;🧀 Comté,410,60;🧀 Fontina,389,30;🧀 Taleggio,315,21;🧀 Raclette Cheese,357,30;🧀 Queso Fresco,299,14;🧀 Stilton,410,30;🧀 Havarti,371,30;🧀 Jarlsberg,355,30;🧀 Ricotta Salata,280,30;🧀 Mimolette,360,60
 Meat|🍗 Chicken Breast,165,2;🍗 Chicken Thighs,209,2;🥩 Beef,250,3;🥩 Pork,242,3;🥩 Ground Beef,254,2;🍖 Lamb,294,3;🦃 Turkey,135,2;🌭 Sausages,301,7;🥓 Bacon,541,7;🍖 Ham,145,7;🥩 Boiled Sausage,257,7;🥓 Salo,770,60;🥩 Liver,135,2;🦆 Duck,337,3;🥩 Veal,172,3;🐇 Rabbit,173,3;🍗 Chicken Wings,203,2;🍗 Chicken Drumsticks,172,2;🍗 Whole Chicken,215,2;🍖 Pork Ribs,277,3;🥩 Steak,271,3;🍖 Meatballs,230,3;🥩 Minced Pork,263,2;🌭 Kielbasa,320,10;🍕 Salami,336,21;🍕 Pepperoni,504,30;🥓 Prosciutto,250,30;🥫 Liver Pate,300,7;🍗 Chicken Liver,119,2;🥩 Beef Tongue,224,3;🌭 Smoked Sausage,420,21;🌭 Hot Dog Sausages,260,10;🥓 Pork Belly,518,3;🦃 Turkey Breast,104,2;🍗 Chicken Hearts,153,2;🥩 Ground Turkey,148,2;🥩 Ground Chicken,143,2;🥩 Pork Neck,240,3;🥩 Beef Ribeye,291,3;🥩 Beef Brisket,250,3;🥓 Smoked Bacon,550,14;🥩 Doktorskaya Sausage,257,7;🥩 Cervelat,460,30;🍗 Chicken Legs,184,2;🍗 Chicken Gizzards,94,2;🦃 Turkey Thighs,144,2;🦃 Turkey Wings,197,2;🥩 Lamb Chops,282,3;🥩 Ground Lamb,282,2;🥩 Beef Tenderloin,218,3;🥩 Beef Sirloin,206,3;🥩 Beef Shank,201,3;🥩 Beef Liver,135,2;🥩 Pork Loin,143,3;🥩 Pork Chops,231,3;🥩 Pork Shoulder,236,3;🥩 Pork Tenderloin,143,3;🍖 Pork Knuckle,260,3;🥩 Venison,158,3;🦆 Duck Breast,201,3;🪿 Goose,305,3;🐦 Quail,227,2;🌭 Chorizo,455,30;🌭 Bratwurst,297,10;🌭 Frankfurters,305,10;🌭 Chicken Sausages,172,7;🥓 Pancetta,458,30;🥓 Turkey Bacon,226,14;🍖 Roast Beef,175,5;🍗 Smoked Chicken,190,7;🍖 Smoked Ham,145,10;🥫 Corned Beef,251,7;🥩 Bresaola,151,30;🥩 Basturma,250,30;🍔 Beef Burger Patties,254,2;🍖 Marinated Shashlik,220,2;🍗 Chicken Fillet,113,2;🌭 Kazy,330,30;🌭 Shuzhuk,420,30;🥓 Zhaya,400,14;🥩 Horse Meat,133,3;🐪 Camel Meat,160,3;🌭 Karta,350,10;🥓 Mutton Tail Fat,800,30;🍖 Sur Et,250,30;🌭 Chuchuk,450,30;🥓 Zhal,580,10;🍖 Lamb Ribs,290,3;🥩 Pastrami,150,10;🍖 Mutton,250,3;🥩 Lamb Liver,130,2;🥩 Beef Chuck,218,3;🥓 Mortadella,311,10;🌭 Lap Cheong,450,30;🥩 Char Siu Pork,260,4;🥓 Guanciale,655,60;🌶️ Nduja,470,60;🍖 Beef Short Ribs,295,3;🍖 Oxtail,262,3;🥓 Lardo,890,60;🍖 Soppressata,400,30;🍖 Iberico Ham,375,90
 Seafood|🐟 Salmon,208,2;🐟 Cod,82,2;🐟 Herring,158,5;🍤 Shrimp,99,2;🥫 Canned Tuna,116,365;🐟 Mackerel,205,3;🐟 Trout,148,2;🦀 Crab Sticks,95,14;🐟 Tilapia,96,2;🐟 Pollock,72,2;🐟 Sea Bass,97,2;🐟 Carp,127,2;🐟 Pike,84,2;🐟 Catfish,95,2;🐟 Halibut,111,2;🐟 Fresh Sardines,208,2;🐟 Smoked Salmon,172,10;🦑 Squid,92,2;🦪 Mussels,86,2;🦪 Oysters,68,2;🦀 Crab,97,2;🦞 Lobster,89,2;🐙 Octopus,82,2;🐚 Scallops,88,2;🥚 Red Caviar,260,14;🐟 Dried Fish,250,90;🐟 Salted Herring,217,14;🐟 Smoked Mackerel,221,10;🐟 Pangasius,90,2;🐟 Sturgeon,160,2;🍤 Tiger Prawns,106,2;🐟 Anchovies,131,30;🐟 Eel,184,2;🐟 Capelin,157,2;🐟 Tuna Steak,144,2;🐟 Haddock,74,2;🐟 Hake,86,2;🐟 Sole,91,2;🐟 Flounder,91,2;🐟 Perch,91,2;🐟 Zander,84,2;🐟 Dorado,96,2;🐟 Red Snapper,100,2;🐟 Swordfish,144,2;🐟 Mahi-Mahi,85,2;🐟 Arctic Char,140,2;🐟 Coho Salmon,146,2;🐟 Pink Salmon,127,2;🐟 Chum Salmon,120,2;🐟 Smelt,97,2;🐟 Baltic Sprats,137,2;🐟 Kippers,217,10;🐟 Pickled Herring,262,21;🍤 Cooked Shrimp,99,3;🍤 King Prawns,85,2;🦞 Crayfish,77,2;🦑 Calamari Rings,92,2;🦪 Clams,86,2;🦀 King Crab,84,2;⚫ Black Caviar,264,30;🐟 Fish Roe,143,4;🐙 Baby Octopus,82,2;🦐 Seafood Mix,90,2;🐟 Salted Salmon,202,7;🐟 Vobla,235,90;🐟 Caspian Kilka,140,2;🐟 Koktal,180,2;🐟 Monkfish,76,2;🦐 Langoustines,90,2;🐟 Barramundi,97,2;🦑 Cuttlefish,79,2;🟠 Sea Urchin,120,2;🐟 Turbot,95,2;🍣 Tobiko,140,7;🍣 Mentaiko,130,7;🦪 Abalone,105,2;🐟 Sea Bream,96,2;🐟 Yellowtail,146,2;🦪 Cockles,79,2;🦀 Snow Crab,90,2;🦪 Razor Clams,82,2
-Grains|🍝 Pasta,350,365;🍚 Rice,360,365;🌾 Buckwheat,343,365;🥣 Oats,389,270;🌾 Millet,378,365;🌾 Semolina,360,365;🌾 Couscous,376,365;🌾 Pearl Barley,352,365;🌾 Flour,364,270;🥣 Cornflakes,357,180;🍜 Instant Noodles,450,270;🌾 Bulgur,342,365;🍚 Brown Rice,362,365;🍚 Basmati Rice,350,365;🍚 Jasmine Rice,355,365;🍚 Wild Rice,357,365;🌾 Quinoa,368,365;🌽 Corn Grits,337,365;🌽 Cornmeal,362,365;🌾 Wheat Groats,335,365;🥣 Muesli,363,180;🥣 Granola,471,180;🍝 Spaghetti,350,365;🍝 Penne,350,365;🍝 Fusilli,350,365;🍜 Egg Noodles,384,365;🍜 Rice Noodles,364,365;🍜 Vermicelli,350,365;🌾 Whole Wheat Flour,340,270;🌾 Rye Flour,325,270;🌽 Corn Starch,381,365;🥔 Potato Starch,333,365;🍞 Breadcrumbs,395,180;🍜 Udon Noodles,127,14;🍝 Lasagna Sheets,350,365;🌾 Spelt,338,365;🌾 Oat Bran,246,180;🍚 Sushi Rice,360,365;🥣 Rolled Oats,379,270;🍜 Soba Noodles,336,365;🌾 Wheat Bran,216,180;🍚 Arborio Rice,349,365;🍚 Black Rice,356,365;🍚 Red Rice,355,365;🍚 Parboiled Rice,374,365;🌾 Amaranth,371,365;🌾 Teff,367,365;🌾 Farro,340,365;🌾 Sorghum,329,365;🌾 Freekeh,325,365;🌾 Barley Groats,343,365;🌾 Rye Flakes,338,270;🌾 Buckwheat Flour,335,270;🌾 Rice Flour,366,270;🌾 Almond Flour,571,180;🥥 Coconut Flour,443,180;🌾 Chickpea Flour,387,270;🌽 Polenta,370,365;🍝 Tagliatelle,358,365;🍝 Farfalle,350,365;🍝 Rigatoni,350,365;🍝 Linguine,350,365;🍝 Macaroni,350,365;🍝 Orzo,357,365;🍝 Whole Wheat Pasta,348,365;🍝 Gluten-Free Pasta,357,365;🍝 Fresh Pasta,288,7;🥟 Gnocchi,133,14;🍜 Ramen Noodles,436,270;🍜 Glass Noodles,351,365;🥣 Bran Flakes,357,180;🥣 Chocolate Cereal,388,180;🥣 Puffed Rice,383,180;🥣 Instant Oatmeal,367,270;🌾 Bread Flour,361,270;🌾 Self-Raising Flour,353,270;🌾 Talkan,370,180;🍜 Lagman Noodles,350,14;🍜 Kespe Noodles,360,180;🌾 Tary,360,180;🍝 Bucatini,360,365;🍝 Pappardelle,360,365;🌾 Fonio,360,365;🌾 Kamut,337,365;🌽 Masa Harina,365,365;🍝 Orecchiette,350,365;🍝 Pearl Couscous,370,365;🍝 Ditalini,350,365;🍝 Fregola,360,365
-Bakery|🍞 White Bread,265,4;🍞 Rye Bread,259,5;🥖 Baguette,270,2;🥐 Croissant,406,3;🫓 Lavash,275,5;🫓 Tortilla,237,10;🍞 Toast Bread,270,7;🥯 Bagel,250,3;🫓 Pita,275,4;🫓 Naan,310,4;🍞 Ciabatta,271,3;🥐 Brioche,375,3;🍩 Donut,452,2;🧁 Muffin,377,3;🥧 Apple Pie,237,3;🥨 Pretzel,380,5;🥞 Burger Bun,260,4;🍞 Sourdough Bread,260,4;🍞 Whole Grain Bread,247,5;🍞 Borodinsky Bread,208,5;🍞 Bread Loaf,266,4;🥖 Breadsticks,410,30;🍘 Crispbread,330,180;🍞 Cornbread,270,3;🍪 Gingerbread,350,30;🧇 Waffles,291,14;🥟 Puff Pastry,558,30;🍕 Pizza Dough,271,5;🥟 Phyllo Dough,300,14;🥐 Pain au Chocolat,414,2;🍞 Poppy Seed Bun,330,3;🍰 Yeast Dough,280,3;🍞 Multigrain Bread,265,5;🍞 Gluten-Free Bread,246,5;🍔 Brioche Buns,350,4;🥐 Almond Croissant,420,2;🥐 Cinnamon Roll,390,3;🥯 Sesame Bagel,270,3;🫓 Focaccia,249,3;🫓 Flatbread,290,5;🫓 Chapati,297,4;🧁 English Muffin,227,7;🥞 Crumpets,198,5;🍞 Banana Bread,326,4;🍰 Sponge Cake,297,4;🧁 Cupcake,305,3;🥧 Cherry Pie,260,3;🥧 Quiche,300,3;🫓 Khachapuri,300,2;🥖 Garlic Bread,350,3;🥨 Soft Pretzel,338,2;🌭 Hot Dog Buns,280,5;🫓 Matzo,395,365;🍪 Biscotti,410,90;🍞 Kulich,350,7;🍞 Raisin Bread,274,4;🥐 Rugelach,420,5;🍩 Baursaks,390,3;🫓 Tandoor Flatbread,260,3;🫓 Shelpek,340,3;🥯 Sushki,340,90;🥐 Buttermilk Biscuits,350,3;🥧 Pecan Pie,412,4;🫓 Kattama,330,3;🍔 Hamburger Buns,279,5;🍞 Zucchini Bread,300,4;🥟 Tandyr Samsa,310,2;🫓 Kystyby,250,2;🥯 Bublik,330,7;🥐 Sochniki,330,3;🌮 Corn Tortillas,218,7;🍞 Pumpernickel,250,7;🍞 Milk Bread,280,4;🍞 Challah,287,4
+Grains|🍝 Pasta,350,365;🍚 Rice,360,365;🌾 Buckwheat,343,365;🥣 Oats,389,270;🌾 Millet,378,365;🌾 Semolina,360,365;🌾 Couscous,376,365;🌾 Pearl Barley,352,365;🌾 Flour,364,270;🥣 Cornflakes,357,180;🍜 Instant Noodles,450,270;🌾 Bulgur,342,365;🍚 Brown Rice,362,365;🍚 Basmati Rice,350,365;🍚 Jasmine Rice,355,365;🍚 Wild Rice,357,365;🌾 Quinoa,368,365;🌽 Corn Grits,337,365;🌽 Cornmeal,362,365;🌾 Wheat Groats,335,365;🥣 Muesli,363,180;🥣 Granola,471,180;🍝 Spaghetti,350,365;🍝 Penne,350,365;🍝 Fusilli,350,365;🍜 Egg Noodles,384,365;🍜 Rice Noodles,364,365;🍜 Vermicelli,350,365;🌾 Whole Wheat Flour,340,270;🌾 Rye Flour,325,270;🌽 Corn Starch,381,365;🥔 Potato Starch,333,365;🍞 Breadcrumbs,395,180;🍜 Udon Noodles,127,14;🍝 Lasagna Sheets,350,365;🌾 Spelt,338,365;🌾 Oat Bran,246,180;🍚 Sushi Rice,360,365;🥣 Rolled Oats,379,270;🍜 Soba Noodles,336,365;🌾 Wheat Bran,216,180;🍚 Arborio Rice,349,365;🍚 Black Rice,356,365;🍚 Red Rice,355,365;🍚 Parboiled Rice,374,365;🌾 Amaranth,371,365;🌾 Teff,367,365;🌾 Farro,340,365;🌾 Sorghum,329,365;🌾 Freekeh,325,365;🌾 Barley Groats,343,365;🌾 Rye Flakes,338,270;🌾 Buckwheat Flour,335,270;🌾 Rice Flour,366,270;🌾 Almond Flour,571,180;🥥 Coconut Flour,443,180;🌾 Chickpea Flour,387,270;🌽 Polenta,370,365;🍝 Tagliatelle,358,365;🍝 Farfalle,350,365;🍝 Rigatoni,350,365;🍝 Linguine,350,365;🍝 Macaroni,350,365;🍝 Orzo,357,365;🍝 Whole Wheat Pasta,348,365;🍝 Gluten-Free Pasta,357,365;🍝 Fresh Pasta,288,7;🥟 Gnocchi,133,14;🍜 Ramen Noodles,436,270;🍜 Glass Noodles,351,365;🥣 Bran Flakes,357,180;🥣 Chocolate Cereal,388,180;🥣 Puffed Rice,383,180;🥣 Instant Oatmeal,367,270;🌾 Bread Flour,361,270;🌾 Self-Raising Flour,353,270;🌾 Talkan,370,180;🍜 Lagman Noodles,350,14;🍜 Kespe Noodles,360,180;🌾 Tary,360,180;🍝 Bucatini,360,365;🍝 Pappardelle,360,365;🌾 Fonio,360,365;🌾 Kamut,337,365;🌽 Masa Harina,365,365;🍝 Orecchiette,350,365;🍝 Pearl Couscous,370,365;🍝 Ditalini,350,365;🍝 Fregola,360,365;🍜 Shirataki Noodles,9,90
+Bakery|🍞 White Bread,265,4;🍞 Rye Bread,259,5;🥖 Baguette,270,2;🥐 Croissant,406,3;🫓 Lavash,275,5;🫓 Tortilla,237,10;🍞 Toast Bread,270,7;🥯 Bagel,250,3;🫓 Pita,275,4;🫓 Naan,310,4;🍞 Ciabatta,271,3;🥐 Brioche,375,3;🍩 Donut,452,2;🧁 Muffin,377,3;🥧 Apple Pie,237,3;🥨 Pretzel,380,5;🥞 Burger Bun,260,4;🍞 Sourdough Bread,260,4;🍞 Whole Grain Bread,247,5;🍞 Borodinsky Bread,208,5;🍞 Bread Loaf,266,4;🥖 Breadsticks,410,30;🍘 Crispbread,330,180;🍞 Cornbread,270,3;🍪 Gingerbread,350,30;🧇 Waffles,291,14;🥟 Puff Pastry,558,30;🍕 Pizza Dough,271,5;🥟 Phyllo Dough,300,14;🥐 Pain au Chocolat,414,2;🍞 Poppy Seed Bun,330,3;🍰 Yeast Dough,280,3;🍞 Multigrain Bread,265,5;🍞 Gluten-Free Bread,246,5;🍔 Brioche Buns,350,4;🥐 Almond Croissant,420,2;🥐 Cinnamon Roll,390,3;🥯 Sesame Bagel,270,3;🫓 Focaccia,249,3;🫓 Flatbread,290,5;🫓 Chapati,297,4;🧁 English Muffin,227,7;🥞 Crumpets,198,5;🍞 Banana Bread,326,4;🍰 Sponge Cake,297,4;🧁 Cupcake,305,3;🥧 Cherry Pie,260,3;🥧 Quiche,300,3;🫓 Khachapuri,300,2;🥖 Garlic Bread,350,3;🥨 Soft Pretzel,338,2;🌭 Hot Dog Buns,280,5;🫓 Matzo,395,365;🍪 Biscotti,410,90;🍞 Kulich,350,7;🍞 Raisin Bread,274,4;🥐 Rugelach,420,5;🍩 Baursaks,390,3;🫓 Tandoor Flatbread,260,3;🫓 Shelpek,340,3;🥯 Sushki,340,90;🥐 Buttermilk Biscuits,350,3;🥧 Pecan Pie,412,4;🫓 Kattama,330,3;🍔 Hamburger Buns,279,5;🍞 Zucchini Bread,300,4;🥟 Tandyr Samsa,310,2;🫓 Kystyby,250,2;🥯 Bublik,330,7;🥐 Sochniki,330,3;🌮 Corn Tortillas,218,7;🍞 Pumpernickel,250,7;🍞 Milk Bread,280,4;🍞 Challah,287,4;🧇 Croffle,420,2
 Nuts & Legumes|🥜 Peanuts,567,180;🌰 Almonds,579,180;🌰 Walnuts,654,180;🌰 Cashews,553,180;🫘 Beans,333,365;🫘 Lentils,353,365;🫘 Chickpeas,364,365;🥜 Peanut Butter,588,90;🌻 Sunflower Seeds,584,180;🥜 Pistachios,560,180;🌰 Hazelnuts,628,180;🌰 Pecans,691,180;🥜 Macadamia,718,180;🌰 Pine Nuts,673,180;🥜 Brazil Nuts,659,180;🎃 Pumpkin Seeds,559,180;🌱 Sesame Seeds,573,180;🌱 Chia Seeds,486,365;🌱 Flax Seeds,534,365;🫘 Kidney Beans,333,365;🫘 Black Beans,341,365;🫘 White Beans,333,365;🫘 Green Lentils,353,365;🫘 Split Peas,341,365;🫘 Soybeans,446,365;🫘 Mung Beans,347,365;🥜 Tahini,595,180;🥜 Almond Butter,614,90;🥥 Coconut Flakes,660,180;🌰 Chestnuts,213,30;🫘 Red Lentils,358,365;🥜 Salted Peanuts,585,180;🌰 Mixed Nuts,607,180;🫘 Broad Beans,341,365;🫘 Pinto Beans,347,365;🫘 Navy Beans,337,365;🫘 Lima Beans,338,365;🫘 Adzuki Beans,329,365;🫘 Black-Eyed Peas,336,365;🫘 Yellow Lentils,345,365;🫘 Black Lentils,352,365;🌰 Roasted Almonds,598,180;🥜 Cashew Butter,587,90;🌱 Hemp Seeds,553,365;🌱 Poppy Seeds,525,365;🥜 Crunchy Peanut Butter,597,90;🌰 Tiger Nuts,409,180;🌰 Candied Pecans,620,90;🥜 Smoked Almonds,600,180;🌰 Apricot Kernels,520,180;🫘 Cannellini Beans,333,365;⚫ Black Sesame Seeds,573,180;🫘 Lupini Beans,119,30;🫘 Borlotti Beans,335,365;🫘 Chana Dal,360,365;🫘 Urad Dal,341,365;🫘 Pigeon Peas,343,365
-Pantry|🫒 Olive Oil,884,365;🌻 Vegetable Oil,884,365;🥫 Ketchup,101,90;🥫 Mayonnaise,680,60;🥫 Tomato Paste,82,90;🥫 Mustard,66,90;🥫 Soy Sauce,53,180;🍯 Honey,304,365;🧂 Sugar,387,365;🥒 Pickles,11,30;🍓 Jam,250,365;🥬 Sauerkraut,19,30;🍶 Balsamic Vinegar,88,365;🍶 Vinegar,18,365;🍶 Apple Cider Vinegar,21,365;🫒 Sesame Oil,884,365;🥥 Coconut Oil,862,365;🌻 Sunflower Oil,884,365;🥫 BBQ Sauce,150,90;🌶️ Hot Sauce,30,180;🌶️ Sriracha,93,180;🌶️ Adjika,70,60;🍅 Tkemali,100,60;🌿 Pesto,420,14;🥫 Tartar Sauce,300,30;🥫 Salad Dressing,350,90;🍅 Tomato Sauce,35,90;🍝 Pasta Sauce,60,90;🥫 Worcestershire Sauce,78,365;🥫 Teriyaki Sauce,89,180;🌿 Wasabi,109,90;🍁 Maple Syrup,260,365;🧂 Brown Sugar,380,365;🧂 Powdered Sugar,389,365;🍫 Chocolate Spread,539,90;🥄 Baking Powder,53,365;🥄 Baking Soda,0,365;🍞 Yeast,325,180;🍬 Vanilla Sugar,390,365;🥄 Gelatin,335,365;☕ Ground Coffee,2,180;☕ Coffee Beans,2,180;☕ Instant Coffee,353,365;🍵 Black Tea,1,365;🍵 Green Tea,1,365;🍫 Cocoa Powder,228,365;🥫 Horseradish Sauce,70,60;🥫 Garlic Sauce,300,30;🥫 Fish Sauce,35,365;🥫 Oyster Sauce,51,180;🥫 Hoisin Sauce,220,180;🥫 Miso Paste,199,180;🥫 Cream Soup Base,350,180;🍯 Dulce de Leche,328,60;🥫 Apple Sauce,42,14;🍯 Fruit Syrup,260,180;🍯 Agave Syrup,310,365;🥫 Pickled Beets,43,60;🥫 Pickled Cabbage,33,30;🥫 Spicy Ketchup,110,90;🫒 Avocado Oil,884,365;🫒 Flaxseed Oil,884,180;🫒 Pumpkin Seed Oil,884,180;🍶 Rice Vinegar,18,365;🍶 Wine Vinegar,19,365;🥫 Dijon Mustard,66,180;🥫 Grainy Mustard,150,180;🌶️ Sweet Chili Sauce,210,180;🥫 Salsa,36,30;🥑 Guacamole,160,5;🥒 Tzatziki,95,7;🥫 Ranch Dressing,430,60;🥫 Caesar Dressing,450,60;🥫 Thousand Island Dressing,370,60;🌿 Red Pesto,360,14;🥫 Curry Paste,140,180;🌶️ Harissa,90,180;🌶️ Gochujang,220,365;🌶️ Tabasco,12,365;🍯 Golden Syrup,325,365;🍯 Molasses,290,365;🍯 Date Syrup,280,365;🧂 Stevia,0,365;🧂 Cane Sugar,380,365;🍫 Chocolate Chips,480,365;🥥 Coconut Cream,330,7;🥣 Vegetable Broth,10,7;🥣 Chicken Broth,15,7;🧊 Bouillon Cubes,250,365;🥫 Tomato Puree,38,90;🍅 Sun-Dried Tomatoes,258,180;🫒 Capers,23,365;🥄 Vanilla Extract,288,365;🥄 Agar-Agar,26,365;🍋 Citric Acid,0,365;🍋 Lemon Curd,320,30;🍒 Cherry Jam,250,365;🍑 Apricot Jam,250,365;🍊 Orange Marmalade,246,365;🫐 Blueberry Jam,250,365;🍓 Strawberry Jam,250,365;🌰 Chestnut Puree,170,180;🍇 Grape Jelly,270,365;🥞 Pancake Mix,370,365;🍲 Bone Broth,20,5;🟢 Pistachio Cream,570,180;🧈 Lard,902,90;🧈 Shortening,884,365;🧂 Xanthan Gum,333,365;🧄 Black Garlic,250,60;🍫 Chocolate Hazelnut Spread,540,180;🥜 Pistachio Butter,600,180;🌶️ Chili Crisp,600,180;🍯 Hot Honey,300,365;🍬 Monk Fruit Sweetener,0,365;🌶️ Calabrian Chili Paste,200,180;🥥 Coconut Aminos,90,365;🍋 Preserved Lemons,30,180;🫙 Kewpie Mayo,700,60;🫙 Mole Paste,500,180;🦐 Shrimp Paste,150,180;🌶️ Doubanjiang,180,180;🍶 Shaoxing Wine,130,365;🍶 Chinkiang Vinegar,40,365;🌿 Moringa Powder,300,365;🌿 Spirulina Powder,290,365;🥜 Peanut Oil,884,365;🍯 Corn Syrup,286,365;🌿 Chimichurri,350,14;🫙 Romesco Sauce,250,10;🧄 Aioli,700,10;🦐 XO Sauce,450,90;🫙 Black Bean Sauce,120,180;🍶 Mentsuyu,100,90;🫒 Truffle Oil,884,365;🍯 Palm Sugar,375,365;🍶 Shio Koji,120,180;🫙 Chamoy,90,180;🫙 Pomegranate Molasses,280,365;🥄 Baobab Powder,250,365;🥄 Lucuma Powder,329,365;🌶️ Peri-Peri Sauce,60,180;🌶️ Buffalo Sauce,30,180;🫙 Kecap Manis,270,365;🟫 Jaggery,383,365;🫙 Liquid Smoke,12,365;🍫 Carob Powder,222,365;🍫 Cacao Nibs,600,365
-Sweets|🍫 Chocolate,546,180;🍪 Cookies,480,90;🍰 Cake,350,3;🍬 Candy,390,180;🍦 Ice Cream,207,60;🥫 Condensed Milk,321,180;🥜 Halva,516,90;🍫 Dark Chocolate,546,180;🍫 Milk Chocolate,535,180;🍫 White Chocolate,539,180;🍫 Chocolate Bar,520,180;🍬 Caramel,382,180;🍭 Lollipop,380,365;🍬 Marshmallow,318,90;🍬 Zefir,326,30;🍬 Pastila,310,60;🐻 Gummy Bears,343,180;🍮 Jelly,60,14;🍫 Brownie,466,5;🍰 Cheesecake,321,4;🍰 Eclair,262,2;🍫 Chocolate Candies,500,180;🍧 Sorbet,131,60;🍦 Popsicle,100,60;🍪 Wafers,520,90;🍬 Marmalade,321,90;🍬 Turkish Delight,320,90;🥮 Baklava,430,10;🍰 Tiramisu,283,3;🍮 Pudding,115,5;🍮 Panna Cotta,200,4;🍰 Napoleon Cake,380,3;🍰 Honey Cake,370,4;🍪 Oatmeal Cookies,430,60;🍪 Shortbread,502,60;🍫 Truffles,510,30;🍨 Gelato,185,60;🍬 Toffee,436,180;🥜 Nut Brittle,480,90;🍬 Candied Fruit,322,180;🍬 Sunflower Halva,523,90;🍯 Chikki,480,90;🍰 Carrot Cake,415,4;🍪 Chocolate Chip Cookies,488,60;🍪 Macarons,404,7;🥖 Churros,390,1;🍰 Red Velvet Cake,367,4;🍰 Chocolate Cake,371,4;🍰 Swiss Roll,350,7;🍮 Creme Brulee,310,3;🍮 Flan,150,4;🍨 Ice Cream Sandwich,240,60;🍬 Licorice,375,365;🍬 Jelly Beans,375,365;🍬 Mints,390,365;🍫 Fudge,411,90;🍫 Praline,530,90;🍬 Nougat,398,90;🍥 Meringues,390,90;🥧 Pumpkin Pie,243,3;🍰 Bird's Milk Cake,420,7;🍩 Ponchiki,410,2;🍯 Kozinaki,576,90;🍚 Rice Pudding,118,4;🍡 Mochi,240,3;🍭 Cotton Candy,390,365;🥧 Strudel,274,4;🍰 Lemon Tart,350,3;🍯 Chak-Chak,450,30;🍬 Zhent,450,30;🍫 Peanut Butter Cups,515,180;🍪 Pryaniki,364,60;🍰 Funnel Cake,380,2;🥧 Key Lime Pie,350,4;🍰 Mannik,290,4;🍯 Medovik,380,5;🍑 Peach Cobbler,230,3;🍌 Banana Pudding,180,3;🥨 Khvorost,520,14;🍇 Churchkhela,410,60;🍪 Snickerdoodle Cookies,480,14;🥧 Pastel de Nata,300,2;🧁 Cannoli,360,2;🧁 Madeleines,420,10;🍰 Pavlova,260,2;🧇 Stroopwafels,460,90;🍪 Alfajores,420,30
-Drinks|🧃 Orange Juice,45,7;🧃 Apple Juice,46,7;🥤 Kvass,27,7;🥤 Cola,42,180;💧 Mineral Water,0,365;💧 Sparkling Water,0,365;🍋 Lemonade,40,30;🍵 Iced Tea,30,30;⚡ Energy Drink,45,180;🥤 Lemon-Lime Soda,41,180;🍅 Tomato Juice,17,7;🍇 Grape Juice,60,7;🧃 Multifruit Juice,48,7;🍍 Pineapple Juice,53,7;🥥 Coconut Water,19,30;🥤 Smoothie,60,2;🥤 Compote,45,5;🥤 Kissel,60,5;🥤 Mors,40,5;🍫 Hot Chocolate,89,1;🍺 Beer,43,180;🍷 Red Wine,85,365;🍷 White Wine,82,365;🥂 Champagne,76,365;🥃 Whiskey,250,365;🍸 Vodka,231,365;🍎 Cider,50,180;🥛 Milkshake,112,2;🍵 Matcha Latte,60,2;🥤 Juice Box,47,180;🍊 Fresh Orange Juice,45,2;🥤 Tarragon Soda,45,180;🥤 Birch Sap,24,5;🍷 Sangria,80,5;🧃 Peach Juice,50,7;☕ Cold Brew,2,14;☕ Iced Coffee,60,7;🧋 Bubble Tea,90,1;🍵 Kombucha,13,30;🥤 Ginger Ale,34,180;🥤 Tonic Water,34,180;🥤 Root Beer,41,180;🥤 Diet Cola,0,180;🧃 Cranberry Juice,46,7;🧃 Pomegranate Juice,54,7;🥕 Carrot Juice,40,5;🧃 Grapefruit Juice,39,7;🧃 Cherry Juice,50,7;🥭 Mango Nectar,60,7;🥤 Sports Drink,26,180;💧 Flavored Water,15,180;🍺 Non-Alcoholic Beer,26,180;🍺 Dark Beer,51,180;🍸 Gin,263,365;🥃 Rum,231,365;🥃 Cognac,239,365;🍷 Rose Wine,80,365;🥛 Protein Shake,70,3;🥤 Green Smoothie,40,2;🍵 Herbal Tea,1,365;🥛 Tan,25,7;🍵 Chai Latte,60,2;☕ Cappuccino,40,1;🥛 Kumys,50,5;🥛 Shubat,88,5;🥤 Cream Soda,51,180;🧃 Kompot,45,5;🍵 Kazakh Milk Tea,45,1;🥛 Chalap,25,2;🍹 Uzvar,30,5;🍯 Sbiten,50,14;🧋 Sweet Tea,40,5;🍒 Kisel,60,3;☕ Espresso,2,1;🍵 Chamomile Tea,1,365;🍵 Earl Grey Tea,1,365;🧉 Yerba Mate,1,365;🌺 Hibiscus Tea,1,365;🍵 Rooibos Tea,1,365;🍵 Barley Tea,1,365;🍵 Hojicha,1,365;🥛 Horchata,54,5;🥭 Mango Lassi,95,3
+Pantry|🫒 Olive Oil,884,365;🌻 Vegetable Oil,884,365;🥫 Ketchup,101,90;🥫 Mayonnaise,680,60;🥫 Tomato Paste,82,90;🥫 Mustard,66,90;🥫 Soy Sauce,53,180;🍯 Honey,304,365;🧂 Sugar,387,365;🥒 Pickles,11,30;🍓 Jam,250,365;🥬 Sauerkraut,19,30;🍶 Balsamic Vinegar,88,365;🍶 Vinegar,18,365;🍶 Apple Cider Vinegar,21,365;🫒 Sesame Oil,884,365;🥥 Coconut Oil,862,365;🌻 Sunflower Oil,884,365;🥫 BBQ Sauce,150,90;🌶️ Hot Sauce,30,180;🌶️ Sriracha,93,180;🌶️ Adjika,70,60;🍅 Tkemali,100,60;🌿 Pesto,420,14;🥫 Tartar Sauce,300,30;🥫 Salad Dressing,350,90;🍅 Tomato Sauce,35,90;🍝 Pasta Sauce,60,90;🥫 Worcestershire Sauce,78,365;🥫 Teriyaki Sauce,89,180;🌿 Wasabi,109,90;🍁 Maple Syrup,260,365;🧂 Brown Sugar,380,365;🧂 Powdered Sugar,389,365;🍫 Chocolate Spread,539,90;🥄 Baking Powder,53,365;🥄 Baking Soda,0,365;🍞 Yeast,325,180;🍬 Vanilla Sugar,390,365;🥄 Gelatin,335,365;☕ Ground Coffee,2,180;☕ Coffee Beans,2,180;☕ Instant Coffee,353,365;🍵 Black Tea,1,365;🍵 Green Tea,1,365;🍫 Cocoa Powder,228,365;🥫 Horseradish Sauce,70,60;🥫 Garlic Sauce,300,30;🥫 Fish Sauce,35,365;🥫 Oyster Sauce,51,180;🥫 Hoisin Sauce,220,180;🥫 Miso Paste,199,180;🥫 Cream Soup Base,350,180;🍯 Dulce de Leche,328,60;🥫 Apple Sauce,42,14;🍯 Fruit Syrup,260,180;🍯 Agave Syrup,310,365;🥫 Pickled Beets,43,60;🥫 Pickled Cabbage,33,30;🥫 Spicy Ketchup,110,90;🫒 Avocado Oil,884,365;🫒 Flaxseed Oil,884,180;🫒 Pumpkin Seed Oil,884,180;🍶 Rice Vinegar,18,365;🍶 Wine Vinegar,19,365;🥫 Dijon Mustard,66,180;🥫 Grainy Mustard,150,180;🌶️ Sweet Chili Sauce,210,180;🥫 Salsa,36,30;🥑 Guacamole,160,5;🥒 Tzatziki,95,7;🥫 Ranch Dressing,430,60;🥫 Caesar Dressing,450,60;🥫 Thousand Island Dressing,370,60;🌿 Red Pesto,360,14;🥫 Curry Paste,140,180;🌶️ Harissa,90,180;🌶️ Gochujang,220,365;🌶️ Tabasco,12,365;🍯 Golden Syrup,325,365;🍯 Molasses,290,365;🍯 Date Syrup,280,365;🧂 Stevia,0,365;🧂 Cane Sugar,380,365;🍫 Chocolate Chips,480,365;🥥 Coconut Cream,330,7;🥣 Vegetable Broth,10,7;🥣 Chicken Broth,15,7;🧊 Bouillon Cubes,250,365;🥫 Tomato Puree,38,90;🍅 Sun-Dried Tomatoes,258,180;🫒 Capers,23,365;🥄 Vanilla Extract,288,365;🥄 Agar-Agar,26,365;🍋 Citric Acid,0,365;🍋 Lemon Curd,320,30;🍒 Cherry Jam,250,365;🍑 Apricot Jam,250,365;🍊 Orange Marmalade,246,365;🫐 Blueberry Jam,250,365;🍓 Strawberry Jam,250,365;🌰 Chestnut Puree,170,180;🍇 Grape Jelly,270,365;🥞 Pancake Mix,370,365;🍲 Bone Broth,20,5;🟢 Pistachio Cream,570,180;🧈 Lard,902,90;🧈 Shortening,884,365;🧂 Xanthan Gum,333,365;🧄 Black Garlic,250,60;🍫 Chocolate Hazelnut Spread,540,180;🥜 Pistachio Butter,600,180;🌶️ Chili Crisp,600,180;🍯 Hot Honey,300,365;🍬 Monk Fruit Sweetener,0,365;🌶️ Calabrian Chili Paste,200,180;🥥 Coconut Aminos,90,365;🍋 Preserved Lemons,30,180;🫙 Kewpie Mayo,700,60;🫙 Mole Paste,500,180;🦐 Shrimp Paste,150,180;🌶️ Doubanjiang,180,180;🍶 Shaoxing Wine,130,365;🍶 Chinkiang Vinegar,40,365;🌿 Moringa Powder,300,365;🌿 Spirulina Powder,290,365;🥜 Peanut Oil,884,365;🍯 Corn Syrup,286,365;🌿 Chimichurri,350,14;🫙 Romesco Sauce,250,10;🧄 Aioli,700,10;🦐 XO Sauce,450,90;🫙 Black Bean Sauce,120,180;🍶 Mentsuyu,100,90;🫒 Truffle Oil,884,365;🍯 Palm Sugar,375,365;🍶 Shio Koji,120,180;🫙 Chamoy,90,180;🫙 Pomegranate Molasses,280,365;🥄 Baobab Powder,250,365;🥄 Lucuma Powder,329,365;🌶️ Peri-Peri Sauce,60,180;🌶️ Buffalo Sauce,30,180;🫙 Kecap Manis,270,365;🟫 Jaggery,383,365;🫙 Liquid Smoke,12,365;🍫 Carob Powder,222,365;🍫 Cacao Nibs,600,365;🦆 Duck Fat,882,180;🌶️ Ssamjang,240,180;🥥 Coconut Sugar,375,365;🍪 Speculoos Spread,584,180
+Sweets|🍫 Chocolate,546,180;🍪 Cookies,480,90;🍰 Cake,350,3;🍬 Candy,390,180;🍦 Ice Cream,207,60;🥫 Condensed Milk,321,180;🥜 Halva,516,90;🍫 Dark Chocolate,546,180;🍫 Milk Chocolate,535,180;🍫 White Chocolate,539,180;🍫 Chocolate Bar,520,180;🍬 Caramel,382,180;🍭 Lollipop,380,365;🍬 Marshmallow,318,90;🍬 Zefir,326,30;🍬 Pastila,310,60;🐻 Gummy Bears,343,180;🍮 Jelly,60,14;🍫 Brownie,466,5;🍰 Cheesecake,321,4;🍰 Eclair,262,2;🍫 Chocolate Candies,500,180;🍧 Sorbet,131,60;🍦 Popsicle,100,60;🍪 Wafers,520,90;🍬 Marmalade,321,90;🍬 Turkish Delight,320,90;🥮 Baklava,430,10;🍰 Tiramisu,283,3;🍮 Pudding,115,5;🍮 Panna Cotta,200,4;🍰 Napoleon Cake,380,3;🍰 Honey Cake,370,4;🍪 Oatmeal Cookies,430,60;🍪 Shortbread,502,60;🍫 Truffles,510,30;🍨 Gelato,185,60;🍬 Toffee,436,180;🥜 Nut Brittle,480,90;🍬 Candied Fruit,322,180;🍬 Sunflower Halva,523,90;🍯 Chikki,480,90;🍰 Carrot Cake,415,4;🍪 Chocolate Chip Cookies,488,60;🍪 Macarons,404,7;🥖 Churros,390,1;🍰 Red Velvet Cake,367,4;🍰 Chocolate Cake,371,4;🍰 Swiss Roll,350,7;🍮 Creme Brulee,310,3;🍮 Flan,150,4;🍨 Ice Cream Sandwich,240,60;🍬 Licorice,375,365;🍬 Jelly Beans,375,365;🍬 Mints,390,365;🍫 Fudge,411,90;🍫 Praline,530,90;🍬 Nougat,398,90;🍥 Meringues,390,90;🥧 Pumpkin Pie,243,3;🍰 Bird's Milk Cake,420,7;🍩 Ponchiki,410,2;🍯 Kozinaki,576,90;🍚 Rice Pudding,118,4;🍡 Mochi,240,3;🍭 Cotton Candy,390,365;🥧 Strudel,274,4;🍰 Lemon Tart,350,3;🍯 Chak-Chak,450,30;🍬 Zhent,450,30;🍫 Peanut Butter Cups,515,180;🍪 Pryaniki,364,60;🍰 Funnel Cake,380,2;🥧 Key Lime Pie,350,4;🍰 Mannik,290,4;🍯 Medovik,380,5;🍑 Peach Cobbler,230,3;🍌 Banana Pudding,180,3;🥨 Khvorost,520,14;🍇 Churchkhela,410,60;🍪 Snickerdoodle Cookies,480,14;🥧 Pastel de Nata,300,2;🧁 Cannoli,360,2;🧁 Madeleines,420,10;🍰 Pavlova,260,2;🧇 Stroopwafels,460,90;🍪 Alfajores,420,30;🍡 Tanghulu,200,1;🍫 Dubai Chocolate,560,60
+Drinks|🧃 Orange Juice,45,7;🧃 Apple Juice,46,7;🥤 Kvass,27,7;🥤 Cola,42,180;💧 Mineral Water,0,365;💧 Sparkling Water,0,365;🍋 Lemonade,40,30;🍵 Iced Tea,30,30;⚡ Energy Drink,45,180;🥤 Lemon-Lime Soda,41,180;🍅 Tomato Juice,17,7;🍇 Grape Juice,60,7;🧃 Multifruit Juice,48,7;🍍 Pineapple Juice,53,7;🥥 Coconut Water,19,30;🥤 Smoothie,60,2;🥤 Compote,45,5;🥤 Kissel,60,5;🥤 Mors,40,5;🍫 Hot Chocolate,89,1;🍺 Beer,43,180;🍷 Red Wine,85,365;🍷 White Wine,82,365;🥂 Champagne,76,365;🥃 Whiskey,250,365;🍸 Vodka,231,365;🍎 Cider,50,180;🥛 Milkshake,112,2;🍵 Matcha Latte,60,2;🥤 Juice Box,47,180;🍊 Fresh Orange Juice,45,2;🥤 Tarragon Soda,45,180;🥤 Birch Sap,24,5;🍷 Sangria,80,5;🧃 Peach Juice,50,7;☕ Cold Brew,2,14;☕ Iced Coffee,60,7;🧋 Bubble Tea,90,1;🍵 Kombucha,13,30;🥤 Ginger Ale,34,180;🥤 Tonic Water,34,180;🥤 Root Beer,41,180;🥤 Diet Cola,0,180;🧃 Cranberry Juice,46,7;🧃 Pomegranate Juice,54,7;🥕 Carrot Juice,40,5;🧃 Grapefruit Juice,39,7;🧃 Cherry Juice,50,7;🥭 Mango Nectar,60,7;🥤 Sports Drink,26,180;💧 Flavored Water,15,180;🍺 Non-Alcoholic Beer,26,180;🍺 Dark Beer,51,180;🍸 Gin,263,365;🥃 Rum,231,365;🥃 Cognac,239,365;🍷 Rose Wine,80,365;🥛 Protein Shake,70,3;🥤 Green Smoothie,40,2;🍵 Herbal Tea,1,365;🥛 Tan,25,7;🍵 Chai Latte,60,2;☕ Cappuccino,40,1;🥛 Kumys,50,5;🥛 Shubat,88,5;🥤 Cream Soda,51,180;🧃 Kompot,45,5;🍵 Kazakh Milk Tea,45,1;🥛 Chalap,25,2;🍹 Uzvar,30,5;🍯 Sbiten,50,14;🧋 Sweet Tea,40,5;🍒 Kisel,60,3;☕ Espresso,2,1;🍵 Chamomile Tea,1,365;🍵 Earl Grey Tea,1,365;🧉 Yerba Mate,1,365;🌺 Hibiscus Tea,1,365;🍵 Rooibos Tea,1,365;🍵 Barley Tea,1,365;🍵 Hojicha,1,365;🥛 Horchata,54,5;🥭 Mango Lassi,95,3;🍶 Sake,134,365;🍵 Oolong Tea,1,365;🍵 Pu-erh Tea,1,365
 Frozen|🥟 Pelmeni,250,180;🥟 Vareniki,200,180;🍕 Frozen Pizza,266,180;🥦 Frozen Vegetables,65,180;🍟 French Fries,312,180;🍓 Frozen Berries,50,180;🍗 Chicken Nuggets,296,180;🐟 Fish Fingers,230,180;🌽 Frozen Corn,81,180;🥬 Frozen Spinach,23,180;🫛 Frozen Peas,77,180;🐟 Frozen Fish Fillet,100,180;🍤 Frozen Shrimp,99,180;🍗 Frozen Chicken,165,180;🍖 Frozen Meatballs,230,180;🥩 Frozen Cutlets,240,180;🥞 Frozen Blini,200,180;🥟 Frozen Cheburek,300,180;🥐 Frozen Dough,270,180;🍄 Frozen Mushrooms,25,180;🥭 Frozen Mango,60,180;🧇 Frozen Waffles,290,180;🌯 Frozen Burrito,230,180;🍝 Frozen Lasagna,135,180;🥔 Frozen Hash Browns,150,180;🥟 Pierogi,190,180;🥟 Manti,210,180;🥟 Khinkali,220,180;🥟 Gyoza,200,180;🥟 Cherry Vareniki,190,180;🥬 Frozen Broccoli,35,180;🥕 Frozen Carrot,35,180;🫑 Frozen Bell Pepper,30,180;🍓 Frozen Strawberries,32,180;🫐 Frozen Blueberries,57,180;🍨 Frozen Yogurt,127,60;🥟 Frozen Syrniki,220,180;🍕 Frozen Calzone,250,180;🫛 Frozen Green Beans,31,180;🍠 Frozen Sweet Potato Fries,180,180;🧅 Frozen Onion Rings,280,180;🥬 Frozen Kale,30,180;🥑 Frozen Avocado,160,180;🍍 Frozen Pineapple,50,180;🍒 Frozen Cherries,50,180;🍇 Frozen Raspberries,52,180;🍒 Frozen Cranberries,46,180;🍌 Frozen Bananas,89,90;🥧 Frozen Pie,280,180;🦑 Frozen Squid,92,180;🐟 Frozen Salmon,208,180;🍗 Frozen Chicken Wings,203,180;🥩 Frozen Minced Meat,254,180;🍔 Frozen Burgers,250,180;🌯 Frozen Spring Rolls,220,180;🥟 Frozen Samosas,260,180;🍚 Frozen Fried Rice,160,180;🥟 Frozen Ravioli,180,180;🥞 Frozen Pancakes,230,180;🥦 Frozen Cauliflower Rice,25,180;🥣 Frozen Soup Mix,40,180;🧊 Frozen Herbs,30,180;🥔 Tater Tots,190,180;🌭 Corn Dogs,260,180
-Spices|🧂 Salt,0,365;🌶️ Black Pepper,251,365;🌶️ Paprika,282,365;🌿 Cinnamon,247,365;🌿 Bay Leaf,313,365;🌿 Oregano,265,365;🌿 Cumin,375,365;🌿 Turmeric,312,365;🌿 Coriander,298,365;🌿 Vanilla,288,365;🌿 Nutmeg,525,365;🌿 Cloves,274,365;🍛 Curry Powder,325,365;🌶️ Chili Flakes,282,365;🌿 Dried Dill,253,365;🧄 Dried Garlic,331,365;🌿 Rosemary,131,14;🌿 Thyme,101,14;🌿 Saffron,310,365;🌿 Cardamom,311,365;🌿 Italian Herbs,265,365;🌿 Khmeli-Suneli,250,365;🌿 Ginger Powder,335,365;🌿 Mustard Seeds,508,365;🌿 Star Anise,337,365;🌿 Dried Basil,233,365;🌿 Dried Parsley,292,365;🌿 Dried Mint,285,365;🌿 Sage,315,365;🌿 Marjoram,271,365;🌿 Fenugreek,323,365;🌿 Allspice,263,365;🍛 Garam Masala,379,365;🌶️ Cajun Seasoning,280,365;🌿 Ras el Hanout,300,365;🌿 Zaatar,300,365;🌿 Sumac,240,365;🌿 Five Spice,347,365;🌶️ Cayenne Pepper,318,365;🌶️ Smoked Paprika,282,365;🌶️ White Pepper,296,365;🌶️ Pink Peppercorns,250,365;🧂 Sea Salt,0,365;🧂 Himalayan Salt,0,365;🧂 Garlic Salt,10,365;🧅 Onion Powder,341,365;🌿 Celery Seeds,392,365;🌿 Caraway Seeds,333,365;🌿 Fennel Seeds,345,365;🌿 Dill Seeds,305,365;🍋 Lemon Pepper,250,365;🍗 Chicken Seasoning,250,365;🥒 Pickling Spice,280,365;🌶️ Gochugaru,290,365;🍙 Furikake,400,365;🌶️ Guajillo Chiles,324,365;🌿 Coriander Seeds,298,365;🫐 Juniper Berries,44,365;🧂 Chaat Masala,250,365;🥜 Dukkah,520,90;🌶️ Tajin Seasoning,0,365;🌶️ Togarashi,300,365;🌿 Epazote,32,7;🌿 Summer Savory,272,365;🌶️ Aleppo Pepper,280,365;🌶️ Sichuan Peppercorns,300,365;🌿 Nigella Seeds,345,365;🌿 Ajwain,305,365;🧂 Asafoetida,297,365;🧂 Annatto Seeds,350,365;🌶️ Ancho Chiles,281,365;🌶️ Berbere,300,365;🌶️ Long Pepper,260,365;🌰 Grains of Paradise,300,365;🌶️ Urfa Biber,282,365;🌰 Mahlab,400,365;🟠 Mace,475,365
+Spices|🧂 Salt,0,365;🌶️ Black Pepper,251,365;🌶️ Paprika,282,365;🌿 Cinnamon,247,365;🌿 Bay Leaf,313,365;🌿 Oregano,265,365;🌿 Cumin,375,365;🌿 Turmeric,312,365;🌿 Coriander,298,365;🌿 Vanilla,288,365;🌿 Nutmeg,525,365;🌿 Cloves,274,365;🍛 Curry Powder,325,365;🌶️ Chili Flakes,282,365;🌿 Dried Dill,253,365;🧄 Dried Garlic,331,365;🌿 Rosemary,131,14;🌿 Thyme,101,14;🌿 Saffron,310,365;🌿 Cardamom,311,365;🌿 Italian Herbs,265,365;🌿 Khmeli-Suneli,250,365;🌿 Ginger Powder,335,365;🌿 Mustard Seeds,508,365;🌿 Star Anise,337,365;🌿 Dried Basil,233,365;🌿 Dried Parsley,292,365;🌿 Dried Mint,285,365;🌿 Sage,315,365;🌿 Marjoram,271,365;🌿 Fenugreek,323,365;🌿 Allspice,263,365;🍛 Garam Masala,379,365;🌶️ Cajun Seasoning,280,365;🌿 Ras el Hanout,300,365;🌿 Zaatar,300,365;🌿 Sumac,240,365;🌿 Five Spice,347,365;🌶️ Cayenne Pepper,318,365;🌶️ Smoked Paprika,282,365;🌶️ White Pepper,296,365;🌶️ Pink Peppercorns,250,365;🧂 Sea Salt,0,365;🧂 Himalayan Salt,0,365;🧂 Garlic Salt,10,365;🧅 Onion Powder,341,365;🌿 Celery Seeds,392,365;🌿 Caraway Seeds,333,365;🌿 Fennel Seeds,345,365;🌿 Dill Seeds,305,365;🍋 Lemon Pepper,250,365;🍗 Chicken Seasoning,250,365;🥒 Pickling Spice,280,365;🌶️ Gochugaru,290,365;🍙 Furikake,400,365;🌶️ Guajillo Chiles,324,365;🌿 Coriander Seeds,298,365;🫐 Juniper Berries,44,365;🧂 Chaat Masala,250,365;🥜 Dukkah,520,90;🌶️ Tajin Seasoning,0,365;🌶️ Togarashi,300,365;🌿 Epazote,32,7;🌿 Summer Savory,272,365;🌶️ Aleppo Pepper,280,365;🌶️ Sichuan Peppercorns,300,365;🌿 Nigella Seeds,345,365;🌿 Ajwain,305,365;🧂 Asafoetida,297,365;🧂 Annatto Seeds,350,365;🌶️ Ancho Chiles,281,365;🌶️ Berbere,300,365;🌶️ Long Pepper,260,365;🌰 Grains of Paradise,300,365;🌶️ Urfa Biber,282,365;🌰 Mahlab,400,365;🟠 Mace,475,365;🧄 Garlic Powder,331,365;🌶️ Jerk Seasoning,250,365;🌿 Herbes de Provence,250,365;🧂 Celery Salt,30,365;🧂 Sea Salt Flakes,0,365;🥯 Everything Bagel Seasoning,420,365
 Canned|🌽 Canned Corn,76,365;🫛 Canned Peas,70,365;🫘 Canned Beans,90,365;🍅 Canned Tomatoes,21,365;🐟 Sprats in Oil,363,365;🥫 Beef Stew,250,365;🐟 Canned Sardines,208,365;🐟 Canned Salmon,140,365;🫒 Green Olives,115,365;🫒 Black Olives,115,365;🍄 Pickled Mushrooms,22,365;🍑 Canned Peaches,60,365;🍍 Canned Pineapple,60,365;🌶️ Pickled Peppers,20,365;🍄 Canned Mushrooms,22,365;🍆 Eggplant Caviar,90,365;🥫 Canned Chickpeas,119,365;🥫 Canned Lentils,116,365;🥫 Canned Coconut Milk,230,365;🥫 Condensed Soup,60,365;🐟 Canned Pink Salmon,136,365;🥫 Canned Pate,230,365;🥫 Canned Carrot,30,365;🍒 Canned Cherries,70,365;🥫 Canned Pumpkin,34,365;🐟 Canned Mackerel,200,365;🐟 Canned Cod Liver,613,365;🫛 Canned Green Beans,20,365;🥫 Canned Artichokes,45,365;🥫 Canned Asparagus,19,365;🍐 Canned Pears,50,365;🍑 Canned Apricots,48,365;🍊 Canned Mandarins,61,365;🍒 Fruit Cocktail,60,365;🎋 Canned Bamboo Shoots,19,365;🥫 Canned Water Chestnuts,50,365;🥫 Canned Jackfruit,30,365;🫘 Baked Beans,94,365;🌶️ Canned Chili,110,365;🥫 Canned Ravioli,90,365;🍗 Canned Chicken,185,365;🍖 Canned Ham,180,365;🥒 Squash Caviar,97,365;🫑 Lecho,60,365;🌶️ Pickled Jalapenos,27,365;🍅 Canned Tomato Soup,30,365;🥫 Canned Lychees,70,365;🦀 Canned Crab,85,365;🐟 Canned Anchovies,210,365;🟣 Canned Beets,30,365;🐟 Tuna in Water,116,365;🍅 Pickled Tomatoes,15,60;🍒 Cranberry Sauce,159,30;🌶️ Chipotle in Adobo,70,30;🌴 Hearts of Palm,28,365;🥫 Canned Ackee,151,365;🥫 Spam,315,730;🥒 Giardiniera,30,365;🫒 Caperberries,25,365;🫒 Castelvetrano Olives,145,365;🫑 Roasted Red Peppers,30,365
-Ready Meals|🥙 Hummus,177,5;🍣 Sushi,150,1;🍣 Sushi Rolls,140,1;🌯 Shawarma,215,1;🍔 Burger,295,1;🌭 Hot Dog,290,1;🍕 Pizza Slice,266,2;🍗 Fried Chicken,246,2;🍖 Cutlets,230,3;🥟 Pirozhki,260,2;🥟 Cheburek,300,1;🥟 Samsa,280,1;🥞 Blini,230,3;🧀 Syrniki,220,3;🥔 Mashed Potatoes,88,3;🍚 Fried Rice,163,3;🥗 Pasta Salad,150,3;🥗 Caesar Salad,120,2;🥗 Greek Salad,105,2;🥗 Olivier Salad,198,3;🐟 Herring Under Fur Coat,180,3;🍲 Borscht Soup,49,4;🍲 Chicken Soup,40,4;🍲 Solyanka,75,4;🥣 Okroshka,60,2;🍜 Lagman,105,3;🍚 Plov,190,3;🧀 Mac and Cheese,164,3;🍝 Lasagna,135,3;🧆 Falafel,333,3;🥬 Cabbage Rolls,120,3;🍃 Dolma,180,4;🥘 Goulash,150,3;🥘 Beef Stroganoff,170,3;🍳 Scrambled Eggs,148,1;🌮 Tacos,226,2;🥪 Sandwich,250,2;🥪 Club Sandwich,230,2;🍟 Takeaway Fries,312,1;🍲 Mushroom Soup,60,4;🍕 Margherita Pizza,250,2;🍝 Spaghetti Bolognese,130,3;🍝 Carbonara,190,2;🍛 Chicken Curry,150,3;🍛 Butter Chicken,160,3;🍜 Pho,60,2;🍜 Ramen Bowl,90,2;🍱 Bento Box,170,1;🥘 Paella,160,2;🌶️ Chili Con Carne,120,3;🍲 Minestrone,40,4;🍲 Lentil Soup,70,4;🍅 Tomato Soup,40,4;🍲 Shchi,35,4;🍲 Ukha,45,3;🥗 Vinegret,90,3;🥗 Crab Salad,180,2;🥗 Coleslaw,150,3;🥗 Potato Salad,140,3;🥗 Tabbouleh,120,3;🌯 Burrito,210,2;🌯 Wrap,220,2;🥙 Gyro,215,1;🍝 Pasta Bake,160,3;🥧 Shepherd's Pie,120,3;🥟 Dim Sum,200,1;🍤 Tempura,250,1;🍣 Poke Bowl,140,1;🍗 Chicken Kiev,270,3;🍚 Risotto,150,2;🍆 Moussaka,140,3;🥞 Stuffed Blini,220,3;🥔 Draniki,200,2;🥔 Baked Potato,93,2;🍲 Kharcho,70,3;🍲 Ragout,110,3;🍳 Quiche Lorraine,290,3;🥘 Leftover Stew,110,3;🍲 Beshbarmak,180,3;🥘 Kuyrdak,230,2;🍲 Sorpa,35,3;🥟 Belyashi,300,2;🥬 Golubtsy,120,3;🍲 Holodets,180,4;🥟 Tushpara,220,2;🍖 Pulled Pork,200,4;🍲 Naryn,220,2;🥣 Kozhe,70,2;🍖 Meatloaf,210,3;🍲 Clam Chowder,90,3;🥘 Jambalaya,150,3;🍲 Gumbo,110,3;🥚 Deviled Eggs,200,2;🍔 Sloppy Joe,220,2;🥘 Lobio,140,3;🥣 Oatmeal,71,3;🥣 Overnight Oats,150,3;🍲 Dimlama,95,3;🥟 Chuchvara,220,3;🥕 Korean Carrot Salad,130,7;🍜 Funchoza Salad,150,3;🐟 Heh Fish,120,2;🍅 Achichuk Salad,30,1;🍢 Lula Kebab,270,2;🥣 Buckwheat Porridge,110,3;🥞 Oladi,230,2;🍞 French Toast,230,1;🌮 Quesadilla,290,2;🍗 Buffalo Wings,250,2;🥧 Chicken Pot Pie,240,3;🍳 Biscuits and Gravy,220,2;🥪 Philly Cheesesteak,250,1;🥘 Zharkoe,160,3;🥗 Mimosa Salad,230,2;🥗 Shalgam Salad,45,4;🍖 Sirne,210,3;🥟 Orama,210,2;🧀 Grilled Cheese Sandwich,350,1;🥪 BLT Sandwich,250,1;🍜 Chicken Noodle Soup,60,3;🌮 Fish Tacos,200,1;🍠 Sweet Potato Casserole,190,3;🌯 Breakfast Burrito,230,2;🧆 Hush Puppies,340,2;🍙 Kimbap,150,1;🥟 Fresh Tortellini,300,14
+Ready Meals|🥙 Hummus,177,5;🍣 Sushi,150,1;🍣 Sushi Rolls,140,1;🌯 Shawarma,215,1;🍔 Burger,295,1;🌭 Hot Dog,290,1;🍕 Pizza Slice,266,2;🍗 Fried Chicken,246,2;🍖 Cutlets,230,3;🥟 Pirozhki,260,2;🥟 Cheburek,300,1;🥟 Samsa,280,1;🥞 Blini,230,3;🧀 Syrniki,220,3;🥔 Mashed Potatoes,88,3;🍚 Fried Rice,163,3;🥗 Pasta Salad,150,3;🥗 Caesar Salad,120,2;🥗 Greek Salad,105,2;🥗 Olivier Salad,198,3;🐟 Herring Under Fur Coat,180,3;🍲 Borscht Soup,49,4;🍲 Chicken Soup,40,4;🍲 Solyanka,75,4;🥣 Okroshka,60,2;🍜 Lagman,105,3;🍚 Plov,190,3;🧀 Mac and Cheese,164,3;🍝 Lasagna,135,3;🧆 Falafel,333,3;🥬 Cabbage Rolls,120,3;🍃 Dolma,180,4;🥘 Goulash,150,3;🥘 Beef Stroganoff,170,3;🍳 Scrambled Eggs,148,1;🌮 Tacos,226,2;🥪 Sandwich,250,2;🥪 Club Sandwich,230,2;🍟 Takeaway Fries,312,1;🍲 Mushroom Soup,60,4;🍕 Margherita Pizza,250,2;🍝 Spaghetti Bolognese,130,3;🍝 Carbonara,190,2;🍛 Chicken Curry,150,3;🍛 Butter Chicken,160,3;🍜 Pho,60,2;🍜 Ramen Bowl,90,2;🍱 Bento Box,170,1;🥘 Paella,160,2;🌶️ Chili Con Carne,120,3;🍲 Minestrone,40,4;🍲 Lentil Soup,70,4;🍅 Tomato Soup,40,4;🍲 Shchi,35,4;🍲 Ukha,45,3;🥗 Vinegret,90,3;🥗 Crab Salad,180,2;🥗 Coleslaw,150,3;🥗 Potato Salad,140,3;🥗 Tabbouleh,120,3;🌯 Burrito,210,2;🌯 Wrap,220,2;🥙 Gyro,215,1;🍝 Pasta Bake,160,3;🥧 Shepherd's Pie,120,3;🥟 Dim Sum,200,1;🍤 Tempura,250,1;🍣 Poke Bowl,140,1;🍗 Chicken Kiev,270,3;🍚 Risotto,150,2;🍆 Moussaka,140,3;🥞 Stuffed Blini,220,3;🥔 Draniki,200,2;🥔 Baked Potato,93,2;🍲 Kharcho,70,3;🍲 Ragout,110,3;🍳 Quiche Lorraine,290,3;🥘 Leftover Stew,110,3;🍲 Beshbarmak,180,3;🥘 Kuyrdak,230,2;🍲 Sorpa,35,3;🥟 Belyashi,300,2;🥬 Golubtsy,120,3;🍲 Holodets,180,4;🥟 Tushpara,220,2;🍖 Pulled Pork,200,4;🍲 Naryn,220,2;🥣 Kozhe,70,2;🍖 Meatloaf,210,3;🍲 Clam Chowder,90,3;🥘 Jambalaya,150,3;🍲 Gumbo,110,3;🥚 Deviled Eggs,200,2;🍔 Sloppy Joe,220,2;🥘 Lobio,140,3;🥣 Oatmeal,71,3;🥣 Overnight Oats,150,3;🍲 Dimlama,95,3;🥟 Chuchvara,220,3;🥕 Korean Carrot Salad,130,7;🍜 Funchoza Salad,150,3;🐟 Heh Fish,120,2;🍅 Achichuk Salad,30,1;🍢 Lula Kebab,270,2;🥣 Buckwheat Porridge,110,3;🥞 Oladi,230,2;🍞 French Toast,230,1;🌮 Quesadilla,290,2;🍗 Buffalo Wings,250,2;🥧 Chicken Pot Pie,240,3;🍳 Biscuits and Gravy,220,2;🥪 Philly Cheesesteak,250,1;🥘 Zharkoe,160,3;🥗 Mimosa Salad,230,2;🥗 Shalgam Salad,45,4;🍖 Sirne,210,3;🥟 Orama,210,2;🧀 Grilled Cheese Sandwich,350,1;🥪 BLT Sandwich,250,1;🍜 Chicken Noodle Soup,60,3;🌮 Fish Tacos,200,1;🍠 Sweet Potato Casserole,190,3;🌯 Breakfast Burrito,230,2;🧆 Hush Puppies,340,2;🍙 Kimbap,150,1;🥟 Fresh Tortellini,300,14;🌮 Birria Tacos,230,2
 Snacks|🥔 Potato Chips,536,90;🍿 Popcorn,387,30;🌮 Nachos,489,90;🥨 Salted Crackers,430,180;🍫 Granola Bar,450,180;💪 Protein Bar,380,180;🍘 Rice Cakes,387,180;🥜 Trail Mix,462,180;🥩 Beef Jerky,410,180;🥨 Pretzel Sticks,380,180;🧀 Cheese Snacks,500,90;🥜 Roasted Chickpeas,380,90;🍫 Energy Bar,400,180;🥜 Peanut Bar,480,180;🍪 Sandwich Crackers,480,180;🧁 Halva Bar,516,180;🫘 Dried Edamame,430,180;🍌 Banana Chips,519,90;🍎 Apple Chips,240,90;🥥 Coconut Chips,600,90;🍘 Rice Crackers,390,180;🥕 Vegetable Chips,500,90;🫓 Pita Chips,450,90;🌽 Tortilla Chips,489,90;🥜 Honey Roasted Peanuts,560,180;🫛 Wasabi Peas,410,180;🍿 Caramel Popcorn,400,60;🧀 Cheese Crackers,490,180;🥩 Biltong,300,180;🦑 Dried Squid,300,180;🥓 Pork Rinds,544,90;🍪 Protein Cookies,400,180;🍎 Fruit Leather,350,180;🍬 Fruit Snacks,330,180;🥕 Veggie Sticks,40,3;🌻 Seed Mix,560,180;🍘 Senbei,380,180;🍿 Microwave Popcorn,480,180;🌰 Roasted Chestnuts,245,5;🍫 Rice Crispy Bar,410,180;🍞 Rye Croutons,410,180;🍪 Graham Crackers,430,180;🥧 Toaster Pastries,390,180;🍫 S'mores,430,30;🍿 Kettle Corn,430,60
 Plant-Based|⬜ Tofu,76,7;⬜ Silken Tofu,55,7;🟫 Smoked Tofu,140,14;🟫 Tempeh,192,10;🥩 Seitan,370,10;🍔 Veggie Burger,180,5;🌭 Vegan Sausages,250,10;🧀 Vegan Cheese,280,30;🥛 Rice Milk,47,7;🥥 Coconut Yogurt,110,10;🥛 Soy Yogurt,66,10;🧈 Plant Butter,600,60;🥩 Plant-Based Mince,200,7;🍗 Vegan Nuggets,230,180;🥛 Pea Milk,40,7;🥛 Cashew Milk,25,7;🥛 Hemp Milk,46,7;🥛 Hazelnut Milk,30,7;🌱 Textured Soy Protein,330,365;🌱 Nutritional Yeast,325,365;🥛 Oat Cream,150,30;🥛 Soy Cream,180,30;🥚 Vegan Mayo,450,60;🥚 Plant-Based Egg,120,10;🫘 Okara,77,3;🫘 Yuba,233,5
 World Foods|🌿 Nori Sheets,35,365;🍚 Rice Paper,333,365;🥬 Kimchi,15,60;🫚 Pickled Ginger,20,180;🥣 Miso Soup Mix,40,365;🌿 Wakame,45,365;🍡 Tteok,230,14;🥟 Wonton Wrappers,290,7;🌮 Taco Shells,467,180;🍛 Curry Roux,500,365;🫘 Refried Beans,90,365;🌶️ Enchilada Sauce,30,180;🧀 Queso Dip,180,30;🍜 Laksa Paste,200,180;🍵 Matcha Powder,324,365;🥟 Spring Roll Wrappers,290,30;🫒 Kalamata Olives,230,365;🧆 Falafel Mix,330,365;🥙 Tahini Sauce,450,30;🍚 Glutinous Rice,370,365;🍶 Mirin,240,365;🍶 Ponzu,60,180;🥫 Tamarind Paste,240,180;🌶️ Sambal Oelek,40,365;🫓 Papadums,370,365;🥟 Bao Buns,240,7;🍜 Pad Thai Noodles,360,365;🍙 Onigiri,170,1;⚫ Tapioca Pearls,358,365;🍞 Panko,395,180;🍜 Dashi Granules,224,365;🫘 Red Bean Paste,240,14;🟣 Ube Powder,350,365;🧵 Kataifi,370,60;🍙 Glutinous Rice Flour,360,365;🌊 Kombu,77,365;🐟 Bonito Flakes,330,365;🫘 Natto,212,7;🫘 Doenjang,170,365;🍋 Yuzu Kosho,90,180;🥟 Gyoza Wrappers,280,7;🥗 Seaweed Salad,70,5;🌿 Hijiki,138,365;🌿 Dulse,264,365
@@ -2148,6 +2148,64 @@ final recipes = <Recipe>[
       'Add the wine and clams, cover and cook 4–5 minutes until they open; finish with the parsley leaves.',
     ],
     'Salt',
+  ),
+  Recipe(
+    'Dense Bean Salad',
+    '🫘',
+    '15 min',
+    3,
+    [Ing('Canned Chickpeas', 240), Ing('Canned Beans', 240), Ing('Cucumber', 150), Ing('Red Onion', 60), Ing('Sun-Dried Tomatoes', 40), Ing('Feta', 80), Ing('Parsley', 20), Ing('Lemon', 40), Ing('Olive Oil', 25)],
+    [
+      'Drain and rinse the chickpeas and beans.',
+      'Dice the cucumber, red onion and sun-dried tomatoes; chop the parsley together with its stems.',
+      'Whisk the lemon juice with the olive oil, salt and pepper.',
+      'Toss everything with the crumbled feta. It keeps 3 days in the fridge — add any leftover veg you have.',
+    ],
+    'Salt, pepper',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Jerk Chicken Thighs',
+    '🍗',
+    '40 min',
+    4,
+    [Ing('Chicken Thighs', 600), Ing('Jerk Seasoning', 15), Ing('Lime', 30), Ing('Honey', 15), Ing('Vegetable Oil', 15), Ing('Spring Onion', 20), Ing('Rice', 200)],
+    [
+      'Rub the chicken thighs with the jerk seasoning, lime juice, honey and oil; leave 10 minutes (or overnight in the fridge).',
+      'Cook the rice in salted water.',
+      'Roast the chicken at 220 °C for 25 minutes until the skin is crisp and charred at the edges.',
+      'Rest 5 minutes, sprinkle with sliced spring onion and serve with the rice.',
+    ],
+    'Salt',
+  ),
+  Recipe(
+    'Shirataki Leftover-Veg Stir-Fry',
+    '🍜',
+    '15 min',
+    2,
+    [Ing('Shirataki Noodles', 400), Ing('Bell Pepper', 120), Ing('Carrot', 100), Ing('Cabbage', 150), Ing('Eggs', 100), Ing('Garlic', 8), Ing('Soy Sauce', 30), Ing('Spring Onion', 15), Ing('Sesame Oil', 10)],
+    [
+      'Rinse the shirataki noodles well and dry-fry them in a hot pan for 3 minutes to remove the water.',
+      'Slice the pepper, carrot and cabbage thinly — any tired veg from the fridge works too.',
+      'Stir-fry the garlic and vegetables in sesame oil for 4 minutes, push them aside and scramble the eggs.',
+      'Add the noodles and soy sauce, toss 2 minutes and finish with spring onion.',
+    ],
+    'Chili flakes',
+    zeroWaste: true,
+  ),
+  Recipe(
+    'Garlic Butter Enoki',
+    '🍄',
+    '10 min',
+    2,
+    [Ing('Enoki Mushrooms', 200), Ing('Butter', 20), Ing('Garlic', 10), Ing('Soy Sauce', 15), Ing('Honey', 5), Ing('Spring Onion', 10)],
+    [
+      'Cut off the root end of the enoki and pull the mushrooms into small bundles.',
+      'Melt the butter, fry the chopped garlic for 30 seconds.',
+      'Add the enoki and fry 2 minutes on each side until golden.',
+      'Pour in the soy sauce mixed with honey, toss 1 minute and top with spring onion.',
+    ],
+    'Pepper',
   ),
 ];
 
@@ -8199,7 +8257,26 @@ class _RecipePageState extends State<RecipePage> {
               child: Text(tr('Also needed: {0}', [trStaples(r.staples)]), style: const TextStyle(color: Colors.grey)),
             ),
           const SizedBox(height: 18),
-          Text(tr('Instructions'), style: headStyle),
+          Row(
+            children: [
+              Expanded(child: Text(tr('Instructions'), style: headStyle)),
+              FilledButton.tonalIcon(
+                onPressed: () async {
+                  final cooked = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(builder: (_) => CookModePage(state: s, recipe: r, portions: portions)),
+                  );
+                  if (cooked == true && context.mounted) {
+                    final m = ScaffoldMessenger.of(context);
+                    Navigator.pop(context);
+                    _snack(m, tr('Bon appétit! {0} kcal logged, ingredients used up.', [r.kcal * portions]), undo: s);
+                  }
+                },
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: Text(tr('Cook step by step')),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           for (final e in trSteps(r.name, r.steps).asMap().entries)
             Appear(
@@ -8250,6 +8327,302 @@ class _RecipePageState extends State<RecipePage> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ───────────────────────── РЕЖИМ ГОТОВКИ ─────────────────────────
+// Шаги крупно по одному (листать или «Далее»), таймеры из текста шага («cook 8–10 minutes» → 8 мин),
+// на финише — «Я приготовил(а)». Как в iOS v24.
+
+final _durRe = RegExp(r'(\d+(?:[.,]\d+)?)(?:\s*(?:–|-|to)\s*\d+(?:[.,]\d+)?)?\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?|h)\b', caseSensitive: false);
+
+List<int> stepDurations(String step) {
+  final out = <int>[];
+  for (final m in _durRe.allMatches(step)) {
+    final n = double.tryParse(m.group(1)!.replaceAll(',', '.')) ?? 0;
+    final u = m.group(2)!.toLowerCase();
+    final secs = (u.startsWith('s') ? n : (u.startsWith('h') ? n * 3600 : n * 60)).round();
+    if (secs >= 10 && secs <= 6 * 3600 && !out.contains(secs)) out.add(secs);
+  }
+  return out.take(3).toList();
+}
+
+String _two(int n) => n.toString().padLeft(2, '0');
+String fmtClock(int s) => s >= 3600 ? '${s ~/ 3600}:${_two(s ~/ 60 % 60)}:${_two(s % 60)}' : '${_two(s ~/ 60)}:${_two(s % 60)}';
+
+String fmtDur(int s) {
+  if (s < 60) return tr('{0} s', [s]);
+  final h = s ~/ 3600, m = s ~/ 60 % 60;
+  if (h == 0) return tr('{0} min', [m]);
+  return m == 0 ? tr('{0} h', [h]) : tr('{0} h {1} min', [h, m]);
+}
+
+class CookModePage extends StatefulWidget {
+  final AppState state;
+  final Recipe recipe;
+  final int portions;
+  const CookModePage({super.key, required this.state, required this.recipe, required this.portions});
+  @override
+  State<CookModePage> createState() => _CookModePageState();
+}
+
+class _CookModePageState extends State<CookModePage> {
+  final _pc = PageController();
+  int page = 0;
+  final Map<String, DateTime> _ends = {};
+  final Map<String, int> _totals = {};
+  final Set<String> _rung = {};
+  String? _alert;
+  Timer? _tick;
+
+  List<String> get steps => trSteps(widget.recipe.name, widget.recipe.steps);
+  int get last => steps.length; // страницы 0…N-1 — шаги, N — готово
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || _ends.isEmpty) return;
+      final now = DateTime.now();
+      for (final e in _ends.entries) {
+        if (!_rung.contains(e.key) && !e.value.isAfter(now)) {
+          _rung.add(e.key);
+          _alert = tr("⏰ Step {0}: time's up! Check it 👀", [int.parse(e.key.split('-').first) + 1]);
+        }
+      }
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    _pc.dispose();
+    super.dispose();
+  }
+
+  void _go(int p) {
+    final t = p.clamp(0, last);
+    _pc.animateToPage(t, duration: const Duration(milliseconds: 280), curve: Curves.easeInOut);
+  }
+
+  String get _line {
+    if (_alert != null) return _alert!;
+    if (page == last) return tr("Yum! Tell me how many portions you ate — I'll log them 🍽️");
+    if (stepDurations(widget.recipe.steps[page]).isNotEmpty) return tr('Start the timer — I will ring right here ⏰');
+    final tips = [
+      trk('Take your time — cooking is not a race 🐾'),
+      trk('Smells good already! 😋'),
+      trk('Tip: clean as you go — less mess at the end 🧽'),
+      trk('Taste it — a pinch of salt fixes a lot 🧂'),
+      trk("You're doing great, chef! 👩‍🍳"),
+    ];
+    return tr(tips[page % tips.length]);
+  }
+
+  int _left(String k) {
+    final e = _ends[k];
+    if (e == null) return 0;
+    final ms = e.difference(DateTime.now()).inMilliseconds;
+    return ms <= 0 ? 0 : (ms / 1000).ceil();
+  }
+
+  Widget _timer(int step, int secs) {
+    final k = '$step-$secs';
+    if (!_ends.containsKey(k)) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(foregroundColor: burgundy, minimumSize: const Size.fromHeight(48)),
+          onPressed: () => setState(() {
+            _ends[k] = DateTime.now().add(Duration(seconds: secs));
+            _totals[k] = secs;
+            _rung.remove(k);
+            _alert = null;
+          }),
+          icon: const Icon(Icons.timer_outlined),
+          label: Text(tr('Start timer · {0}', [fmtDur(secs)])),
+        ),
+      );
+    }
+    final left = _left(k);
+    final done = left == 0;
+    final color = done ? Colors.green.shade700 : burgundy;
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(20)),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 52,
+            height: 52,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(value: left / (_totals[k] ?? secs), strokeWidth: 6, color: color, backgroundColor: burgundy.withValues(alpha: 0.12)),
+                Icon(done ? Icons.check : Icons.timer_outlined, color: color),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(done ? tr("Time's up!") : fmtClock(left), style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: color)),
+                Text(tr('Timer · {0}', [fmtDur(secs)]), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
+            ),
+          ),
+          if (!done)
+            TextButton(
+              onPressed: () => setState(() {
+                final base = _ends[k]!.isAfter(DateTime.now()) ? _ends[k]! : DateTime.now();
+                _ends[k] = base.add(const Duration(minutes: 1));
+                _totals[k] = (_totals[k] ?? secs) + 60;
+              }),
+              child: Text(tr('+1 min'), style: const TextStyle(color: burgundy, fontWeight: FontWeight.bold)),
+            ),
+          IconButton(
+            tooltip: tr('Cancel'),
+            onPressed: () => setState(() {
+              _ends.remove(k);
+              _totals.remove(k);
+              _rung.remove(k);
+              _alert = null;
+            }),
+            icon: const Icon(Icons.close, color: burgundy),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stepPage(int i) {
+    final r = widget.recipe;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: CircleAvatar(
+            radius: 26,
+            backgroundColor: burgundy,
+            child: Text('${i + 1}', style: const TextStyle(color: cream, fontSize: 22, fontWeight: FontWeight.bold)),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(steps[i], style: const TextStyle(fontSize: 22, height: 1.4, fontWeight: FontWeight.w500)),
+        for (final secs in stepDurations(r.steps[i])) _timer(i, secs),
+      ],
+    );
+  }
+
+  Widget _finishPage() {
+    final r = widget.recipe;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(22, 24, 22, 18),
+      children: [
+        const Center(child: Text('🎉', style: TextStyle(fontSize: 64))),
+        const SizedBox(height: 10),
+        Text(tr('{0} is ready!', [tn(r.name)]), textAlign: TextAlign.center, style: titleStyle),
+        const SizedBox(height: 18),
+        SizedBox(
+          height: 54,
+          child: FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: burgundy),
+            onPressed: () {
+              widget.state.cook(r, widget.portions);
+              Navigator.pop(context, true);
+            },
+            child: Text(tr('I cooked it · log {0} kcal', [r.kcal * widget.portions])),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(tr('Ingredients from your fridge are used up — the ones expiring first.'), textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.recipe;
+    final title = page == last ? tr('Done!') : tr('Step {0} of {1}', [page + 1, steps.length]);
+    return Scaffold(
+      appBar: AppBar(
+        title: Column(
+          children: [
+            Text('${r.emoji} ${tn(r.name)}', style: headStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        ),
+        centerTitle: true,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(end: (page + 1) / (last + 1)),
+                duration: const Duration(milliseconds: 280),
+                builder: (_, v, __) => LinearProgressIndicator(value: v, minHeight: 5, color: burgundy, backgroundColor: burgundy.withValues(alpha: 0.12)),
+              ),
+            ),
+          ),
+        ),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: PageView.builder(
+              controller: _pc,
+              itemCount: last + 1,
+              onPageChanged: (i) => setState(() {
+                page = i;
+                _alert = null;
+              }),
+              itemBuilder: (_, i) => i == last ? _finishPage() : _stepPage(i),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: NutrikSays(key: ValueKey(_line), text: _line, size: 64, mode: page == last ? NutrikMode.cheer : NutrikMode.idle),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Row(
+                children: [
+                  if (page > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(foregroundColor: burgundy, minimumSize: const Size(110, 52)),
+                        onPressed: () => _go(page - 1),
+                        child: Text(tr('Back')),
+                      ),
+                    ),
+                  if (page < last)
+                    Expanded(
+                      child: SizedBox(
+                        height: 52,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(backgroundColor: burgundy),
+                          onPressed: () => _go(page + 1),
+                          child: Text(page == last - 1 ? tr('Finish 🎉') : tr('Next')),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
