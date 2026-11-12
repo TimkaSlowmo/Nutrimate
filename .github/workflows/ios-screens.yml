@@ -82,6 +82,8 @@ jobs:
           shot 09-diary 5 -sheet diary
           shot 10-shopping 5 -sheet shopping
           shot 11-tutorial 6 -tutorial
+          shot 12-week 6 -sheet week
+          shot 13-onboarding-goal 6 -onboarding -obStep 3
           # короткое видео: Home и анимации Нутрика
           xcrun simctl terminate "$UDID" $BID 2>/dev/null || true
           xcrun simctl io "$UDID" recordVideo --codec=h264 --force screens/home.mp4 &

@@ -7,6 +7,7 @@ struct ProfileView: View {
     @State private var showEco = false
     @State private var showChat = false
     @State private var showBody = false
+    @State private var showWeek = false
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
@@ -68,6 +69,13 @@ struct ProfileView: View {
                             Text("📟 Body dashboard (BMI)").bold().foregroundStyle(Color.burgundy)
                             Spacer()
                             Text(String(format: "BMI %.1f", store.data.profile.bmi)).font(.subheadline).foregroundStyle(store.data.profile.bmiCategory.color)
+                        }
+                    }
+                    Button { showWeek = true } label: {
+                        HStack {
+                            Text("📊 Weekly report").bold().foregroundStyle(Color.burgundy)
+                            Spacer()
+                            Text("score \(WeekStats(store: store).score)").font(.subheadline).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -183,6 +191,7 @@ struct ProfileView: View {
             .sheet(isPresented: $showEco) { EcoImpactView() }
             .sheet(isPresented: $showChat) { ChatView() }
             .sheet(isPresented: $showBody) { BodyView() }
+            .sheet(isPresented: $showWeek) { WeekReportView() }
             .alert("Erase all data?", isPresented: $confirmErase) {
                 Button("Erase", role: .destructive) { store.eraseAll() }
                 Button("Cancel", role: .cancel) {}

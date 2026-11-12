@@ -319,13 +319,16 @@ final class AppStore: ObservableObject {
         checkMedals()
     }
 
-    func register(name: String, email: String, isMan: Bool, age: Int, weight: Double, height: Double, demo: Bool) {
+    func register(name: String, email: String, isMan: Bool, age: Int, weight: Double, height: Double,
+                  activity: Int = 1, goal: Int = 0, demo: Bool) {
         data.profile.name = name.isEmpty ? "Friend" : name
         data.profile.email = email
         data.profile.isMan = isMan
         data.profile.age = age
         data.profile.weight = weight
         data.profile.height = height
+        data.profile.activity = min(4, max(0, activity))
+        data.profile.goal = min(1, max(-1, goal))
         data.weights = [WeightEntry(date: Date(), kg: weight)]
         data.stats.streakStart = Date()
         if demo { loadDemo() }

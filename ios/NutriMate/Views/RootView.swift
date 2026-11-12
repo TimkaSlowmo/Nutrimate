@@ -58,6 +58,7 @@ struct RootView: View {
             case "chat": ChatView()
             case "eco": EcoImpactView()
             case "shopping": ShoppingView()
+            case "week": WeekReportView()
             default: DiaryView()
             }
         }

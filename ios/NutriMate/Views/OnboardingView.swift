@@ -3,7 +3,7 @@ import SwiftUI
 /// Знакомство с Нутриком и регистрация (данные хранятся только на телефоне).
 struct OnboardingView: View {
     @EnvironmentObject var store: AppStore
-    @State private var step = 0
+    @State private var step = min(3, max(0, Int(UIShot.value("-obStep") ?? "") ?? 0))
     @State private var name = ""
     @State private var email = ""
     @State private var isMan = true
@@ -11,12 +11,31 @@ struct OnboardingView: View {
     @State private var weight = 70.0
     @State private var height = 175.0
     @State private var demo = true
+    @State private var activity = 1
+    @State private var goal = 0
+    @State private var goalTouched = false
+
+    private let lastStep = 3
+
+    /// Временный профиль для живого расчёта цели калорий.
+    private var preview: Profile {
+        var p = Profile()
+        p.isMan = isMan; p.age = age; p.weight = weight; p.height = height
+        p.activity = activity; p.goal = goal
+        return p
+    }
 
     private var line: String {
         switch step {
         case 0: return "Hi! I'm Nutrik 🐾 I help people stop wasting food. Nice to meet you!"
         case 1: return "What should I call you?"
-        default: return "A few numbers so I can count your daily calories 📏"
+        case 2: return "A few numbers so I can count your daily calories 📏"
+        default:
+            switch preview.bmiCategory {
+            case .under: return "How active are you? You're a bit light — I'd suggest \"Gain\" 🍝"
+            case .over, .obese: return "How active are you? A gentle \"Lose\" goal works best — no strict diets! 🥗"
+            case .normal: return "How active are you, and what's your goal? 🎯"
+            }
         }
     }
 
@@ -43,10 +62,11 @@ struct OnboardingView: View {
                     Group {
                         if step == 1 { account }
                         if step == 2 { params }
+                        if step == 3 { activityGoal }
                     }
                     .transition(.move(edge: .trailing).combined(with: .opacity))
 
-                    Button(step == 2 ? "Start saving food 🌱" : "Next") { next() }
+                    Button(step == lastStep ? "Start saving food 🌱" : "Next") { next() }
                         .buttonStyle(PrimaryButtonStyle())
                         .disabled(step == 1 && name.trimmingCharacters(in: .whitespaces).isEmpty)
                         .opacity(step == 1 && name.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
@@ -99,6 +119,81 @@ struct OnboardingView: View {
         .glassCard()
     }
 
+    private var activityGoal: some View {
+        let p = preview
+        let underweight = p.bmiCategory == .under
+        return VStack(alignment: .leading, spacing: 14) {
+            Text("Activity").font(.headline)
+            VStack(spacing: 8) {
+                ForEach(0..<Profile.activityTitles.count, id: \.self) { i in
+                    Button {
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        withAnimation(.spring(response: 0.35)) { activity = i }
+                    } label: {
+                        HStack {
+                            Text(Profile.activityTitles[i]).font(.subheadline)
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength: 6)
+                            Image(systemName: activity == i ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(activity == i ? Color.burgundy : Color.burgundy.opacity(0.3))
+                        }
+                        .padding(.horizontal, 12).padding(.vertical, 10)
+                        .background(activity == i ? Color.burgundy.opacity(0.10) : Color.sand.opacity(0.6),
+                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(activity == i ? Color.burgundy.opacity(0.5) : .clear, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            Text("Goal").font(.headline)
+            Picker("Goal", selection: Binding(get: { goal }, set: { goal = $0; goalTouched = true })) {
+                Text("📉 Lose").tag(-1)
+                Text("⚖️ Keep").tag(0)
+                Text("📈 Gain").tag(1)
+            }
+            .pickerStyle(.segmented)
+            if underweight && goal < 0 {
+                Text("Your weight is already below the healthy range, so I'll plan for keeping it instead 💛")
+                    .font(.caption).foregroundStyle(Color.warnOrange)
+            }
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Your daily goal").font(.caption.bold()).foregroundStyle(Color.burgundy.opacity(0.7))
+                    Text("\(effectiveTarget) kcal")
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .contentTransition(.numericText())
+                        .animation(.spring, value: effectiveTarget)
+                }
+                Spacer()
+                Text("BMI \(p.bmi, specifier: "%.1f")")
+                    .font(.caption.bold())
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(p.bmiCategory.color.opacity(0.18), in: Capsule())
+            }
+            Text("Base metabolism \(p.bmr) × activity, \(goal < 0 && !underweight ? "−400 to lose gently" : goal > 0 ? "+300 to gain" : "to keep your weight"). You can change it later in Profile.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .foregroundStyle(Color.burgundy)
+        .glassCard()
+        .onAppear {
+            guard !goalTouched else { return }
+            switch p.bmiCategory {
+            case .under: goal = 1
+            case .over, .obese: goal = -1
+            case .normal: goal = 0
+            }
+        }
+    }
+
+    /// Недовесу не даём выбрать похудение.
+    private var finalGoal: Int { preview.bmiCategory == .under && goal < 0 ? 0 : goal }
+    private var effectiveTarget: Int {
+        var p = preview
+        p.goal = finalGoal
+        return p.targetCalories
+    }
+
     private func field(_ title: String, text: Binding<String>, icon: String) -> some View {
         HStack {
             Image(systemName: icon).foregroundStyle(Color.burgundy)
@@ -110,11 +205,11 @@ struct OnboardingView: View {
 
     private func next() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        if step < 2 {
+        if step < lastStep {
             withAnimation(.spring) { step += 1 }
         } else {
             store.register(name: name.trimmingCharacters(in: .whitespaces), email: email, isMan: isMan,
-                           age: age, weight: weight, height: height, demo: demo)
+                           age: age, weight: weight, height: height, activity: activity, goal: finalGoal, demo: demo)
         }
     }
 }

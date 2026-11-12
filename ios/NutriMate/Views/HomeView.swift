@@ -8,6 +8,7 @@ struct HomeView: View {
     @State private var showEco = false
     @State private var showChat = false
     @State private var showBody = false
+    @State private var showWeek = false
     @State private var openItem: PantryItem?
     @State private var tipIndex: Int?
 
@@ -84,6 +85,7 @@ struct HomeView: View {
                     HStack(spacing: 12) {
                         quick("🛒", "Shopping", "\(store.data.shopping.count) items") { showShopping = true }
                         quick("📒", "Diary", "\(store.todayLog.count) today") { showDiary = true }
+                        quick("📊", "Week", "score \(WeekStats(store: store).score)") { showWeek = true }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -96,6 +98,7 @@ struct HomeView: View {
             .sheet(isPresented: $showEco) { EcoImpactView() }
             .sheet(isPresented: $showChat) { ChatView() }
             .sheet(isPresented: $showBody) { BodyView() }
+            .sheet(isPresented: $showWeek) { WeekReportView() }
             .sheet(item: $openItem) { p in ItemSheet(id: p.id) }
             .navigationDestination(for: Recipe.self) { r in RecipeDetail(recipe: r) }
         }
@@ -243,15 +246,12 @@ struct HomeView: View {
 
     private func quick(_ e: String, _ title: String, _ sub: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(e).font(.title2)
-                VStack(alignment: .leading) {
-                    Text(title).font(.headline).foregroundStyle(Color.burgundy)
-                    Text(sub).font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
+                Text(title).font(.headline).foregroundStyle(Color.burgundy).lineLimit(1)
+                Text(sub).font(.caption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.8)
             }
-            .glassCard(radius: 18, padding: 14)
+            .glassCard(radius: 18, padding: 12)
         }
         .buttonStyle(.plain)
     }
@@ -282,6 +282,7 @@ struct PantryRow: View {
 struct DiaryView: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) private var dismiss
+    @State private var showWeek = false
 
     var body: some View {
         NavigationStack {
@@ -289,6 +290,10 @@ struct DiaryView: View {
                 Section {
                     WeekCaloriesChart()
                         .padding(.vertical, 4)
+                    Button { showWeek = true } label: {
+                        Label("Open weekly report", systemImage: "chart.bar.doc.horizontal")
+                            .font(.subheadline.bold()).foregroundStyle(Color.burgundy)
+                    }
                 }
                 Section {
                     HStack {
@@ -318,6 +323,7 @@ struct DiaryView: View {
             .scrollContentBackground(.hidden)
             .background(Color.cream)
             .navigationTitle("Food diary")
+            .sheet(isPresented: $showWeek) { WeekReportView() }
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
     }

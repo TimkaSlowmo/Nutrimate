@@ -55,9 +55,15 @@ enum UIShot {
             LogEntry(emoji: "🍌", name: "Banana · 120 g", kcal: 107, date: now.addingTimeInterval(-4 * 3600)),
             LogEntry(emoji: "🍗", name: "Chicken Breast · 200 g", kcal: 330, date: now.addingTimeInterval(-2 * 3600)),
         ]
-        for back in 1...6 {
-            d.log.append(LogEntry(emoji: "🍽️", name: "Meals", kcal: 1500 + back * 90, date: day(-back)))
+        for back in 1...13 {
+            d.log.append(LogEntry(emoji: "🍽️", name: "Meals", kcal: back < 7 ? 1500 + back * 90 : 1350 + back * 40, date: day(-back)))
         }
+        d.log += [
+            LogEntry(emoji: "🍌", name: "Banana · 120 g", kcal: 107, date: day(-1)),
+            LogEntry(emoji: "🥚", name: "Eggs · 100 g", kcal: 155, date: day(-2)),
+            LogEntry(emoji: "🍌", name: "Banana · 120 g", kcal: 107, date: day(-3)),
+            LogEntry(emoji: "🍗", name: "Chicken Breast · 150 g", kcal: 248, date: day(-4)),
+        ]
         d.weights = [WeightEntry(date: day(-28), kg: 51.2), WeightEntry(date: day(-21), kg: 51.5),
                      WeightEntry(date: day(-14), kg: 51.6), WeightEntry(date: day(-7), kg: 51.9),
                      WeightEntry(date: now, kg: 52)]
