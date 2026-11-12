@@ -103,7 +103,7 @@ struct WeekReportView: View {
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
                         tile("🔥", s.avg > 0 ? "\(s.avg)" : "—", L("avg kcal / day"), L("goal {0}", s.target), delta: s.prevAvg > 0 && s.avg > 0 ? s.avg - s.prevAvg : nil, goodWhenUp: nil)
                         tile("🎯", "\(s.onTarget)/7", L("days on target"), L("80–110% of goal"), delta: nil, goodWhenUp: nil)
-                        tile("🦸", "\(s.saved)", L("products saved"), L("{0} kept", String(format: "$%.2f", s.savedMoney)), delta: s.saved - s.prevSaved, goodWhenUp: true)
+                        tile("🦸", "\(s.saved)", L("products saved"), L("{0} kept", Money(s.savedMoney, 2)), delta: s.saved - s.prevSaved, goodWhenUp: true)
                         tile("🗑️", "\(s.wasted)", L("thrown away"), s.wasted == 0 ? L("perfect!") : L("let's do better"), delta: s.wasted - s.prevWasted, goodWhenUp: false)
                     }
                     WeekCaloriesChart().glassCard()
@@ -265,7 +265,7 @@ struct WeekShareCard: View {
             }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                 stat("🦸", "\(s.saved)", L("products saved"))
-                stat("💰", String(format: "$%.2f", s.savedMoney), L("money kept"))
+                stat("💰", Money(s.savedMoney, 2), L("money kept"))
                 stat("🗑️", "\(s.wasted)", L("thrown away"))
                 stat("🎯", "\(s.onTarget)/7", L("days on target"))
             }

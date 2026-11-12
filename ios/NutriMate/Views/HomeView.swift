@@ -166,7 +166,7 @@ struct HomeView: View {
                 SectionTitle(text: L("Use these first"))
                 Spacer()
                 if store.moneyAtRisk > 0 {
-                    Text(L("{0} at risk", String(format: "$%.1f", store.moneyAtRisk))).font(.caption.bold()).foregroundStyle(Color.warnOrange)
+                    Text(L("{0} at risk", Money(store.moneyAtRisk, 1))).font(.caption.bold()).foregroundStyle(Color.warnOrange)
                 }
             }
             if list.isEmpty {
@@ -213,7 +213,7 @@ struct HomeView: View {
         HStack(spacing: 10) {
             stat("🧊", "\(store.unitCount)", L("in fridge"))
             stat("🦸", "\(store.data.stats.rescued)", L("rescued"))
-            stat("💰", String(format: "$%.0f", store.data.stats.rescuedMoney), L("saved"))
+            stat("💰", Money(store.data.stats.rescuedMoney), L("saved"))
             stat("🌍", "\(store.ecoScore)", L("eco score"))
         }
     }
@@ -224,7 +224,7 @@ struct HomeView: View {
                 Text("🌍").font(.system(size: 34))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L("Eco Impact")).font(.headline).foregroundStyle(Color.burgundy)
-                    Text(L("{0} kg food · {1} kg CO₂ · {2} saved", String(format: "%.1f", store.rescuedKg), String(format: "%.1f", store.co2), String(format: "$%.0f", store.data.stats.rescuedMoney)))
+                    Text(L("{0} kg food · {1} kg CO₂ · {2} saved", String(format: "%.1f", store.rescuedKg), String(format: "%.1f", store.co2), Money(store.data.stats.rescuedMoney)))
                         .font(.caption).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
                 }
                 Spacer(minLength: 0)

@@ -480,6 +480,8 @@ struct AppData: Codable {
     var language: AppLang = AppLang.system
     /// Оформление: светлое (фирменное, по умолчанию), тёмное или как в системе
     var appearance: AppAppearance = .light
+    /// Валюта (nil — авто: тенге в Казахстане, иначе доллар)
+    var currency: AppCurrency?
 
     init() {}
     init(from decoder: Decoder) throws {
@@ -503,7 +505,13 @@ struct AppData: Codable {
         deviceId = (try? c.decodeIfPresent(String.self, forKey: .deviceId)) ?? UUID().uuidString
         language = (try? c.decodeIfPresent(AppLang.self, forKey: .language)) ?? AppLang.system
         appearance = (try? c.decodeIfPresent(AppAppearance.self, forKey: .appearance)) ?? .light
+        currency = try? c.decodeIfPresent(AppCurrency.self, forKey: .currency)
     }
+}
+
+extension AppData {
+    /// Валюта для показа: выбранная или авто по региону/языку
+    var effectiveCurrency: AppCurrency { currency ?? AppCurrency.auto(language) }
 }
 
 struct Medal: Identifiable {

@@ -124,3 +124,70 @@ func N(_ englishName: String) -> String {
     // Категории, места хранения и пр. — из общей таблицы
     return L10n.raw(englishName, lang)
 }
+
+/// Валюта для денег в приложении (спасено, под угрозой, недельный отчёт…).
+/// Внутри всё хранится в долларах (оценка по категориям), показ — в выбранной валюте по примерному курсу.
+enum AppCurrency: String, CaseIterable, Identifiable, Codable {
+    case kzt, usd, eur, rub
+    var id: String { rawValue }
+
+    var symbol: String {
+        switch self {
+        case .kzt: return "₸"
+        case .usd: return "$"
+        case .eur: return "€"
+        case .rub: return "₽"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .kzt: return L("Tenge")
+        case .usd: return L("US dollar")
+        case .eur: return L("Euro")
+        case .rub: return L("Ruble")
+        }
+    }
+
+    /// Примерный курс к доллару (ноябрь 2026, округлён — деньги в приложении и так оценка).
+    var perUSD: Double {
+        switch self {
+        case .kzt: return 520
+        case .usd: return 1
+        case .eur: return 0.86
+        case .rub: return 80
+        }
+    }
+
+    /// По умолчанию: тенге для Казахстана (регион или язык kk/ru), иначе доллар.
+    static func auto(_ lang: AppLang) -> AppCurrency {
+        if Locale.current.region?.identifier == "KZ" || lang == .kk || lang == .ru { return .kzt }
+        return .usd
+    }
+
+    /// Текущая валюта (выставляет AppStore при загрузке и при смене в профиле)
+    static var current: AppCurrency = .usd
+
+    /// Сумма в долларах → строка в этой валюте: «$4.50», «2 340 ₸», «€3.90», «360 ₽».
+    func format(_ usd: Double, decimals: Int = 0) -> String {
+        let v = usd * perUSD
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.groupingSeparator = "\u{202F}"
+        f.decimalSeparator = "."
+        let whole = self == .kzt || self == .rub
+        // для тенге/рубля копейки не показываем; крупные суммы в тенге округляем до 10
+        let d = whole ? 0 : decimals
+        let value = self == .kzt && v >= 1000 ? (v / 10).rounded() * 10 : v
+        f.minimumFractionDigits = d
+        f.maximumFractionDigits = d
+        let n = f.string(from: NSNumber(value: value)) ?? String(format: "%.\(d)f", value)
+        switch self {
+        case .usd, .eur: return symbol + n
+        case .kzt, .rub: return n + "\u{00A0}" + symbol
+        }
+    }
+}
+
+/// Деньги в выбранной валюте. `usd` — сумма в долларах.
+func Money(_ usd: Double, _ decimals: Int = 0) -> String { AppCurrency.current.format(usd, decimals: decimals) }

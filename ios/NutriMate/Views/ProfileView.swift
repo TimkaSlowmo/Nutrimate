@@ -81,7 +81,7 @@ struct ProfileView: View {
                         .padding(.horizontal, 14).padding(.vertical, 9)
                     }
 
-                    SettingsGroup(title: L("Language")) {
+                    SettingsGroup(title: L("Language & currency")) {
                         Menu {
                             Picker(L("Language"), selection: $store.data.language) {
                                 ForEach(AppLang.allCases) { lang in
@@ -94,6 +94,32 @@ struct ProfileView: View {
                                 Text(L("App language")).foregroundStyle(.primary).lineLimit(1).minimumScaleFactor(0.8)
                                 Spacer(minLength: 6)
                                 Text("\(store.data.language.flag) \(store.data.language.native)")
+                                    .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                                Image(systemName: "chevron.up.chevron.down").font(.footnote.bold()).foregroundStyle(.tertiary)
+                            }
+                            .padding(.horizontal, 14).padding(.vertical, 11)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(RowPressStyle())
+                        RowDivider()
+                        Menu {
+                            Picker(L("Currency"), selection: Binding(
+                                get: { store.data.effectiveCurrency },
+                                set: { store.data.currency = $0 })) {
+                                ForEach(AppCurrency.allCases) { c in
+                                    Text("\(c.symbol)  \(c.title)").tag(c)
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                SettingsIcon(name: "banknote.fill", tint: Color(hex: 0x2E7D32))
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(L("Currency")).foregroundStyle(.primary).lineLimit(1).minimumScaleFactor(0.8)
+                                    Text(L("Money saved and at risk — approximate"))
+                                        .font(.caption).foregroundStyle(.secondary).lineLimit(2).minimumScaleFactor(0.85)
+                                }
+                                Spacer(minLength: 6)
+                                Text("\(store.data.effectiveCurrency.symbol) \(store.data.effectiveCurrency.title)")
                                     .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                                 Image(systemName: "chevron.up.chevron.down").font(.footnote.bold()).foregroundStyle(.tertiary)
                             }
@@ -216,7 +242,7 @@ struct ProfileView: View {
         HStack(spacing: 10) {
             StatTile(value: "\(store.data.stats.rescued)", label: L("products\nsaved"), emoji: "🦸")
             StatTile(value: "\(store.streakDays)", label: L("days without\nwaste"), emoji: "🌱")
-            StatTile(value: String(format: "$%.0f", store.data.stats.rescuedMoney), label: L("money\nsaved"), emoji: "💰")
+            StatTile(value: Money(store.data.stats.rescuedMoney), label: L("money\nsaved"), emoji: "💰")
         }
     }
 

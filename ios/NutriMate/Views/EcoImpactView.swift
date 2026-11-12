@@ -43,7 +43,7 @@ struct EcoImpactView: View {
         let s = store.data.stats
         return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
             tile("🦸", "\(s.rescued)", L("products rescued"), L("≈ {0} kg of food", String(format: "%.1f", store.rescuedKg)))
-            tile("💰", String(format: "$%.2f", s.rescuedMoney), L("money saved"), L("{0} lost to the bin", String(format: "$%.2f", s.wastedMoney)))
+            tile("💰", Money(s.rescuedMoney, 2), L("money saved"), L("{0} lost to the bin", Money(s.wastedMoney, 2)))
             tile("🌍", L("{0} kg", String(format: "%.1f", store.co2)), L("CO₂ avoided"), L("{0} of a tree / year", trees))
             tile("🌱", "\(store.streakDays)", L("days without waste"), L("eco score {0}", store.ecoScore))
         }

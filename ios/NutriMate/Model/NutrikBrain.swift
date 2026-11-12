@@ -198,8 +198,8 @@ enum NutrikBrain {
             let s = store.data.stats
             let days = store.streakDays
             let streak = days > 0 ? L("{0} without waste! 🌱", Lp(days, "day|days")) : L("Let's start a zero-waste streak today! 🌱")
-            let text = L("🌍 You rescued {0} (≈ {1} kg of food), saved ${2} and avoided {3} kg of CO₂. Eco score: {4}%. {5}",
-                         Lp(s.rescued, "product|products"), String(format: "%.1f", store.rescuedKg), String(format: "%.0f", s.rescuedMoney),
+            let text = L("🌍 You rescued {0} (≈ {1} kg of food), saved {2} and avoided {3} kg of CO₂. Eco score: {4}%. {5}",
+                         Lp(s.rescued, "product|products"), String(format: "%.1f", store.rescuedKg), Money(s.rescuedMoney),
                          String(format: "%.1f", store.co2), store.ecoScore, streak)
             return NutrikReply(text: text, mood: .cheer)
         }
@@ -260,7 +260,7 @@ enum NutrikBrain {
                 list = list.filter { r in r.ingredients.contains { i in foods.contains { $0.name == i.name } } }
             }
             if has(["quick", "fast", "быстр", "жылдам", "тез"]) {
-                list = list.filter { r in Int(r.time.prefix { $0.isNumber }).map { $0 <= 20 && r.time.contains("min") } ?? false }
+                list = list.filter { r in Int(r.time.prefix { $0.isNumber }).map { $0 <= 20 && r.time.contains("min") && !r.time.contains("+") } ?? false }
             }
             if has(["zero waste", "zero-waste", "leftover", "остатк", "қалдық"]) { list = list.filter(\.zeroWaste) }
             if list.isEmpty { return NutrikReply(text: L("I couldn't find a recipe with that. Try another product! 🤔"), mood: .sad) }

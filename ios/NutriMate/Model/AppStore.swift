@@ -8,6 +8,7 @@ final class AppStore: ObservableObject {
     @Published var data: AppData {
         didSet {
             if AppLang.current != data.language { AppLang.current = data.language }
+            if AppCurrency.current != data.effectiveCurrency { AppCurrency.current = data.effectiveCurrency }
             groupsCache = nil
             rankCache = nil
             scheduleSave()
@@ -38,6 +39,7 @@ final class AppStore: ObservableObject {
             fileURL = dir.appendingPathComponent("nutrimate-uishot.json")
             data = UIShot.demoData()
             AppLang.current = data.language
+            AppCurrency.current = data.effectiveCurrency
             if UIShot.args.contains("-undo"), let p = data.pantry.first {
                 undoSnapshot = data
                 undo = UndoInfo(icon: "trash", text: L("Thrown away: {0}", "\(p.emoji) \(N(p.name))"))
@@ -47,6 +49,7 @@ final class AppStore: ObservableObject {
         fileURL = dir.appendingPathComponent("nutrimate.json")
         data = AppStore.load(from: fileURL)
         AppLang.current = data.language
+        AppCurrency.current = data.effectiveCurrency
         // v9: одинаковые продукты складываются в одну строку — мягко объединяем старые сохранения
         let merged = AppStore.normalized(data.pantry)
         if merged.count != data.pantry.count { data.pantry = merged }

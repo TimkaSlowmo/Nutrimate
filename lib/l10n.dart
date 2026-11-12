@@ -16,6 +16,31 @@ const langHello = {
 /// Текущий язык (выставляет AppState при загрузке и при смене).
 String appLang = 'en';
 
+/// Валюта (kzt/usd/eur/rub); пусто — авто: тенге для ru/kk, иначе доллар. Деньги хранятся в долларах.
+const appCurrencies = ['kzt', 'usd', 'eur', 'rub'];
+const currencySymbol = {'kzt': '₸', 'usd': '\$', 'eur': '€', 'rub': '₽'};
+const _perUsd = {'kzt': 520.0, 'usd': 1.0, 'eur': 0.86, 'rub': 80.0};
+String? appCurrencyPref;
+String get appCurrency => appCurrencyPref ?? (appLang == 'en' ? 'usd' : 'kzt');
+
+/// Сумма в долларах → строка в выбранной валюте: «$4.50», «2 340 ₸», «€3.90», «360 ₽».
+String money(double usd, [int decimals = 0]) {
+  final c = appCurrency;
+  var v = usd * (_perUsd[c] ?? 1);
+  final whole = c == 'kzt' || c == 'rub';
+  final d = whole ? 0 : decimals;
+  if (c == 'kzt' && v >= 1000) v = (v / 10).roundToDouble() * 10;
+  final parts = v.toStringAsFixed(d).split('.');
+  final buf = StringBuffer();
+  final ip = parts[0];
+  for (var i = 0; i < ip.length; i++) {
+    if (i > 0 && (ip.length - i) % 3 == 0 && ip[i - 1] != '-') buf.write('\u202F');
+    buf.write(ip[i]);
+  }
+  final n = parts.length > 1 ? '$buf.${parts[1]}' : buf.toString();
+  return whole ? '$n\u00A0${currencySymbol[c]}' : '${currencySymbol[c]}$n';
+}
+
 int get _li => appLang == 'ru' ? 0 : (appLang == 'kk' ? 1 : -1);
 
 String _raw(String key) {
