@@ -9,6 +9,7 @@ struct HomeView: View {
     @State private var showChat = false
     @State private var showBody = false
     @State private var showWeek = false
+    @State private var showQuests = false
     @State private var showPlan = false
     @State private var openItem: PantryGroup?
     @State private var tipIndex: Int?
@@ -81,6 +82,7 @@ struct HomeView: View {
                     Button { showBody = true } label: { BodyMiniCard() }.buttonStyle(.plain)
                     rescueCard
                     recipeOfDayCard
+                    Button { showQuests = true } label: { ChallengesCard(w: store.challenges) }.buttonStyle(.plain)
                     statsRow
                     ecoBanner
                     HStack(spacing: 12) {
@@ -102,6 +104,7 @@ struct HomeView: View {
             .sheet(isPresented: $showBody) { BodyView() }
             .sheet(isPresented: $showWeek) { WeekReportView() }
             .sheet(isPresented: $showPlan) { PlanView() }
+            .sheet(isPresented: $showQuests) { ChallengesView() }
             .sheet(item: $openItem) { p in ItemSheet(key: p.id) }
             .navigationDestination(for: Recipe.self) { r in RecipeDetail(recipe: r) }
         }

@@ -9,6 +9,7 @@ struct ProfileView: View {
     @State private var showChat = false
     @State private var showBody = false
     @State private var showWeek = false
+    @State private var showQuests = false
     @State private var showAvatar = false
     @State private var path: [ProfileRoute] = (UIShot.enabled ? UIShot.value("-push") : nil).flatMap(ProfileRoute.init(rawValue:)).map { [$0] } ?? []
 
@@ -39,6 +40,9 @@ struct ProfileView: View {
                     SettingsGroup(title: L("Progress")) {
                         SettingsRow(icon: "chart.bar.xaxis", tint: .brandLight, title: L("Weekly report"),
                                     value: L("score {0}", WeekStats(store: store).score)) { showWeek = true }
+                        RowDivider()
+                        SettingsRow(icon: "target", tint: Color(hex: 0xC2185B), title: L("Weekly challenges"),
+                                    value: "\(store.challenges.doneCount)/\(store.challenges.items.count)") { showQuests = true }
                         RowDivider()
                         SettingsRow(icon: "leaf.fill", tint: .freshGreen, title: L("Eco impact"),
                                     value: L("{0} kg CO₂", String(format: "%.1f", store.co2))) { showEco = true }
@@ -175,6 +179,7 @@ struct ProfileView: View {
             .sheet(isPresented: $showChat) { ChatView() }
             .sheet(isPresented: $showBody) { BodyView() }
             .sheet(isPresented: $showWeek) { WeekReportView() }
+            .sheet(isPresented: $showQuests) { ChallengesView() }
             .sheet(isPresented: $showAvatar) {
                 AvatarPicker().presentationDetents([.medium]).presentationBackground(Color.appBackground)
             }

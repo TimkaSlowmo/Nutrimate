@@ -106,6 +106,10 @@ enum UIShot {
             let kind: EcoKind = back % 9 == 4 ? .wasted : back % 3 == 0 ? .rescued : back % 4 == 1 ? .frozen : .eaten
             d.events.append(EcoEvent(kind: kind, money: 2, date: day(-back)))
         }
+        // недельные задания (v32): на этой неделе приготовил 1 рецепт и убрал 2 порции остатков
+        d.acts = [ActEvent(kind: "cook", n: 1, date: day(-1)), ActEvent(kind: "leftover", n: 2, date: day(-1)),
+                  ActEvent(kind: "buy", n: 1, date: day(0))]
+        d.questsDone = ["2026-44:rescue", "2026-44:freeze", "2026-44:zeroWaste", "2026-44:all", "2026-45:share"]
         d.wasteLog = [WasteEntry(name: "Lettuce", category: "Vegetables", reason: .forgot, money: 1.2, date: day(-9)),
                       WasteEntry(name: "Yogurt", category: "Dairy", reason: .expired, money: 2, date: day(-18))]
         d.unlocked = ["first", "rescue", "chef", "fridge", "freezer", "share", "shop"]

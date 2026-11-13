@@ -61,6 +61,7 @@ struct RootView: View {
             case "shopping": ShoppingView()
             case "week": WeekReportView()
             case "plan": PlanView()
+            case "quests": ChallengesView()
             case "quickadd": QuickAddView(initialText: QuickAddDemo.list)
             case "receipt": QuickAddView(demoReceipt: true)
             case "weekcard": WeekShareSheet()

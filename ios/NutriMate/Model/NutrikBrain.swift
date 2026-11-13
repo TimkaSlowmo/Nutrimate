@@ -11,7 +11,7 @@ struct NutrikReply {
 enum NutrikBrain {
     /// Подсказки в чате (ключи переводов; показывать и отправлять через L(x) — Нутрик понимает все три языка)
     static let suggestions = [
-        LK("What can I cook?"), LK("Plan my next 3 days"), LK("What expires soon?"), LK("What's in my fridge?"), LK("How to store tomatoes?"),
+        LK("What can I cook?"), LK("Plan my next 3 days"), LK("My weekly challenges"), LK("What expires soon?"), LK("What's in my fridge?"), LK("How to store tomatoes?"),
         LK("Add 2 eggs to fridge"), LK("Can I freeze bread?"), LK("Calories today"), LK("My eco impact"), LK("Add milk to shopping list"),
         LK("I don't like onion"), LK("Tell me a joke"),
     ]
@@ -66,7 +66,13 @@ enum NutrikBrain {
         if t.range(of: dislikePattern, options: .regularExpression) != nil || t.contains("ұнамайды") { return true }
         if t.range(of: likeAgainPattern, options: .regularExpression) != nil { return true }
         if isShopping(t) { return true }
+        if isChallenges(t) { return true }   // задания недели знает только приложение — ИИ бы выдумал
         return NutrikActions.isAction(message, db: FoodDB.shared)
+    }
+
+    /// «my weekly challenges», «мои задания недели», «апталық тапсырмаларым»
+    static func isChallenges(_ t: String) -> Bool {
+        ["challenge", "задани", "челлендж", "тапсырма"].contains { t.contains($0) }
     }
 
     static let dislikePattern = #"(don't like|dont like|do not like|hate|allergic to|не люблю|без)\s+([^\s,.!?]+)"#
@@ -237,6 +243,16 @@ enum NutrikBrain {
 
         if has(["still good", "still ok", "safe to eat", "can i eat", "gone bad", "можно ли есть", "можно есть", "не испортил", "жеуге бола"]) {
             return NutrikReply(text: L("Trust your senses for \"best before\" products: look, smell, taste a little. ⚠️ But never risk it with meat, fish or dairy past the \"use by\" date. When in doubt — throw it out (and tell me, I'll learn the reason)."), mood: .happy)
+        }
+
+        if isChallenges(t) {
+            let w = store.challenges
+            var lines = [w.allDone ? L("All 3 challenges of the week done! 🏆") : L("Challenges of the week — {0} of {1} done:", w.doneCount, w.items.count)]
+            for c in w.items {
+                lines.append("\(c.done ? "✅" : c.emoji) \(c.title) — \(c.done ? L("done") : "\(c.progress)/\(c.target)")")
+            }
+            if let next = w.items.first(where: { !$0.done && !$0.missed }) { lines.append("💡 " + next.hint) }
+            return NutrikReply(text: lines.joined(separator: "\n"), mood: w.allDone ? .cheer : .happy)
         }
 
         if has(["plan my", "meal plan", "use-it-up", "next 3 days", "next days", "план", "на неделю", "ближайшие дни", "жоспар", "3 күн"]) {

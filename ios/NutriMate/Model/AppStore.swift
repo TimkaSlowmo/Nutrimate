@@ -513,6 +513,7 @@ final class AppStore: ObservableObject {
         }
         data.log.append(LogEntry(emoji: r.emoji, name: "\(N(r.name)) ×\(portions)", kcal: r.kcal * portions))
         data.stats.cooked += 1
+        act("cook")
         haptic(.medium)
         if leftovers > 0 {
             // Остатки — в холодильник отдельной строкой «🍳 Омлет ×2» (порции), срок 3 дня; Нутрик напомнит
@@ -525,6 +526,7 @@ final class AppStore: ObservableObject {
                                               added: now, expiry: exp, storage: .fridge, qty: leftovers, leftover: true))
             }
             data.stats.leftoversSaved += leftovers
+            act("leftover", leftovers)
             react(.cheer, L("Bon appétit! 🥡 {0} saved in the fridge — eat within 3 days", Lp(leftovers, "portion|portions")), emoji: r.emoji)
         } else {
             react(.eat, L("Bon appétit! {0} cooked 👩‍🍳", N(r.name)), emoji: r.emoji)
@@ -543,6 +545,7 @@ final class AppStore: ObservableObject {
             if data.shopping.contains(it.food.name) {
                 data.shopping.removeAll { $0 == it.food.name }
                 data.stats.bought += 1
+                act("buy")
             }
         }
         haptic(.medium)
@@ -568,6 +571,7 @@ final class AppStore: ObservableObject {
         data.shopping.removeAll { $0 == n }
         if let f = db.byName[n] {
             data.stats.bought += 1
+            act("buy")
             add(f)
         }
     }
@@ -622,6 +626,7 @@ final class AppStore: ObservableObject {
     var xp: Int {
         let s = data.stats
         return s.consumed * 2 + s.rescued * 10 + s.cooked * 15 + s.frozen * 5 + s.shared * 10 + s.bought * 3 + data.unlocked.count * 25
+            + Challenges.xp(data.questsDone)
     }
     var level: (n: Int, title: String, progress: Double, toNext: Int) {
         // порог уровня n: 50·(n−1)²  → 0, 50, 200, 450, 800…
@@ -668,6 +673,33 @@ final class AppStore: ObservableObject {
         }
     }
 
+    // MARK: - Недельные задания (v32)
+
+    func act(_ kind: String, _ n: Int = 1) {
+        data.acts.append(ActEvent(kind: kind, n: n))
+        if data.acts.count > 300 { data.acts.removeFirst(data.acts.count - 300) }
+    }
+
+    /// Задания этой недели с прогрессом (считаются из сохранённых событий — без отдельного состояния).
+    var challenges: Challenges { Challenges(data: data) }
+
+    /// Отметить выполненные задания: +XP, Нутрик радуется; все три — медаль «Чемпион недели».
+    private func checkQuests() {
+        guard !UIShot.enabled else { return }
+        let w = challenges
+        var finished: [Challenge] = []
+        for c in w.items where c.done && !data.questsDone.contains(w.key(c)) {
+            data.questsDone.append(w.key(c))
+            finished.append(c)
+        }
+        if w.allDone && !data.questsDone.contains(w.allKey) {
+            data.questsDone.append(w.allKey)
+            react(.cheer, L("🏆 All 3 challenges of the week done! +{0} XP", Challenges.xpPerQuest * 3 + Challenges.xpBonusAll), emoji: "🏆")
+        } else if let c = finished.last {
+            react(.cheer, L("🎯 Challenge done: {0} · +{1} XP", c.title, Challenges.xpPerQuest), emoji: c.emoji)
+        }
+    }
+
     // MARK: - Достижения
 
     private func done(_ id: String) -> Bool {
@@ -685,11 +717,13 @@ final class AppStore: ObservableObject {
         case "cleanfridge": return unitCount >= 5 && expired.isEmpty
         case "chatty": return data.chat.filter(\.fromUser).count >= 5
         case "leftovers": return s.leftoversSaved >= 3
+        case "champion": return data.questsDone.contains { $0.hasSuffix(":all") }
         default: return co2 >= 2
         }
     }
 
     func checkMedals() {
+        checkQuests()
         for m in Medal.all where !data.unlocked.contains(m.id) && done(m.id) {
             data.unlocked.append(m.id)
             newMedal = m

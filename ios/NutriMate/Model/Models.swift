@@ -408,6 +408,13 @@ struct WeightEntry: Codable, Identifiable, Hashable {
 /// Событие для экрана Eco Impact (по датам): съел, спас, заморозил, поделился, выбросил.
 enum EcoKind: String, Codable { case eaten, rescued, frozen, shared, wasted }
 
+/// Действие для недельных заданий: kind — «cook», «buy», «leftover» (строка: незнакомые значения просто не считаются).
+struct ActEvent: Codable, Hashable {
+    var kind: String
+    var n: Int = 1
+    var date: Date = Date()
+}
+
 struct EcoEvent: Codable, Hashable {
     var kind: EcoKind
     var money: Double
@@ -578,6 +585,10 @@ struct AppData: Codable {
     var appearance: AppAppearance = .light
     /// Валюта (nil — авто: тенге в Казахстане, иначе доллар)
     var currency: AppCurrency?
+    /// Действия для недельных заданий (v32): готовка, покупки по списку, остатки — с датой (последние 300)
+    var acts: [ActEvent] = []
+    /// Выполненные недельные задания: «2026-46:rescue», «2026-46:all» (v32)
+    var questsDone: [String] = []
 
     init() {}
     init(from decoder: Decoder) throws {
@@ -602,6 +613,8 @@ struct AppData: Codable {
         language = (try? c.decodeIfPresent(AppLang.self, forKey: .language)) ?? AppLang.system
         appearance = (try? c.decodeIfPresent(AppAppearance.self, forKey: .appearance)) ?? .light
         currency = try? c.decodeIfPresent(AppCurrency.self, forKey: .currency)
+        acts = (try? c.decodeIfPresent([ActEvent].self, forKey: .acts)) ?? []
+        questsDone = (try? c.decodeIfPresent([String].self, forKey: .questsDone)) ?? []
     }
 }
 
@@ -629,6 +642,7 @@ struct Medal: Identifiable {
         Medal(id: "share", emoji: "🤝", title: LK("Good Neighbor"), desc: LK("Share food with someone instead of binning it")),
         Medal(id: "cleanfridge", emoji: "✨", title: LK("Clean Fridge"), desc: LK("5+ products and nothing expired")),
         Medal(id: "chatty", emoji: "💬", title: LK("Chatterbox"), desc: LK("Ask Nutrik 5 questions")),
+        Medal(id: "champion", emoji: "🏆", title: LK("Weekly Champion"), desc: LK("Complete all 3 challenges of a week")),
         Medal(id: "leftovers", emoji: "🥡", title: LK("Leftover Hero"), desc: LK("Save 3 leftover portions for later instead of binning them")),
     ]
 }
