@@ -121,6 +121,7 @@ jobs:
             shot $LG-25-item-open 5 -sheet item -item Kefir -lang $LG
             shot $LG-26-plan 6 -sheet plan -lang $LG
             shot $LG-27-quickadd 6 -sheet quickadd -lang $LG
+            shot $LG-10-shopping 5 -sheet shopping -lang $LG
             shot $LG-19-week-share 6 -sheet weekcard -lang $LG
             shot $LG-20-undo 6 -tab fridge -undo -lang $LG
             shot $LG-21-cook 6 -sheet cook -cookTimer -lang $LG

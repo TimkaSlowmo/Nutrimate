@@ -97,7 +97,7 @@ enum UIShot {
         d.weights = [WeightEntry(date: day(-28), kg: 51.2), WeightEntry(date: day(-21), kg: 51.5),
                      WeightEntry(date: day(-14), kg: 51.6), WeightEntry(date: day(-7), kg: 51.9),
                      WeightEntry(date: now, kg: 52)]
-        d.shopping = ["Yogurt", "Oats", "Peanut Butter"]
+        d.shopping = ["Milk", "Yogurt", "Lettuce", "Oats", "Peanut Butter", "Bananas from the market"]
         d.stats.consumed = 24; d.stats.rescued = 9; d.stats.wasted = 2; d.stats.cooked = 4
         d.stats.frozen = 3; d.stats.shared = 1; d.stats.bought = 2
         d.stats.rescuedMoney = 21.5; d.stats.wastedMoney = 4

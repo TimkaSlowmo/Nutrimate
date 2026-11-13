@@ -750,31 +750,36 @@ struct ShoppingView: View {
                         Text(L("You often eat — not in your fridge"))
                     }
                 }
-                Section {
-                    if store.data.shopping.isEmpty {
+                let hints = Dictionary(store.data.shopping.map { ($0, store.shopHint($0)) }, uniquingKeysWith: { a, _ in a })
+                let atHome = store.data.shopping.filter { (hints[$0]?.homeQty ?? 0) > 0 }
+                if !atHome.isEmpty {
+                    Section { homeBanner(atHome) }
+                        .listRowBackground(Color.warnOrange.opacity(0.12))
+                }
+                if store.data.shopping.isEmpty {
+                    Section {
                         Text(L("The list is empty. Add missing ingredients from any recipe 🍲")).foregroundStyle(.secondary)
                     }
-                    ForEach(store.data.shopping, id: \.self) { n in
-                        HStack {
-                            Button { store.buy(n) } label: {
-                                Image(systemName: "circle").font(.title3).foregroundStyle(Color.burgundy)
-                            }
-                            .buttonStyle(.plain)
-                            Text("\(store.db.byName[n]?.emoji ?? "🛒") \(N(n))")
-                            Spacer()
+                }
+                // По отделам магазина: молочка, овощи, хлеб… — меньше бегать между полками
+                ForEach(aisles) { aisle in
+                    Section {
+                        ForEach(aisle.items, id: \.self) { n in
+                            row(n, hint: hints[n] ?? .init())
                         }
-                        .swipeActions {
-                            Button(role: .destructive) { store.removeShopping(n) } label: { Label(L("Delete"), systemImage: "trash") }
-                        }
+                    } header: {
+                        Text("\(FoodDB.catEmoji[aisle.cat] ?? "🛒") \(aisle.cat == Self.other ? L("Other") : N(aisle.cat))")
                     }
-                    if !store.data.shopping.isEmpty {
+                }
+                if !store.data.shopping.isEmpty {
+                    Section {
                         Button { quickAdd = true } label: {
                             Label(L("Back from the shop? Scan the receipt"), systemImage: "doc.text.viewfinder")
                                 .font(.subheadline.weight(.semibold)).foregroundStyle(Color.burgundy)
                         }
+                    } footer: {
+                        Text(L("Tap the circle when you bought it — it goes straight into your fridge."))
                     }
-                } footer: {
-                    Text(L("Tap the circle when you bought it — it goes straight into your fridge."))
                 }
             }
             .sheet(isPresented: $quickAdd) { QuickAddView() }
@@ -791,6 +796,70 @@ struct ShoppingView: View {
                 }
             }
         }
+    }
+
+    static let other = "__other"
+
+    /// Список, разложенный по отделам (категориям базы, в их порядке); своё — в «Другое» в конце.
+    struct Aisle: Identifiable { let cat: String; let items: [String]; var id: String { cat } }
+
+    private var aisles: [Aisle] {
+        var map: [String: [String]] = [:]
+        for n in store.data.shopping { map[store.db.byName[n]?.category ?? Self.other, default: []].append(n) }
+        let order = store.db.categories + [Self.other]
+        return order.compactMap { c in map[c].map { Aisle(cat: c, items: $0) } }
+    }
+
+    private func homeBanner(_ names: [String]) -> some View {
+        let money = names.reduce(0.0) { $0 + store.price(store.db.byName[$1]?.category ?? "") }
+        return HStack(alignment: .top, spacing: 12) {
+            Text("🏠").font(.title2)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(L("{0} already at home", Lp(names.count, "product|products")))
+                    .font(.subheadline.weight(.semibold))
+                Text(L("Check before buying — skipping them saves about {0} and keeps food out of the bin.", Money(money)))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button { store.removeShoppingAtHome() } label: {
+                    Text(L("Remove from the list"))
+                        .font(.caption.weight(.semibold)).foregroundStyle(.white)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(Color.warnOrange, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func row(_ n: String, hint h: AppStore.ShopHint) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Button { store.buy(n) } label: {
+                Image(systemName: "circle").font(.title3).foregroundStyle(Color.burgundy)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L("Bought"))
+            VStack(alignment: .leading, spacing: 3) {
+                Text("\(store.db.byName[n]?.emoji ?? "🛒") \(N(n))")
+                if h.homeQty > 0 {
+                    Text(L("🏠 At home: ×{0} · {1}", h.homeQty, daysText(h.homeDays ?? 0)))
+                        .font(.caption.weight(.semibold)).foregroundStyle(Color.warnOrange)
+                }
+                if h.wasted > 0 {
+                    Text(L("🗑️ Thrown away {0} lately — take a smaller pack", Lp(h.wasted, "time|times")))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .swipeActions {
+            Button(role: .destructive) { store.removeShopping(n) } label: { Label(L("Delete"), systemImage: "trash") }
+        }
+    }
+
+    private func daysText(_ d: Int) -> String {
+        d == 0 ? L("Use today!") : d == 1 ? L("Expires tomorrow") : L("{0} left", Lp(d, "day|days"))
     }
 
     private func addTyped() {

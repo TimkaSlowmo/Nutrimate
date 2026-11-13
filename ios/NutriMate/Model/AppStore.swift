@@ -132,6 +132,38 @@ final class AppStore: ObservableObject {
     }
 
     func price(_ category: String) -> Double { FoodDB.price[category] ?? 2.0 }
+
+    /// Подсказка к строке списка покупок (v31): сколько уже есть дома (несрочно-просроченное)
+    /// и сколько раз этот продукт выбрасывали за 60 дней — «купи меньше».
+    struct ShopHint: Equatable {
+        var homeQty = 0
+        var homeDays: Int? = nil
+        var wasted = 0
+        var isEmpty: Bool { homeQty == 0 && wasted == 0 }
+    }
+
+    func shopHint(_ name: String) -> ShopHint {
+        var h = ShopHint()
+        for g in sortedPantry where g.name == name && !g.isLeftover {
+            for b in g.batches where b.daysLeft >= 0 {
+                h.homeQty += b.qty
+                h.homeDays = min(h.homeDays ?? b.daysLeft, b.daysLeft)
+            }
+        }
+        let since = Calendar.current.date(byAdding: .day, value: -60, to: Date()) ?? Date()
+        h.wasted = data.wasteLog.filter { $0.name == name && $0.date >= since }.count
+        return h
+    }
+
+    /// Убрать из списка всё, что уже есть дома (свежее). Возвращает, сколько убрано.
+    @discardableResult
+    func removeShoppingAtHome() -> Int {
+        let home = data.shopping.filter { shopHint($0).homeQty > 0 }
+        guard !home.isEmpty else { return 0 }
+        withAnimation { data.shopping.removeAll { home.contains($0) } }
+        say(L("🏠 {0} removed — you already have them", Lp(home.count, "product|products")))
+        return home.count
+    }
     func item(_ id: UUID) -> PantryItem? { data.pantry.first { $0.id == id } }
 
     func rankedRecipes() -> [Recipe] {
@@ -524,7 +556,10 @@ final class AppStore: ObservableObject {
             data.shopping.append(n)
             added += 1
         }
-        if added > 0 { say(L("🛒 {0} added to shopping list", added)) }
+        let home = (added == 1 && names.count == 1) ? shopHint(names[0]).homeQty : 0
+        if home > 0 {
+            say(L("🛒 Added. Heads up: you already have {0} ×{1} at home", N(names[0]), home))
+        } else if added > 0 { say(L("🛒 {0} added to shopping list", added)) }
     }
 
     func removeShopping(_ n: String) { data.shopping.removeAll { $0 == n } }
