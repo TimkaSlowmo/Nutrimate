@@ -750,8 +750,8 @@ struct ShoppingView: View {
                         Text(L("You often eat — not in your fridge"))
                     }
                 }
-                let hints = Dictionary(store.data.shopping.map { ($0, store.shopHint($0)) }, uniquingKeysWith: { a, _ in a })
-                let atHome = store.data.shopping.filter { (hints[$0]?.homeQty ?? 0) > 0 }
+                let shopHints = Dictionary(store.data.shopping.map { ($0, store.shopHint($0)) }, uniquingKeysWith: { a, _ in a })
+                let atHome = store.data.shopping.filter { (shopHints[$0]?.homeQty ?? 0) > 0 }
                 if !atHome.isEmpty {
                     Section { homeBanner(atHome) }
                         .listRowBackground(Color.warnOrange.opacity(0.12))
@@ -765,7 +765,7 @@ struct ShoppingView: View {
                 ForEach(aisles) { aisle in
                     Section {
                         ForEach(aisle.items, id: \.self) { n in
-                            row(n, hint: hints[n] ?? .init())
+                            row(n, hint: shopHints[n] ?? .init())
                         }
                     } header: {
                         Text("\(FoodDB.catEmoji[aisle.cat] ?? "🛒") \(aisle.cat == Self.other ? L("Other") : N(aisle.cat))")
