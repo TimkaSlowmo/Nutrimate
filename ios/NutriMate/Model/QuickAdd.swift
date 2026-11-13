@@ -74,6 +74,12 @@ enum QuickAdd {
         }
     }
 
+    private static let generic: [(String, String)] = [
+        ("bread", "White Bread"), ("cheese", "Cheddar Cheese"), ("chicken", "Chicken Breast"), ("juice", "Orange Juice"),
+        ("oil", "Vegetable Oil"), ("pepper", "Bell Pepper"), ("peppers", "Bell Pepper"), ("sausage", "Sausages"),
+        ("mince", "Ground Beef"), ("coffee", "Ground Coffee"), ("tea", "Black Tea"), ("nuts", "Mixed Nuts"), ("mushroom", "Mushrooms"),
+    ]
+
     /// Названия продуктов в нижнем регистре (EN, RU, KK) — считаются один раз.
     private static var names: [[String]] = []
 
@@ -91,6 +97,13 @@ enum QuickAdd {
             }
         }
         var out = best.sorted { $0.1 > $1.1 }.map(\.0)
+        // общее слово из списка покупок («bread», «cheese») — самый обычный продукт, а не первый похожий (Rye Bread)
+        if out.isEmpty {
+            let ws = NutrikActions.words(t)
+            for (w, name) in generic where ws.contains(w) {
+                if let f = db.byName[name], !out.contains(f) { out.append(f) }
+            }
+        }
         for f in NutrikActions.foods(in: t, db: db) where !out.contains(f) { out.append(f) }
         return Array(out.prefix(4))
     }

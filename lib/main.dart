@@ -8438,6 +8438,12 @@ class QuickAddParse {
       }
     }
     if (best != null) return best;
+    // общее слово («bread», «cheese») — самый обычный продукт
+    const generic = {'bread': 'White Bread', 'cheese': 'Cheddar Cheese', 'chicken': 'Chicken Breast', 'juice': 'Orange Juice', 'oil': 'Vegetable Oil', 'pepper': 'Bell Pepper', 'peppers': 'Bell Pepper', 'sausage': 'Sausages', 'mince': 'Ground Beef', 'coffee': 'Ground Coffee', 'tea': 'Black Tea', 'nuts': 'Mixed Nuts', 'mushroom': 'Mushrooms'};
+    for (final w in t.split(' ')) {
+      final g = foodByName[generic[w]];
+      if (g != null) return g;
+    }
     final fs = NutrikActions.foods(t);
     return fs.isEmpty ? null : fs.first;
   }
