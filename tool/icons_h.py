@@ -225,17 +225,16 @@ def ic_couscous(I):
 @icon('bulgur', 'Bulgur')
 def ic_bulgur(I):
     def d(I, x, y, i):
-        with I.at(x, y, 1, (i * 37) % 360): I.p('M-3 -2L3 -2.5L2.5 2.5L-2.5 2Z', ('#c8964a', '#b8823a', '#d8aa5e')[i % 3])
-    heap(I, 70, d, bowl='#7a4a2a', rx=36, ry=8, h=18, cy=84)
+        I.p(f'M{f(x - 3)} {f(y - 2)}l6 -.5l-.5 5l-5 -.5Z', ('#c8964a', '#b8823a', '#d8aa5e')[i % 3])
+    heap(I, 64, d, bowl='#7a4a2a', rx=36, ry=8, h=18, cy=84)
 
 
 @icon('pearl_barley', 'Pearl Barley')
 def ic_pearl_barley(I):
     def d(I, x, y, i):
-        with I.at(x, y, 1, (i * 61) % 180):
-            I.e(0, 0, 4, 3, I.rg('#efe2c2', .5, .3))
-            I.line('M-3 0H3', '#b8a070', .8, .8)
-    heap(I, 50, d, bowl='#6a8a4a')
+        I.e(x, y, 4, 3, I.rg('#efe2c2', .5, .3))
+        I.e(x, y, 2.6, .6, '#b8a070')
+    heap(I, 40, d, bowl='#6a8a4a')
 
 
 @icon('millet', 'Millet')
@@ -340,8 +339,7 @@ def ic_rigatoni(I):
     def d(I, x, y, i):
         with I.at(x, y, 1, (i * 47) % 180 - 90):
             I.p('M-12 -6H10V6H-12Z', I.cyl('#f0c050', .45, .3))
-            for k in range(-10, 10, 4):
-                I.line(f'M{k} -6V6', '#d09a30', .9, .7)
+            I.line(''.join(f'M{k} -6V6' for k in range(-10, 10, 4)), '#d09a30', .9, .7)
             I.e(10, 0, 3, 6, '#f6d47a'); I.e(10, 0, 1.8, 4, '#b8802a')
     heap(I, 12, d, h=28)
 
