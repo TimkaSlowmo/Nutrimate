@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=NutriMate
+Comment=Fridge, recipes and less food waste
+Comment[ru]=Холодильник, рецепты и меньше выброшенной еды
+Comment[kk]=Тоңазытқыш, рецепттер және азырақ тағам қалдығы
+Exec=NutriMate
+Icon=nutrimate
+Terminal=false
+Categories=Utility;
+StartupWMClass=kz.innotech.nutrimate.app

@@ -69,6 +69,19 @@ jobs:
             --title "NutriMate iOS v$V" \
             --notes "Unsigned build v$V ($(date -u +%Y-%m-%d)). Download NutriMate.ipa → Sideloadly (or AltStore) with your Apple ID → iPhone via cable. Installing on top keeps your data."
 
+      # Копия в общий релиз `latest` (там же APK / Windows / macOS / Linux — см. apps.yml и README)
+      - name: Copy NutriMate.ipa into release latest
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: ios
+        run: |
+          if ! gh release view latest >/dev/null 2>&1; then
+            gh release create latest --target "$GITHUB_SHA" --latest --title "NutriMate — all platforms" \
+              --notes "Downloads for Android, Windows, macOS, Linux and iPhone — see README: https://github.com/${GITHUB_REPOSITORY}#readme"
+          fi
+          gh release upload latest NutriMate.ipa --clobber
+
   # Юнит-тесты (v33) на симуляторе: «метка Vision / имя от сервера → продукт базы», «чек или продукты».
   # Отдельная задача: релиз ios-latest от неё не зависит.
   test:

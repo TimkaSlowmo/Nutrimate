@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Burgundy gradient of the NutriMate icon (tool/make_platform_icons.py) -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient android:angle="270" android:startColor="#8E1230" android:endColor="#4A0213"/>
+</shape>
