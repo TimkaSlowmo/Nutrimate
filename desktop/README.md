@@ -1,5 +1,5 @@
 # NutriMate — Desktop (Linux, Xvfb)
-Build 94398c1, 2026-11-16 13:11 UTC.
+Build d09832c, 2026-11-16 13:21 UTC.
 
 ### linux-fridge-wide
 <img src="linux-fridge-wide.png" width="300">
