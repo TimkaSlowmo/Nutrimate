@@ -1,6 +1,6 @@
 // Локальная проверка воркера без Cloudflare: node server/test.mjs
 import assert from 'node:assert/strict';
-import worker, { buildContext, sanitizeMessages, claimsAction, detectLang, langInstruction, HONEST_REPLY, extractActions } from './src/index.js';
+import worker, { parseVision, VISION_MODELS, buildContext, sanitizeMessages, claimsAction, detectLang, langInstruction, HONEST_REPLY, extractActions } from './src/index.js';
 
 let calls = 0;
 const env = {
@@ -131,4 +131,46 @@ assert.equal((await (await worker.fetch(req({ deviceId: 'act-promise-1', actions
 // старые клиенты (без actions: true) не получают правила действий
 const old = { AI: { async run(model, input) { assert.doesNotMatch(input.messages[0].content, /ACTIONS: \[/); return { response: 'Hi 🐾' }; } } };
 assert.equal((await worker.fetch(req({ deviceId: 'old-client-1', messages: [{ role: 'user', content: 'hi' }], context: ctx }), old)).status, 200);
+// ───── /vision ─────
+const jpeg = '/9j/' + 'A'.repeat(1200);
+let seenVision = null;
+const vis = { AI: { async run(model, input) {
+  seenVision = { model, input };
+  const c = input.messages[0].content;
+  assert.ok(Array.isArray(c) && c[1].type === 'image_url' && c[1].image_url.url.startsWith('data:image/jpeg;base64,/9j/'));
+  return { response: 'Here you go:\n{"items":[{"name":"Banana","qty":5,"confidence":0.93},{"name":"banana","qty":1},{"name":"🍎 Red Apple!","qty":"2","confidence":88}]}' };
+} } };
+const vreq = (body, headers = { 'x-nutrimate-client': 'ios/33' }) => req(body, headers, 'POST', '/vision');
+let vr = await worker.fetch(vreq({ deviceId: 'vision-device-1', image: jpeg }), vis);
+assert.equal(vr.status, 200);
+let vb = await vr.json();
+assert.deepEqual(vb.items, [{ name: 'Banana', qty: 5, confidence: 0.93 }, { name: 'Red Apple', qty: 2, confidence: 0.88 }]);
+assert.equal(seenVision.model, VISION_MODELS[0].id);
+assert.match(seenVision.input.messages[0].content[0].text, /Return ONLY JSON/);
+// чек
+vr = await worker.fetch(vreq({ deviceId: 'vision-device-2', image: jpeg, mode: 'receipt' }, { 'x-nutrimate-client': 'android/36' }), vis);
+assert.equal(vr.status, 200);
+assert.match(seenVision.input.messages[0].content[0].text, /receipt/);
+// мусор / не картинка / без клиента
+assert.equal((await worker.fetch(vreq({ deviceId: 'vision-device-3', image: 'hello' }), vis)).status, 400);
+assert.equal((await worker.fetch(vreq({ deviceId: 'vision-device-3', image: 'R0lGOD' + 'A'.repeat(500) }), vis)).status, 400);
+assert.equal((await worker.fetch(vreq({ deviceId: 'vision-device-3', image: jpeg }, {}), vis)).status, 403);
+assert.equal((await worker.fetch(vreq({ deviceId: 'vision-device-3', image: '/9j/' + 'A'.repeat(500000) }), vis)).status, 413);
+// лимит 15 фото в день
+for (let i = 0; i < 16; i++) vr = await worker.fetch(vreq({ deviceId: 'vision-limit-1', image: jpeg }), vis);
+assert.equal(vr.status, 429);
+// первая модель упала → запасная
+const fb = { AI: { async run(model, input) { if (model === VISION_MODELS[0].id) throw new Error('model unavailable'); return { response: '{"items":[{"name":"Lime","qty":3,"confidence":0.7}]}' }; } } };
+vb = await (await worker.fetch(vreq({ deviceId: 'vision-fb-1', image: jpeg }), fb)).json();
+assert.deepEqual(vb.items, [{ name: 'Lime', qty: 3, confidence: 0.7 }]);
+assert.equal(vb.model, VISION_MODELS[1].id);
+// квота → 429, всё сломалось → 503
+assert.equal((await worker.fetch(vreq({ deviceId: 'vision-q-1', image: jpeg }), quota)).status, 429);
+assert.equal((await worker.fetch(vreq({ deviceId: 'vision-e-1', image: jpeg }), bad)).status, 503);
+// разбор ответа
+assert.deepEqual(parseVision('no food here'), []);
+assert.deepEqual(parseVision('{"items":[]}'), []);
+assert.deepEqual(parseVision('[{"name":"Kiwi","qty":0}]'), [{ name: 'Kiwi', qty: 1, confidence: 0.5 }]);
+assert.deepEqual(parseVision({ items: [{ name: 'Milk', qty: 2, confidence: 1 }] }), [{ name: 'Milk', qty: 2, confidence: 1 }]);
+assert.equal(parseVision(JSON.stringify({ items: Array.from({ length: 30 }, (_, i) => ({ name: 'Food' + 'abcdefghijklmnopqrstuvwxyz'[i % 26] + i })) })).length, 8);
 console.log(`server tests passed ✅ (${calls} AI calls)`);

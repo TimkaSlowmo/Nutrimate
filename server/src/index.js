@@ -1,4 +1,5 @@
 // NutriMate · Nutrik AI — Cloudflare Worker (бесплатный тариф Workers Free + Workers AI).
+// POST /vision { deviceId, image(base64 JPEG), mode: food|receipt } → { items:[{name, qty, confidence}] } — см. ниже.
 // POST /chat  { deviceId, messages: [{role, content}], context: {...}, actions?: true }  →  200 { reply, model, actions? }
 // actions: true — клиент умеет сам выполнять действия: ИИ может ПРЕДЛОЖИТЬ их в структурированном виде
 // [{type: add_fridge|add_freezer|add_shopping|eat|discard|freeze, name, qty}], приложение проверяет имя по базе,
@@ -216,6 +217,111 @@ async function runModel(env, messages) {
   throw lastErr || new Error('ai failed');
 }
 
+
+// ───────────── POST /vision — распознавание еды по фото (бесплатная vision-модель Workers AI) ─────────────
+// { deviceId, image: "<base64 JPEG ≤ 768 px>", mode?: "food"|"receipt", language? } → 200 { items:[{name, qty, confidence}], model }
+// Фото нигде не сохраняется и не логируется: только передаётся модели и сразу забывается.
+export const VISION_MODELS = [
+  { id: '@cf/meta/llama-4-scout-17b-16e-instruct', style: 'openai' }, // мультимодальная, без лицензионного «agree»
+  { id: '@cf/google/gemma-3-12b-it', style: 'openai' },                // запасная
+  { id: '@cf/meta/llama-3.2-11b-vision-instruct', style: 'image' },    // запасная №2 (нужно один раз принять лицензию)
+];
+const VISION_LIMIT_DEVICE = 15;   // фото в день на устройство
+const VISION_LIMIT_IP = 45;       // и на IP
+const VISION_LIMIT_TOTAL = 400;   // и всего на изолят в день — чтобы фото не съели бесплатные нейроны чата
+const MAX_IMAGE_B64 = 420000;     // ≈ 310 КБ JPEG — 768 px с запасом
+
+export const VISION_PROMPT = {
+  food: `You are a food recognizer for a fridge app. Look at the photo and list every distinct FOOD or DRINK product you can see (fruit, vegetables, packaged groceries, dishes).
+Return ONLY JSON, no other text: {"items":[{"name":"Banana","qty":5,"confidence":0.9}]}
+Rules: "name" = a short common English grocery name, singular ("Banana", "Red Apple", "Milk", "Chicken Breast", "Cherry Tomato"). Be specific (say "Lime", not "Citrus"; "Bell Pepper", not "Vegetable"). "qty" = how many pieces/packs you can count (1 if unsure). "confidence" = 0..1. At most 8 items. If there is no food, return {"items":[]}. Never invent items you cannot see. Read brand labels only to identify the product type.`,
+  receipt: `This is a photo of a grocery store receipt (any language: English, Russian, Kazakh). List the FOOD products bought.
+Return ONLY JSON, no other text: {"items":[{"name":"Milk","qty":2,"confidence":0.9}]}
+Rules: "name" = a short common English grocery name, singular, translated from the receipt line ("МОЛОКО 2.5% 1Л" → "Milk", "ЯЙЦА С0 10ШТ" → "Eggs" qty 10). Skip non-food lines (bags, totals, discounts, cards). "qty" = the count on the line (1 if unclear). At most 25 items. If it is not a receipt, return {"items":[]}.`,
+};
+
+/** Достаём {items:[...]} из ответа модели и чистим его. */
+export function parseVision(out, max = 8) {
+  let obj = out;
+  if (typeof out !== 'object' || out === null || Array.isArray(out)) {
+    const t = String(out ?? '');
+    const iObj = t.indexOf('{'), iArr = t.indexOf('[');
+    const tryParse = (re) => { const m = t.match(re); try { return m ? JSON.parse(m[0]) : null; } catch (_) { return null; } };
+    const asObj = () => tryParse(/\{[\s\S]*\}/), asArr = () => { const a = tryParse(/\[[\s\S]*\]/); return Array.isArray(a) ? { items: a } : null; };
+    obj = iArr >= 0 && (iObj < 0 || iArr < iObj) ? asArr() || asObj() : asObj() || asArr();
+  }
+  const arr = Array.isArray(obj) ? obj : Array.isArray(obj?.items) ? obj.items : [];
+  const seen = new Set();
+  const items = [];
+  for (const it of arr) {
+    const name = clip(String(typeof it === 'string' ? it : it?.name ?? ''), 40).replace(/[^\p{L}\p{N} '&-]/gu, '').trim();
+    if (!/\p{L}{2}/u.test(name) || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    const c = Number(it?.confidence);
+    items.push({
+      name,
+      qty: Math.min(50, Math.max(1, Math.round(Number(it?.qty) || 1))),
+      confidence: Number.isFinite(c) ? Math.round(Math.min(1, Math.max(0, c > 1 ? c / 100 : c)) * 100) / 100 : 0.5,
+    });
+    if (items.length >= max) break;
+  }
+  return items;
+}
+
+const b64ToBytes = (b64) => { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
+let llamaVisionAgreed = false;
+
+async function runVision(env, b64, mode) {
+  const prompt = VISION_PROMPT[mode];
+  let lastErr;
+  for (const m of VISION_MODELS) {
+    try {
+      let res;
+      if (m.style === 'openai') {
+        res = await env.AI.run(m.id, {
+          messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}` } }] }],
+          max_tokens: mode === 'receipt' ? 700 : 300, temperature: 0.1,
+        });
+      } else {
+        if (!llamaVisionAgreed) { try { await env.AI.run(m.id, { prompt: 'agree' }); } catch (_) { /* уже принято */ } llamaVisionAgreed = true; }
+        res = await env.AI.run(m.id, { messages: [{ role: 'user', content: prompt }], image: [...b64ToBytes(b64)], max_tokens: 400, temperature: 0.1 });
+      }
+      const text = typeof res === 'string' ? res : res?.response ?? res?.result?.response ?? res?.choices?.[0]?.message?.content ?? '';
+      if (text !== '' && text != null) return { items: parseVision(text, mode === 'receipt' ? 25 : 8), model: m.id };
+      lastErr = new Error('empty');
+    } catch (e) {
+      lastErr = e;
+      if (/neuron|quota|4006|3036/i.test(String(e?.message || e))) throw Object.assign(new Error('quota'), { quota: true });
+    }
+  }
+  throw lastErr || new Error('vision failed');
+}
+
+async function handleVision(request, env, cors) {
+  const raw = await request.text();
+  if (raw.length > MAX_IMAGE_B64 + 2000) return json({ error: 'too_large' }, 413, cors);
+  let body;
+  try { body = JSON.parse(raw); } catch (_) { return json({ error: 'bad_json' }, 400, cors); }
+  const deviceId = clip(body?.deviceId, 64);
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(deviceId)) return json({ error: 'bad_device' }, 400, cors);
+  const b64 = typeof body?.image === 'string' ? body.image.replace(/^data:image\/\w+;base64,/, '') : '';
+  if (b64.length < 200 || !/^[A-Za-z0-9+/=]+$/.test(b64.slice(0, 400))) return json({ error: 'no_image' }, 400, cors);
+  // JPEG (FF D8) или PNG — остальное не принимаем
+  if (!(b64.startsWith('/9j/') || b64.startsWith('iVBOR'))) return json({ error: 'bad_image' }, 400, cors);
+  const mode = body?.mode === 'receipt' ? 'receipt' : 'food';
+  if (!env.AI) return json({ error: 'offline', reason: 'no_ai_binding' }, 503, cors);
+  const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+  if (!(await bump(env, `v:${deviceId}`, VISION_LIMIT_DEVICE)) || !(await bump(env, `vip:${ip}`, VISION_LIMIT_IP)) || !(await bump(env, 'vall', VISION_LIMIT_TOTAL))) {
+    return json({ error: 'offline', reason: 'daily_limit' }, 429, cors);
+  }
+  try {
+    const out = await runVision(env, b64, mode);
+    return json({ items: out.items, model: out.model, mode }, 200, cors);
+  } catch (e) {
+    return json({ error: 'offline', reason: e?.quota ? 'ai_quota' : 'ai_error' }, e?.quota ? 429 : 503, cors);
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -227,12 +333,13 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
     if (request.method === 'GET' && (url.pathname === '/' || url.pathname === '/health')) {
-      return json({ ok: true, service: 'nutrik', ai: Boolean(env.AI), models: MODELS }, 200, cors);
+      return json({ ok: true, service: 'nutrik', ai: Boolean(env.AI), models: MODELS, vision: VISION_MODELS.map((m) => m.id) }, 200, cors);
     }
-    if (url.pathname !== '/chat' || request.method !== 'POST') return json({ error: 'not_found' }, 404, cors);
+    if (!['/chat', '/vision'].includes(url.pathname) || request.method !== 'POST') return json({ error: 'not_found' }, 404, cors);
 
     const client = request.headers.get('x-nutrimate-client') || '';
-    if (!origin && !/^(ios|web)/.test(client)) return json({ error: 'forbidden' }, 403);
+    if (!origin && !/^(ios|web|android|windows|macos|linux|desktop|app)/.test(client)) return json({ error: 'forbidden' }, 403);
+    if (url.pathname === '/vision') return handleVision(request, env, cors);
 
     const raw = await request.text();
     if (raw.length > 20000) return json({ error: 'too_large' }, 413, cors);

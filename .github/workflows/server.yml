@@ -110,6 +110,29 @@ jobs:
           "
           done
 
+      - name: Smoke test /vision (food photo → items)
+        if: steps.url.outputs.url != ''
+        env:
+          URL: ${{ steps.url.outputs.url }}
+        run: |
+          for F in bananas apples; do
+            python3 -c "import base64,json,sys; print(json.dumps({'deviceId':'ci-vision-$F-'+sys.argv[1],'image':base64.b64encode(open('server/fixtures/$F.jpg','rb').read()).decode()}))" "$GITHUB_RUN_ID" > vreq.json
+            CODE=$(curl -sS -o vis.json -w '%{http_code}' -X POST "$URL/vision" -H 'content-type: application/json' -H 'x-nutrimate-client: ios-ci' --data-binary @vreq.json || echo 000)
+            echo "Vision ($F) HTTP $CODE"; cat vis.json; echo
+            if [ "$CODE" = "200" ]; then
+              python3 -c "
+          import json,sys
+          r=json.load(open('vis.json')); names=' '.join(i['name'].lower() for i in r.get('items',[]))
+          want='$F'.rstrip('s')[:5]
+          print(('✅ recognized ' if want in names else '::warning::did not recognize $F: ')+names, '·', r.get('model'))
+          "
+              echo "### 📷 /vision $F: $(cat vis.json)" >> "$GITHUB_STEP_SUMMARY"
+            else echo "::warning::/vision answered $CODE — the app keeps on-device recognition only"; fi
+          done
+          # мусор вместо фото — 400, а не 500
+          CODE=$(curl -sS -o /dev/null -w '%{http_code}' -X POST "$URL/vision" -H 'content-type: application/json' -H 'x-nutrimate-client: ios-ci' -d '{"deviceId":"ci-vision-bad-'"$GITHUB_RUN_ID"'","image":"hello"}')
+          [ "$CODE" = "400" ] || { echo "::error::/vision with a bad image answered $CODE"; exit 1; }
+
       - name: Put worker URL into the iOS app
         if: steps.url.outputs.url != ''
         env:
