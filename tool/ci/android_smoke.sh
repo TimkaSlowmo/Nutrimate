@@ -32,9 +32,15 @@ shot() { # имя, экран (пусто — обычный запуск), ож
     echo "::error::NutriMate is not running after start ($name) — crash?"
     FAIL=1
   fi
-  A exec-out screencap -p > "$OUT/$name.png"
+  timeout 40 adb exec-out screencap -p > "$OUT/$name.png"
   local size
   size=$(stat -c %s "$OUT/$name.png")
+  if [ "$size" -le 1000 ]; then
+    # screencap внутри Android не всегда может прочитать кадр (эмулятор без GPU) — снимаем экран со стороны эмулятора
+    echo "screencap: $(timeout 40 adb shell screencap -p /sdcard/s.png 2>&1 | head -3) rc=$?"
+    timeout 40 adb emu screenrecord screenshot "$PWD/$OUT/$name.png" >/dev/null 2>&1 || true
+    size=$(stat -c %s "$OUT/$name.png" 2>/dev/null || echo 0)
+  fi
   [ "$size" -gt 1000 ] || { echo "::warning::empty screenshot $name"; rm -f "$OUT/$name.png"; }
   echo "📸 $name ($size bytes) $(date -u +%T)"
 }
@@ -66,5 +72,7 @@ if grep -E "Process: $PKG|Fatal signal.*$PKG|ANR in $PKG" "$LOG/logcat.txt" >/de
   FAIL=1
 fi
 grep -E "E/flutter" "$LOG/logcat.txt" | head -40 || true
+echo "── render diagnostics ──"
+grep -iE "screencap|impeller|vulkan|egl|SurfaceFlinger.*(err|fail|timeout)" "$LOG/logcat.txt" | grep -v "^--" | tail -30 || true
 echo "FAIL=$FAIL"
 exit $FAIL
