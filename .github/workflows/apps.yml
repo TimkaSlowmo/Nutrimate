@@ -22,9 +22,10 @@ on:
 permissions:
   contents: write
 
+# Не отменяем идущую сборку (иначе частые пуши не дают дойти до релиза): новая ждёт, промежуточные схлопываются.
 concurrency:
   group: apps
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   android:

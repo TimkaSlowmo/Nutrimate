@@ -24,7 +24,7 @@ run() { # имя экрана (--shot), имя файла
   if [ -n "$wid" ]; then
     import -window "$wid" "$OUT/$name.png" || true
     # широкое окно: интерфейс не растягивается, колонка по центру на бордовом фоне
-    xdotool windowsize "$wid" 1280 860 && sleep 4 && import -window "$wid" "$OUT/$name-wide.png" || true
+    xdotool windowsize "$wid" 1280 860 && sleep 8 && import -window "$wid" "$OUT/$name-wide.png" || true
   else
     import -window root "$OUT/$name.png" || true
   fi
