@@ -158,7 +158,7 @@ struct FoodRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            EmojiBadge(emoji: food.emoji, size: 42)
+            EmojiBadge(emoji: food.emoji, name: food.name, size: 42)
             VStack(alignment: .leading, spacing: 2) {
                 Text(N(food.name)).font(.body.weight(.semibold)).foregroundStyle(Color.burgundy)
                 Text(L("{0} kcal · keeps {1} · {2}", food.kcal, shelfText(food.shelf), FoodDB.defaultStorage(food).emoji))
@@ -253,7 +253,7 @@ struct LogFoodSheet: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            EmojiBadge(emoji: food.emoji, size: 80)
+            EmojiBadge(emoji: food.emoji, name: food.name, size: 80)
             Text(N(food.name)).font(.title2.bold()).foregroundStyle(Color.burgundy)
             Stepper(L("{0} g · {1} kcal", grams, food.kcal * grams / 100), value: $grams, in: 10...2000, step: 10)
                 .padding(.horizontal)
@@ -281,7 +281,7 @@ struct AddFoodSheet: View {
             Form {
                 Section {
                     HStack(spacing: 14) {
-                        EmojiBadge(emoji: food.emoji, size: 64)
+                        EmojiBadge(emoji: food.emoji, name: food.name, size: 64)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(N(food.name)).font(.title3.bold()).foregroundStyle(Color.burgundy)
                             Text(L("{0} · {1} kcal / 100 g", N(food.category), food.kcal)).font(.caption).foregroundStyle(.secondary)

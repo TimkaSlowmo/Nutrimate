@@ -63,6 +63,10 @@ if st_path.exists():
         if len(t.get('ru', [])) != len(r['steps']) or len(t.get('kk', [])) != len(r['steps']):
             print('warning: step count differs, skipped:', name); continue
         r['stepsRu'], r['stepsKk'] = t['ru'], t['kk']; n_st += 1
+# собственные иконки (tool/icon_overrides.json → assets/icons/<slug>.svg, на iOS — картинка fi_<slug>)
+ov = json.loads((root / 'tool/icon_overrides.json').read_text(encoding='utf-8'))
+for f in foods:
+    if f['name'] in ov: f['icon'] = ov[f['name']]
 rn = [r['name'].lower() for r in recipes]
 for n in set(rn):
     if rn.count(n) > 1: errors.append('duplicate recipe: ' + n)
@@ -70,6 +74,11 @@ expected = src.count('\n  Recipe(\n')
 if expected != len(recipes): errors.append(f'parsed {len(recipes)} recipes, expected {expected}')
 if errors:
     print('\n'.join(errors)); sys.exit(1)
+# правило «одна иконка = один продукт» (tool/check_icons.py)
+sys.path.insert(0, str(root / 'tool'))
+import check_icons  # noqa: E402
+if check_icons.run([]):
+    sys.exit(1)
 print(f'OK: {len(foods)} products, {len(recipes)} recipes ({sum(r["zeroWaste"] for r in recipes)} zero-waste), {len(set(f["category"] for f in foods))} categories, {len(tips)} storage tips, {n_tr} translated names (ru/kk), {n_st} recipes with translated steps')
 if '--check' not in sys.argv:
     out = root / 'ios/NutriMate/Resources/foods.json'

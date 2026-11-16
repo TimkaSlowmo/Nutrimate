@@ -251,7 +251,7 @@ struct QuickAddView: View {
                     .font(.title3).foregroundStyle(isOn ? Color.freshGreen : Color.secondary)
             }
             .accessibilityLabel(isOn ? L("Don't add") : L("Add"))
-            EmojiBadge(emoji: f.emoji, size: 40)
+            EmojiBadge(emoji: f.emoji, name: f.name, size: 40)
             VStack(alignment: .leading, spacing: 2) {
                 Text(N(f.name)).font(.subheadline.weight(.semibold)).foregroundStyle(Color.burgundy).lineLimit(2)
                 HStack(spacing: 4) {

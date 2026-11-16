@@ -1,0 +1,36 @@
+name: Data & icons check
+
+# База продуктов/рецептов (lib/main.dart) и правило «одна иконка = один продукт».
+# PNG иконок коммитятся готовыми (tool/build_svg_icons.py), здесь ничего не рендерится —
+# только проверяется, что они есть и не устарели (tool/icons_manifest.json).
+on:
+  push:
+    paths:
+      - lib/main.dart
+      - assets/icons/**
+      - tool/**
+      - ios/NutriMate/Resources/foods.json
+      - .github/workflows/data-check.yml
+  pull_request:
+    paths:
+      - lib/main.dart
+      - assets/icons/**
+      - tool/**
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Products, recipes, translations (export_data.py --check)
+        run: python3 tool/export_data.py --check
+      - name: Icons (check_icons.py)
+        run: python3 tool/check_icons.py
+      - name: foods.json is up to date
+        run: |
+          python3 tool/export_data.py > /dev/null
+          git diff --exit-code --stat ios/NutriMate/Resources/foods.json || { echo "::error::foods.json is stale — run python3 tool/export_data.py"; exit 1; }

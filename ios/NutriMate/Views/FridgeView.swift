@@ -126,7 +126,7 @@ struct ItemSheet: View {
                 let id = p.id
                 ScrollView {
                     VStack(spacing: 16) {
-                        EmojiBadge(emoji: g.emoji, size: 96)
+                        EmojiBadge(emoji: g.emoji, name: g.name, size: 96)
                         VStack(spacing: 4) {
                             Text(N(g.name)).font(.title.bold()).foregroundStyle(Color.burgundy).multilineTextAlignment(.center)
                             if g.isLeftover, let r = FoodDB.shared.recipeByName[g.name] {

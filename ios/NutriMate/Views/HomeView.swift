@@ -272,7 +272,7 @@ struct PantryRow: View {
     let item: PantryGroup
     var body: some View {
         HStack(spacing: 12) {
-            EmojiBadge(emoji: item.emoji)
+            EmojiBadge(emoji: item.emoji, name: item.name)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(N(item.name)).font(.body.weight(.semibold)).foregroundStyle(Color.burgundy).lineLimit(1)

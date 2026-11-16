@@ -724,7 +724,7 @@ struct ShoppingView: View {
                     }
                     ForEach(hints) { f in
                         Button { store.addShopping([f.name]); text = "" } label: {
-                            Text("\(f.emoji) \(N(f.name))").foregroundStyle(Color.burgundy)
+                            FoodLabel(emoji: f.emoji, name: f.name).foregroundStyle(Color.burgundy)
                         }
                     }
                 }
@@ -736,7 +736,7 @@ struct ShoppingView: View {
                                 ForEach(sugg) { f in
                                     Button { withAnimation { store.addShopping([f.name]) } } label: {
                                         HStack(spacing: 4) {
-                                            Text("\(f.emoji) \(N(f.name))").lineLimit(1)
+                                            FoodLabel(emoji: f.emoji, name: f.name, size: 18).lineLimit(1)
                                             Image(systemName: "plus").font(.caption.bold())
                                         }
                                         .font(.subheadline)
@@ -845,7 +845,7 @@ struct ShoppingView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(L("Bought"))
             VStack(alignment: .leading, spacing: 3) {
-                Text("\(store.db.byName[n]?.emoji ?? "🛒") \(N(n))")
+                FoodLabel(emoji: store.db.byName[n]?.emoji ?? "🛒", name: n)
                 if h.homeQty > 0 {
                     Text(L("🏠 At home: ×{0} · {1}", h.homeQty, daysText(h.homeDays ?? 0)))
                         .font(.caption.weight(.semibold)).foregroundStyle(Color.warnOrange)

@@ -97,7 +97,7 @@ struct PlanView: View {
                 .font(.caption).foregroundStyle(.secondary)
             ForEach(list) { g in
                 HStack(spacing: 10) {
-                    EmojiBadge(emoji: g.emoji)
+                    EmojiBadge(emoji: g.emoji, name: g.name)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(g.title).font(.subheadline.weight(.semibold)).foregroundStyle(Color.burgundy)
                         Text(g.status).font(.caption).foregroundStyle(Color.freshness(g.daysLeft))

@@ -12,6 +12,8 @@ struct Food: Codable, Hashable, Identifiable {
     /// Переводы названия (из tool/translations_src.txt); нет — показываем английское
     var ru: String? = nil
     var kk: String? = nil
+    /// Собственная иконка (картинка fi_<icon> в Assets/FoodIcons); нет — показываем emoji
+    var icon: String? = nil
     var id: String { name }
 }
 

@@ -41,35 +41,38 @@ have_e = sorted(os.path.basename(f)[:-4] for f in glob.glob(edir + '/*.png'))
 have_p = {os.path.basename(f)[:-4] for f in glob.glob(os.path.join(ROOT, 'assets/icons/p/*.png'))}
 overrides = json.load(open(os.path.join(ROOT, 'tool/icon_overrides.json')))
 names = {f[2] for f in foods}
+have_s = {os.path.basename(f)[:-4] for f in glob.glob(os.path.join(ROOT, 'assets/icons/s/*.png'))}
+def sub(slug):  # нарисованная SVG-иконка (assets/icons/s, tool/build_svg_icons.py) важнее старой PNG (assets/icons/p)
+    return 's/' + slug if slug in have_s else 'p/' + slug
 for n, slug in overrides.items():
     assert n in names, 'override for unknown food ' + n
-    assert slug in have_p, 'missing custom icon ' + slug
+    assert slug in have_s or slug in have_p, 'missing custom icon ' + slug
 
 # Проверки базы
 dup = [n for n, c in Counter(f[2].lower() for f in foods).items() if c > 1]
 assert not dup, 'duplicates: %s' % dup
-ings = re.findall(r"Ing\('([^']+)'", src)
+ings = [i.replace("\\'", "'") for i in re.findall(r"Ing\('((?:[^'\\]|\\.)*)'", src)]
 bad = sorted({i for i in ings if i not in names})
 assert not bad, 'unknown ingredients: %s' % bad
 noicon = [f[2] for f in foods if f[2] not in overrides and key(f[1]) not in have_e]
 assert not noicon, 'no icon: %s' % noicon
 # Уникальность: продукт уникален, если у него своя иконка или его эмодзи больше ни у кого нет
-emc = Counter(f[1] for f in foods if f[2] not in overrides)
-uniq = sum(1 for f in foods if f[2] in overrides or emc[f[1]] == 1)
+eff = Counter(('i' + overrides[f[2]]) if f[2] in overrides else f[1] for f in foods)
+uniq = sum(1 for f in foods if eff[('i' + overrides[f[2]]) if f[2] in overrides else f[1]] == 1)
 
 out = ['// СГЕНЕРИРОВАНО tool/build_icons.py — не редактировать вручную.',
        '// 3D-иконки: Microsoft Fluent Emoji (MIT, см. assets/icons/LICENSE-fluentui-emoji.txt)',
-       '// + собственные иконки NutriMate (assets/icons/p).', '',
+       '// + собственные иконки NutriMate: assets/icons/s (из SVG assets/icons/*.svg) и assets/icons/p.', '',
        "import 'package:flutter/material.dart';", '', "import 'main.dart' show FoodItem;", '',
        'const _emojiIcons = <String>{' + ', '.join("'%s'" % k for k in have_e) + '};', '',
        'const _foodIcons = <String, String>{']
-out += ["  '%s': '%s'," % (n.replace("'", "\\'"), s) for n, s in sorted(overrides.items())]
+out += ["  '%s': '%s'," % (n.replace("'", "\\'"), sub(s)) for n, s in sorted(overrides.items())]
 out += ['};', '', '''String _key(String emoji) => emoji.runes.where((r) => r != 0xfe0f).map((r) => r.toRadixString(16)).join('-');
 
 /// Путь к картинке-иконке для эмодзи (и, если известно, для конкретного продукта).
 String? iconPath(String emoji, [String? food]) {
   final own = food == null ? null : _foodIcons[food];
-  if (own != null) return 'assets/icons/p/$own.png';
+  if (own != null) return 'assets/icons/$own.png';
   final k = _key(emoji);
   return _emojiIcons.contains(k) ? 'assets/icons/e/$k.png' : null;
 }
@@ -80,7 +83,7 @@ void precacheFoodIcons(BuildContext context) {
     precacheImage(AssetImage('assets/icons/e/$k.png'), context);
   }
   for (final p in _foodIcons.values.toSet()) {
-    precacheImage(AssetImage('assets/icons/p/$p.png'), context);
+    precacheImage(AssetImage('assets/icons/$p.png'), context);
   }
 }
 
@@ -123,4 +126,4 @@ class FoodIcon extends StatelessWidget {
 ''']
 open(os.path.join(ROOT, 'lib/food_icons.dart'), 'w').write('\n'.join(out))
 nrec = src[src.index('final recipes = <Recipe>['):].count('  Recipe(' + chr(10))
-print(f'foods={len(foods)} recipes={nrec} emoji_icons={len(have_e)} custom={len(have_p)} unique={uniq}/{len(foods)}')
+print(f'foods={len(foods)} recipes={nrec} emoji_icons={len(have_e)} custom={len(have_p)}+{len(have_s)}svg unique={uniq}/{len(foods)}')

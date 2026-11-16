@@ -274,7 +274,7 @@ struct IngredientRows: View {
             let need = max(1, i.pieces ?? 1)
             let counted = i.pieces != nil
             HStack(spacing: big ? 10 : 8) {
-                Text(store.db.byName[i.name]?.emoji ?? "•").font(big ? .title3 : .body)
+                FoodIcon(emoji: store.db.byName[i.name]?.emoji ?? "•", name: i.name, size: big ? 28 : 22)
                 Text(N(i.name)).lineLimit(2)
                 Spacer(minLength: 6)
                 Text(amount(i)).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)

@@ -140,10 +140,11 @@ struct FreshBar: View {
 /// Кружок с эмодзи продукта.
 struct EmojiBadge: View {
     let emoji: String
+    /// Название продукта — тогда показывается его собственная иконка (FoodIcon), если она есть.
+    var name: String? = nil
     var size: CGFloat = 44
     var body: some View {
-        Text(emoji)
-            .font(.system(size: size * 0.58))
+        FoodIcon(emoji: emoji, name: name, size: size * 0.72)
             .frame(width: size, height: size)
             .background(Circle().fill(Color.paper.opacity(0.65)))
             .overlay(Circle().strokeBorder(Color.paper, lineWidth: 1))
