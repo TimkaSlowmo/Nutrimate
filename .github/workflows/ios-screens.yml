@@ -159,6 +159,7 @@ jobs:
           # что увидел Vision на тестовых фото (метки и уверенность) — пишет само приложение
           C=$(xcrun simctl get_app_container "$UDID" $BID data)
           cp "$C/Documents/scan.txt" screens/scan.txt 2>/dev/null || echo "no scan log" > screens/scan.txt
+          mkdir -p screens/scan-debug && cp "$C"/Documents/scan-normalized-*.png screens/scan-debug/ 2>/dev/null || true
           echo "SCAN:"; cat screens/scan.txt
           # замер плавности: приложение само прокручивает экран 6 с и пишет fps в Documents/fps.txt
           : > screens/fps.txt

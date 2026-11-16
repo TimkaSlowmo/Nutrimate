@@ -356,7 +356,10 @@ struct QuickAddView: View {
         reading = true
         let r = await PhotoScan.analyze(img, hint: hint, store: store)
         reading = false
-        if let log { PhotoScan.log(r, name: log) }
+        if let log {
+            let diag = await Task.detached(priority: .userInitiated) { PhotoScan.diagnose(img, name: log) }.value
+            PhotoScan.log(r, name: log, extra: diag)
+        }
         if !UIShot.enabled { store.data.scanInfoSeen = true }
         switch r.kind {
         case .receipt:

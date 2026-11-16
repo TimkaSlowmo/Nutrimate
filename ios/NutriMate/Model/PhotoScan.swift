@@ -465,8 +465,64 @@ enum PhotoScan {
         return r
     }
 
+    /// Средняя яркость (0…255) и доля почти чёрных пикселей — проверка, что Vision получил настоящую картинку.
+    static func brightness(_ cg: CGImage) -> (mean: Double, dark: Double) {
+        let n = 32
+        var px = [UInt8](repeating: 0, count: n * n * 4)
+        let ok: Bool = px.withUnsafeMutableBytes { buf -> Bool in
+            guard let ctx = CGContext(data: buf.baseAddress, width: n, height: n, bitsPerComponent: 8, bytesPerRow: n * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: n, height: n))
+            return true
+        }
+        guard ok else { return (-1, -1) }
+        var sum = 0.0, dark = 0
+        for i in 0..<(n * n) {
+            let v = (Double(px[i * 4]) + Double(px[i * 4 + 1]) + Double(px[i * 4 + 2])) / 3
+            sum += v
+            if v < 16 { dark += 1 }
+        }
+        return (sum / Double(n * n), Double(dark) / Double(n * n))
+    }
+
+    /// Режим скриншотов: диагностика — та же картинка по-разному (исходная / перерисованная, CPU / по умолчанию).
+    static func diagnose(_ image: UIImage, name: String) -> String {
+        func fmt(_ l: [VisionLabel]) -> String {
+            l.prefix(5).map { "\($0.id) \(String(format: "%.2f", $0.confidence))" }.joined(separator: ", ")
+        }
+        func classify(_ cg: CGImage, cpu: Bool) -> String {
+            let req = VNClassifyImageRequest()
+            if cpu { prepare(req) }
+            do { try VNImageRequestHandler(cgImage: cg, orientation: .up).perform([req]) } catch { return "error \(error.localizedDescription)" }
+            return fmt(labels(req))
+        }
+        var s = "  diag: uiImage \(Int(image.size.width))×\(Int(image.size.height)) @\(image.scale)x orient=\(image.imageOrientation.rawValue)\n"
+        if let orig = image.cgImage {
+            let b = brightness(orig)
+            s += "  diag: original cg \(orig.width)×\(orig.height) bpc=\(orig.bitsPerComponent) alpha=\(orig.alphaInfo.rawValue) mean=\(Int(b.mean)) dark=\(String(format: "%.2f", b.dark))\n"
+            s += "  diag: original/default: \(classify(orig, cpu: false))\n"
+            s += "  diag: original/cpu: \(classify(orig, cpu: true))\n"
+        } else {
+            s += "  diag: no cgImage\n"
+        }
+        if let cg = normalized(image, maxSide: 2048) {
+            let b = brightness(cg)
+            s += "  diag: normalized cg \(cg.width)×\(cg.height) mean=\(Int(b.mean)) dark=\(String(format: "%.2f", b.dark))\n"
+            s += "  diag: normalized/default: \(classify(cg, cpu: false))\n"
+            s += "  diag: normalized/cpu: \(classify(cg, cpu: true))\n"
+            if let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first,
+               let png = UIImage(cgImage: cg).pngData() {
+                try? png.write(to: dir.appendingPathComponent("scan-normalized-\(name).png"))
+            }
+        } else {
+            s += "  diag: normalized = nil\n"
+        }
+        return s
+    }
+
     /// Режим скриншотов: что увидел Vision — в Documents/scan.txt (CI кладёт в screens/scan.txt).
-    static func log(_ r: ScanResult, name: String) {
+    static func log(_ r: ScanResult, name: String, extra: String = "") {
         func fmt(_ l: [VisionLabel]) -> String {
             l.prefix(8).map { "\($0.id) \(String(format: "%.2f", $0.confidence))" }.joined(separator: ", ")
         }
@@ -480,6 +536,7 @@ enum PhotoScan {
         s += "  items: " + found.joined(separator: ", ") + "\n"
         s += "  alternatives: " + r.alternatives.map(\.name).joined(separator: ", ") + "\n"
         if !r.text.isEmpty { s += "  text: " + String(r.text.replacingOccurrences(of: "\n", with: " | ").prefix(300)) + "\n" }
+        s += extra
         print(s)
         guard let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
         let url = dir.appendingPathComponent("scan.txt")

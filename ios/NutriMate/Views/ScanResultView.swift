@@ -165,7 +165,13 @@ struct ScanResultView: View {
         VStack(alignment: .leading, spacing: 10) {
             if nothing {
                 HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "camera.metering.unknown").font(.title2).foregroundStyle(Color.burgundy)
+                    if let img = result.image {
+                        Image(uiImage: img).resizable().scaledToFill().frame(width: 52, height: 52)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .accessibilityHidden(true)
+                    } else {
+                        Image(systemName: "camera.metering.unknown").font(.title2).foregroundStyle(Color.burgundy)
+                    }
                     VStack(alignment: .leading, spacing: 4) {
                         Text(L("Couldn't recognize")).font(.headline).foregroundStyle(Color.burgundy)
                         Text(L("Hold the camera closer, add light and keep 1–4 products in the frame. Or find the product in search."))
