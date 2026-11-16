@@ -16,6 +16,9 @@ A wait-for-device
 A shell settings put global window_animation_scale 0 || true
 A shell settings put global transition_animation_scale 0 || true
 A shell settings put global animator_duration_scale 0 || true
+# эмулятор без GPU после загрузки ещё долго «дожимает» системные приложения — даём ему успокоиться
+sleep 60
+A shell input keyevent KEYCODE_HOME || true
 A install -r -g "$APK" || { echo "::error::adb install failed"; exit 1; }
 A shell dumpsys package $PKG | grep -E "versionName|versionCode" | head -2
 A logcat -c || true
@@ -45,6 +48,8 @@ shot() { # имя, экран (пусто — обычный запуск), ож
   fi
   [ "$size" -gt 1000 ] || { echo "::warning::empty screenshot $name"; rm -f "$OUT/$name.png"; }
   echo "📸 $name ($size bytes) $(date -u +%T)"
+  A shell am force-stop $PKG  # программная отрисовка грузит эмулятор — не держим приложение открытым зря
+  sleep 4
   if ! timeout 10 adb get-state >/dev/null 2>&1; then
     echo "::error::emulator went offline during $name — last log lines:"
     grep -vE " [VD]/" "$LOG/live.txt" | tail -60
@@ -57,13 +62,10 @@ shot 01-home home
 shot 02-fridge fridge
 shot 03-search search
 shot 04-recipes recipes
-shot 05-chat chat
-shot 06-photo-notice photo
-shot 07-photo photosheet
-shot 08-photo-review photoresult
-shot 09-fridge-ru fridge-ru
-shot 10-search-kk search-kk
-shot 11-photo-review-ru photoresult-ru
+shot 05-photo-review photoresult
+shot 06-photo photosheet
+shot 07-fridge-ru fridge-ru
+shot 08-photo-review-kk photoresult-kk
 A shell setprop debug.nutrimate.shot none || true
 
 # обычный запуск снова (без демо) и живо ли спустя время (анимации Нутрика, таймеры)
