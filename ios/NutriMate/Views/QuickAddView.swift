@@ -8,6 +8,8 @@ struct QuickAddView: View {
     @Environment(\.dismiss) private var dismiss
     var initialText = ""
     var demoReceipt = false
+    /// Режим скриншотов: фото продуктов из Resources/uishot (bananas / apples) — весь путь распознавания на телефоне
+    var demoPhoto: String? = nil
 
     @State private var text = ""
     @State private var lines: [QuickAdd.Line] = []
@@ -19,6 +21,9 @@ struct QuickAddView: View {
     @State private var photo: PhotosPickerItem?
     @State private var showCamera = false
     @State private var scanned: UIImage?
+    /// Что на фото: авто / чек / продукты (v33)
+    @State private var hint: ScanHint = .auto
+    @State private var scanResult: ScanResult?
     @FocusState private var focused: Bool
 
     private struct Row: Identifiable {
@@ -50,8 +55,11 @@ struct QuickAddView: View {
                     inputCard
                     if !rows.isEmpty { foundCard }
                     if !unknown.isEmpty { unknownCard }
-                    Label(L("Photos are read right on your phone — nothing is uploaded."), systemImage: "lock.fill")
+                    Label(NutrikVision.available(store)
+                          ? L("Photos are read on your phone. If I'm unsure, Smart Nutrik checks a small copy — it isn't stored.")
+                          : L("Photos are read right on your phone — nothing is uploaded."), systemImage: "lock.fill")
                         .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity)
+                        .multilineTextAlignment(.center)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
@@ -77,6 +85,9 @@ struct QuickAddView: View {
                     photo = nil
                 }
             }
+            .sheet(item: $scanResult) { r in
+                ScanResultView(result: r) { dismiss() }
+            }
             .fullScreenCover(isPresented: $showCamera) {
                 CameraPicker { img in Task { await read(img) } }.ignoresSafeArea()
             }
@@ -88,6 +99,11 @@ struct QuickAddView: View {
                     let img = QuickAddDemo.receipt()
                     await read(img)
                 }
+                if let name = demoPhoto, UIShot.enabled,
+                   let url = Bundle.main.url(forResource: name, withExtension: "jpg"),
+                   let img = UIImage(contentsOfFile: url.path) {
+                    await read(img, log: name)
+                }
             }
         }
     }
@@ -95,7 +111,7 @@ struct QuickAddView: View {
     private var headline: String {
         if reading { return L("Reading the photo… 🔍") }
         if rows.isEmpty && unknown.isEmpty {
-            return L("Type or paste your shopping list — or snap the receipt. I'll find every product!")
+            return L("Type or paste your shopping list — or snap the receipt or the groceries themselves. I'll find every product!")
         }
         if rows.isEmpty { return L("Hmm, I didn't recognize these. Pick a suggestion or write it differently.") }
         return L("Found {0}. Check the amounts and tap Add 👇", Lp(rows.count, "product|products"))
@@ -130,9 +146,19 @@ struct QuickAddView: View {
                 }
             }
 
+            if !store.data.scanInfoSeen { scanInfo }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(L("What's in the photo?")).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Picker(L("What's in the photo?"), selection: $hint) {
+                    ForEach(ScanHint.allCases) { h in Text(h.title).tag(h) }
+                }
+                .pickerStyle(.segmented)
+            }
+
             HStack(spacing: 8) {
                 if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                    Button { showCamera = true } label: { tile("camera.fill", L("Scan receipt")) }
+                    Button { showCamera = true } label: { tile("camera.fill", L("Camera")) }
                 }
                 PhotosPicker(selection: $photo, matching: .images) { tile("photo.on.rectangle", L("From photo")) }
                 Button {
@@ -153,6 +179,28 @@ struct QuickAddView: View {
             }
         }
         .glassCard()
+    }
+
+    /// Один раз: камера теперь понимает и продукты; куда может уйти фото (честно)
+    private var scanInfo: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text("📸").font(.title2)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(L("New: snap the groceries themselves — bananas, apples, a whole bag. Or a receipt, as before."))
+                    .font(.caption.weight(.semibold)).foregroundStyle(Color.burgundy)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(store.data.smartNutrik
+                     ? L("I recognize photos on your phone. If I'm not sure and Smart Nutrik is on, a small copy (no location) goes to our server only for recognition — it isn't stored.")
+                     : L("I recognize photos right on your phone — nothing is uploaded."))
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(L("Got it")) { withAnimation { store.data.scanInfoSeen = true } }
+                    .font(.caption.weight(.bold))
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.burgundy.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func tile(_ icon: String, _ title: String) -> some View {
@@ -302,16 +350,25 @@ struct QuickAddView: View {
         )
     }
 
-    private func read(_ img: UIImage) async {
+    /// Фото → чек (текст в поле, как раньше) или продукты (лист проверки). Авто: решает по тексту и меткам Vision.
+    private func read(_ img: UIImage, log: String? = nil) async {
         scanned = img
         reading = true
-        let s = await QuickAdd.recognize(img)
+        let r = await PhotoScan.analyze(img, hint: hint, store: store)
         reading = false
-        let clean = s.trimmingCharacters(in: .whitespacesAndNewlines)
-        if clean.isEmpty {
-            store.say(L("I couldn't read any text — try a sharper photo with more light 📸"))
-        } else {
-            text = text.isEmpty ? clean : text + "\n" + clean
+        if let log { PhotoScan.log(r, name: log) }
+        if !UIShot.enabled { store.data.scanInfoSeen = true }
+        switch r.kind {
+        case .receipt:
+            let clean = r.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if clean.isEmpty {
+                store.say(L("I couldn't read any text — try a sharper photo with more light 📸"))
+            } else {
+                text = text.isEmpty ? clean : text + "\n" + clean
+            }
+        case .products, .nothing:
+            scanned = nil
+            scanResult = r
         }
     }
 }

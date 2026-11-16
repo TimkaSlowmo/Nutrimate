@@ -64,6 +64,7 @@ struct RootView: View {
             case "quests": ChallengesView()
             case "quickadd": QuickAddView(initialText: QuickAddDemo.list)
             case "receipt": QuickAddView(demoReceipt: true)
+            case "scan": QuickAddView(demoPhoto: UIShot.value("-photo") ?? "bananas")
             case "weekcard": WeekShareSheet()
             case "item": ItemSheet(key: "\(UIShot.value("-item") ?? "Milk")|fridge")
             case "cook":

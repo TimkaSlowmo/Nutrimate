@@ -3,7 +3,7 @@ name: iOS build (unsigned IPA)
 on:
   push:
     branches: [main]
-    paths: ['ios/**', '!ios/*.md', '.github/workflows/ios.yml']
+    paths: ['ios/**', '!ios/*.md', '.github/workflows/ios.yml', 'tool/vision_labels.py']
   workflow_dispatch:
 
 permissions:
@@ -68,3 +68,39 @@ jobs:
           gh release create ios-latest NutriMate.ipa --target "$GITHUB_SHA" --latest=false \
             --title "NutriMate iOS v$V" \
             --notes "Unsigned build v$V ($(date -u +%Y-%m-%d)). Download NutriMate.ipa → Sideloadly (or AltStore) with your Apple ID → iPhone via cable. Installing on top keeps your data."
+
+  # Юнит-тесты (v33) на симуляторе: «метка Vision / имя от сервера → продукт базы», «чек или продукты».
+  # Отдельная задача: релиз ios-latest от неё не зависит.
+  test:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Vision label dictionary
+        run: python3 tool/vision_labels.py --check
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Unit tests (simulator)
+        working-directory: ios
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)['devices']
+          c = [(k, x) for k, v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone')]
+          c.sort(key=lambda kx: [int(p) for p in kx[0].split('iOS-')[-1].split('-') if p.isdigit()])
+          print(c[-1][1]['udid'] if c else '')")
+          echo "Simulator: $UDID"
+          xcodebuild test -project NutriMate.xcodeproj -scheme NutriMate -destination "id=$UDID" -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO > test.log 2>&1 || {
+              echo "::group::Failures"; grep -E "error:|failed|XCTAssert|fatal" test.log | sort -u | head -80; echo "::endgroup::"
+              tail -60 test.log
+              exit 1
+            }
+          grep -E "Test Case .*(passed|failed)|Executed" test.log | tail -20

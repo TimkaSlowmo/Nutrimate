@@ -56,7 +56,7 @@ struct ProfileView: View {
                         RowDivider()
                         SettingsToggle(icon: "sparkles", tint: Color(hex: 0x8E24AA), title: L("Smart Nutrik (online AI)"),
                                        subtitle: NutrikAI.isConfigured
-                                       ? L("Free AI answers in chat. AI answers can be wrong. Sends only your name, fridge, today's kcal and the last messages.")
+                                       ? L("Free AI answers in chat and help with photos I can't recognize. AI answers can be wrong. Sends only your name, fridge, today's kcal, the last messages — and a small copy of such a photo (never stored).")
                                        : L("AI answers can be wrong. The AI server isn't connected yet — Nutrik answers offline for now."),
                                        isOn: $store.data.smartNutrik)
                         RowDivider()
@@ -779,7 +779,7 @@ struct ShoppingView: View {
                 if !store.data.shopping.isEmpty {
                     Section {
                         Button { quickAdd = true } label: {
-                            Label(L("Back from the shop? Scan the receipt"), systemImage: "doc.text.viewfinder")
+                            Label(L("Back from the shop? Snap the receipt or the groceries"), systemImage: "camera.viewfinder")
                                 .font(.subheadline.weight(.semibold)).foregroundStyle(Color.burgundy)
                         }
                     } footer: {

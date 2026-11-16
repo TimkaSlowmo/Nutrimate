@@ -8,8 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "32"
-    CURRENT_PROJECT_VERSION: "32"
+    MARKETING_VERSION: "33"
+    CURRENT_PROJECT_VERSION: "33"
 targets:
   NutriMate:
     type: application
@@ -21,8 +21,8 @@ targets:
       path: NutriMate/Info.plist
       properties:
         CFBundleDisplayName: NutriMate
-        CFBundleShortVersionString: "32"
-        CFBundleVersion: "32"
+        CFBundleShortVersionString: "33"
+        CFBundleVersion: "33"
         LSRequiresIPhoneOS: true
         UILaunchScreen:
           UIColorName: LaunchBackground
@@ -30,8 +30,9 @@ targets:
           - UIInterfaceOrientationPortrait
         UIApplicationSupportsIndirectInputEvents: true
         ITSAppUsesNonExemptEncryption: false
-        # «Сканировать чек» (v30): текст читается на телефоне, фото никуда не отправляется
-        NSCameraUsageDescription: "NutriMate reads your grocery receipt to add products to your fridge. The photo stays on your phone. / NutriMate читает чек, чтобы добавить продукты в холодильник. Фото остаётся на телефоне."
+        # Камера (v30 чек, v33 и сами продукты): распознаётся на телефоне; если не уверен и включён Умный Нутрик —
+        # уменьшенная копия без геометки уходит на наш сервер только для распознавания и не хранится
+        NSCameraUsageDescription: "NutriMate recognizes your groceries or receipt to add products to your fridge. Photos are processed on your phone; with Smart Nutrik on, a small copy may be checked online and is never stored. / NutriMate распознаёт продукты или чек, чтобы добавить их в холодильник. Фото обрабатывается на телефоне; с Умным Нутриком уменьшенная копия может быть проверена онлайн и не хранится."
         # ProMotion: разрешаем 120 Гц на iPhone 13 Pro Max и новее
         CADisableMinimumFrameDurationOnPhone: true
     settings:
@@ -43,11 +44,29 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: NO
         CODE_SIGNING_ALLOWED: NO
+  # Юнит-тесты (v33): сопоставление «метка Vision / имя от сервера → продукт базы», решение «чек или продукты»
+  NutriMateTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: NutriMateTests
+    dependencies:
+      - target: NutriMate
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: kz.innotech.nutrimate.tests
+        CODE_SIGNING_ALLOWED: NO
 schemes:
   NutriMate:
     build:
       targets:
         NutriMate: all
+    test:
+      config: Debug
+      targets:
+        - NutriMateTests
     run:
       config: Debug
     archive:

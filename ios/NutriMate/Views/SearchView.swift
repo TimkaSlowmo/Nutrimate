@@ -2,7 +2,10 @@ import SwiftUI
 
 struct SearchView: View {
     @EnvironmentObject var store: AppStore
-    @State private var query = ""
+    @Environment(\.dismiss) private var dismiss
+    @State private var query: String
+    /// Открыт листом (например, «Найти вручную» после фото) — с кнопкой «Готово»
+    private let inSheet: Bool
     @State private var category: String?
     @State private var logFood: Food?
     @State private var addFood: Food?
@@ -12,6 +15,11 @@ struct SearchView: View {
     private let suggestions = ["Kurt", "Baursaks", "Kazy", "Shubat", "Kumys", "Irimshik", "Milk", "Eggs", "Banana", "Chicken Breast", "Tomato", "Bread"]
 
     private var results: [Food] { store.db.search(query, category: category) }
+
+    init(initialQuery: String = "", inSheet: Bool = false) {
+        _query = State(initialValue: initialQuery)
+        self.inSheet = inSheet
+    }
 
     var body: some View {
         NavigationStack {
@@ -31,6 +39,9 @@ struct SearchView: View {
             .scrollDismissesKeyboard(.immediately)
             .background(LiveBackground())
             .navigationTitle(L("Search"))
+            .toolbar {
+                if inSheet { ToolbarItem(placement: .confirmationAction) { Button(L("Done")) { dismiss() } } }
+            }
             .sheet(item: $logFood) { f in LogFoodSheet(food: f) }
             .sheet(item: $addFood) { f in AddFoodSheet(food: f) }
             .sheet(isPresented: $quickAdd) { QuickAddView() }
@@ -105,7 +116,7 @@ struct SearchView: View {
                     .background(Circle().fill(Color.white.opacity(0.14)))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L("Add a list or receipt")).font(.headline).foregroundStyle(Color.cream)
-                    Text(L("Type \"2 eggs, milk, bread\" or snap the receipt — everything goes in at once"))
+                    Text(L("Type \"2 eggs, milk, bread\", snap the receipt or the groceries — everything goes in at once"))
                         .font(.caption).foregroundStyle(Color.cream.opacity(0.8)).multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }

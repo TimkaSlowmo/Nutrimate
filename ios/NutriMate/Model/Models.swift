@@ -589,6 +589,8 @@ struct AppData: Codable {
     var acts: [ActEvent] = []
     /// Выполненные недельные задания: «2026-46:rescue», «2026-46:all» (v32)
     var questsDone: [String] = []
+    /// Сканер еды по фото (v33): один раз показали, что фото может уйти Умному Нутрику (и не хранится)
+    var scanInfoSeen = false
 
     init() {}
     init(from decoder: Decoder) throws {
@@ -615,6 +617,7 @@ struct AppData: Codable {
         currency = try? c.decodeIfPresent(AppCurrency.self, forKey: .currency)
         acts = (try? c.decodeIfPresent([ActEvent].self, forKey: .acts)) ?? []
         questsDone = (try? c.decodeIfPresent([String].self, forKey: .questsDone)) ?? []
+        scanInfoSeen = (try? c.decodeIfPresent(Bool.self, forKey: .scanInfoSeen)) ?? false
     }
 }
 

@@ -156,7 +156,7 @@ enum QuickAdd {
         }.value
     }
 
-    private static func joinLines(_ obs: [VNRecognizedTextObservation]) -> String {
+    static func joinLines(_ obs: [VNRecognizedTextObservation]) -> String {
         struct Piece { let text: String; let box: CGRect }
         let pieces = obs.compactMap { o in o.topCandidates(1).first.map { Piece(text: $0.string, box: o.boundingBox) } }
             .sorted { $0.box.midY > $1.box.midY }          // сверху вниз (у Vision y снизу)
