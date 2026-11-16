@@ -202,6 +202,10 @@ jobs:
           \`\`\`
           MD
           for f in *.png; do echo "### ${f%.png}" >> README.md; echo "<img src=\"$f\" width=\"300\">" >> README.md; echo >> README.md; done
+          # другие платформы и галерея иконок живут в подпапках ветки — сохраняем их (android/, desktop/, icons/)
+          git clone -q --depth 1 -b ios-screens "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ../old-screens 2>/dev/null || true
+          for d in android desktop icons; do [ -d "../old-screens/$d" ] && cp -r "../old-screens/$d" . || true; done
+          for d in android desktop icons; do [ -f "$d/README.md" ] && printf '\n## %s\nСм. папку [%s/](%s/)\n' "$d" "$d" "$d" >> README.md || true; done
           git init -q -b ios-screens
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
