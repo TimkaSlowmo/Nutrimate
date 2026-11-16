@@ -171,7 +171,7 @@ class _PhotoAddSheetState extends State<PhotoAddSheet> {
         VisionItem('Eggs', 10, 0.88),
         VisionItem('Whole Milk', 1, 0.81),
         VisionItem('Cherry Tomato', 1, 0.42),
-        VisionItem('Dragon fruit sauce', 1, 0.6),
+        VisionItem('Zorbleberry', 1, 0.6),
       ], null);
     }
   }

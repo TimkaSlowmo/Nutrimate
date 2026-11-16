@@ -1,87 +1,70 @@
 #!/usr/bin/env bash
-# Проверка Android на эмуляторе (CI, .github/workflows/apps.yml).
-#  1) РЕЛИЗНЫЙ APK (тот, что уходит людям): установить, запустить, убедиться, что живо и не падает, снять первый экран.
-#  2) Скриншоты экранов: profile-сборка того же кода (релизный Flutter игнорирует intent-параметры от чужих
-#     процессов, в т. ч. от adb — так и надо для безопасности), экраны открываются через extra «route» (/shot/<экран>):
-#     демо-холодильник, ничего не сохраняется.
-#   bash tool/ci/android_smoke.sh NutriMate-android.apk NutriMate-android-profile.apk shots/android
+# Проверка релизного APK на эмуляторе (CI, .github/workflows/apps.yml): установить, запустить, убедиться, что живо
+# и не падает, снять скриншоты экранов. Экран для скриншота выбирается свойством debug.nutrimate.shot
+# (его может выставить только adb; MainActivity превращает его в маршрут /shot/<экран> — демо-данные, ничего не сохраняется).
+#   bash tool/ci/android_smoke.sh NutriMate-android.apk shots/android
 set -u
 APK=${1:-NutriMate-android.apk}
-SHOTS_APK=${2:-NutriMate-android-profile.apk}
-OUT=${3:-shots/android}
+OUT=${2:-shots/android}
 PKG=kz.innotech.nutrimate.app
 ACT=$PKG/kz.innotech.nutrimate.MainActivity
 LOG=logs
 mkdir -p "$OUT" "$LOG"
+A() { timeout 90 adb "$@"; }  # ни одна команда adb не может повесить проверку
 
-adb wait-for-device
-adb shell settings put global window_animation_scale 0 || true
-adb shell settings put global transition_animation_scale 0 || true
-adb shell settings put global animator_duration_scale 0 || true
+A wait-for-device
+A shell settings put global window_animation_scale 0 || true
+A shell settings put global transition_animation_scale 0 || true
+A shell settings put global animator_duration_scale 0 || true
+A install -r -g "$APK" || { echo "::error::adb install failed"; exit 1; }
+A shell dumpsys package $PKG | grep -E "versionName|versionCode" | head -2
+A logcat -c || true
 
 FAIL=0
-alive() { adb shell pidof $PKG >/dev/null; }
-shot() { # имя, маршрут (пусто — обычный запуск), ожидание
-  local name=$1 route=$2 wait=${3:-12}
-  adb shell am force-stop $PKG
-  if [ -n "$route" ]; then
-    adb shell am start -W -n "$ACT" --es route "$route" >/dev/null
-  else
-    adb shell am start -W -n "$ACT" >/dev/null
-  fi
+alive() { A shell pidof $PKG >/dev/null; }
+shot() { # имя, экран (пусто — обычный запуск), ожидание
+  local name=$1 what=$2 wait=${3:-12}
+  A shell am force-stop $PKG
+  A shell setprop debug.nutrimate.shot "${what:-none}"
+  A shell am start -n "$ACT" >/dev/null
   sleep "$wait"
   if ! alive; then
     echo "::error::NutriMate is not running after start ($name) — crash?"
     FAIL=1
   fi
-  adb exec-out screencap -p > "$OUT/$name.png"
-  echo "📸 $name ($(stat -c %s "$OUT/$name.png") bytes)"
-}
-crashes() { # файл logcat → есть ли падения именно нашего процесса
-  grep -E "Process: $PKG|Fatal signal.*$PKG|ANR in $PKG" "$1" >/dev/null
+  A exec-out screencap -p > "$OUT/$name.png"
+  local size
+  size=$(stat -c %s "$OUT/$name.png")
+  [ "$size" -gt 1000 ] || { echo "::warning::empty screenshot $name"; rm -f "$OUT/$name.png"; }
+  echo "📸 $name ($size bytes) $(date -u +%T)"
 }
 
-# ── 1. релизный APK ──
-adb install -r -g "$APK" || { echo "::error::adb install of the release APK failed"; exit 1; }
-adb shell dumpsys package $PKG | grep -E "versionName|versionCode" | head -2
-adb logcat -c || true
 shot 00-onboarding "" 20
-sleep 10
-alive || { echo "::error::release build died while idle"; FAIL=1; }
-adb logcat -d > "$LOG/logcat-release.txt" || true
-if crashes "$LOG/logcat-release.txt"; then
-  echo "::error::Release build crashed:"
-  grep -E -B 2 -A 20 "Process: $PKG|Fatal signal.*$PKG|ANR in $PKG" "$LOG/logcat-release.txt" | head -80
+shot 01-home home
+shot 02-fridge fridge
+shot 03-search search
+shot 04-recipes recipes
+shot 05-chat chat
+shot 06-photo-notice photo
+shot 07-photo photosheet
+shot 08-photo-review photoresult
+shot 09-fridge-ru fridge-ru
+shot 10-search-kk search-kk
+shot 11-photo-review-ru photoresult-ru
+A shell setprop debug.nutrimate.shot none || true
+
+# обычный запуск снова (без демо) и живо ли спустя время (анимации Нутрика, таймеры)
+A shell am force-stop $PKG
+A shell am start -n "$ACT" >/dev/null
+sleep 15
+alive || { echo "::error::NutriMate died while idle"; FAIL=1; }
+
+A logcat -d > "$LOG/logcat.txt" || true
+if grep -E "Process: $PKG|Fatal signal.*$PKG|ANR in $PKG" "$LOG/logcat.txt" >/dev/null; then
+  echo "::error::Crash in logcat:"
+  grep -E -B 2 -A 20 "Process: $PKG|Fatal signal.*$PKG|ANR in $PKG" "$LOG/logcat.txt" | head -80
   FAIL=1
 fi
-grep -E "E/flutter" "$LOG/logcat-release.txt" | head -20 || true
-echo "Release APK: FAIL=$FAIL"
-
-# ── 2. скриншоты (profile-сборка ставится начисто: Flutter подписывает profile стандартным debug-ключом) ──
-if [ -f "$SHOTS_APK" ]; then
-  adb uninstall kz.innotech.nutrimate.app >/dev/null 2>&1 || true  # профиль-сборка подписана другим (отладочным) ключом
-  adb install -r -d -g "$SHOTS_APK" || { echo "::error::adb install of the profile APK failed"; exit 1; }
-  adb logcat -c || true
-  shot 01-home /shot/home
-  shot 02-fridge /shot/fridge
-  shot 03-search /shot/search
-  shot 04-recipes /shot/recipes
-  shot 05-chat /shot/chat
-  shot 06-photo-notice /shot/photo
-  shot 07-photo /shot/photosheet
-  shot 08-photo-review /shot/photoresult
-  shot 09-fridge-ru /shot/fridge-ru
-  shot 10-search-kk /shot/search-kk
-  shot 11-photo-review-ru /shot/photoresult-ru
-  sleep 6
-  alive || { echo "::error::NutriMate died while idle"; FAIL=1; }
-  adb logcat -d > "$LOG/logcat-shots.txt" || true
-  if crashes "$LOG/logcat-shots.txt"; then
-    echo "::error::Crash during screenshots:"
-    grep -E -B 2 -A 20 "Process: $PKG|Fatal signal.*$PKG|ANR in $PKG" "$LOG/logcat-shots.txt" | head -80
-    FAIL=1
-  fi
-  grep -E "E/flutter" "$LOG/logcat-shots.txt" | head -40 || true
-fi
+grep -E "E/flutter" "$LOG/logcat.txt" | head -40 || true
 echo "FAIL=$FAIL"
 exit $FAIL
