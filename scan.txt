@@ -1,0 +1,55 @@
+[bananas] kind=nothing uncertain=true server=false
+  labels: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18, people 0.04, adult 0.04
+  items: 
+  alternatives: 
+  diag: uiImage 768×576 @1.0x orient=0
+  diag: original cg 768×576 bpc=8 alpha=5 mean=107 dark=0.00
+  diag: original/default: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+  diag: original/cpu: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+  diag: normalized cg 768×576 mean=107 dark=0.00
+  diag: normalized/default: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+  diag: normalized/cpu: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+[apples] kind=nothing uncertain=true server=false
+  labels: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18, people 0.04, adult 0.04
+  items: 
+  alternatives: 
+  diag: uiImage 768×576 @1.0x orient=0
+  diag: original cg 768×576 bpc=8 alpha=5 mean=98 dark=0.00
+  diag: original/default: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+  diag: original/cpu: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+  diag: normalized cg 768×576 mean=98 dark=0.00
+  diag: normalized/default: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+  diag: normalized/cpu: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+[bananas] kind=nothing uncertain=true server=false
+  labels: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18, people 0.04, adult 0.04
+  items: 
+  alternatives: 
+  diag: uiImage 768×576 @1.0x orient=0
+  diag: original cg 768×576 bpc=8 alpha=5 mean=107 dark=0.00
+  diag: original/default: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+  diag: original/cpu: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+  diag: normalized cg 768×576 mean=107 dark=0.00
+  diag: normalized/default: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+  diag: normalized/cpu: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+[bananas] kind=nothing uncertain=true server=false
+  labels: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18, people 0.04, adult 0.04
+  items: 
+  alternatives: 
+  diag: uiImage 768×576 @1.0x orient=0
+  diag: original cg 768×576 bpc=8 alpha=5 mean=107 dark=0.00
+  diag: original/default: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+  diag: original/cpu: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+  diag: normalized cg 768×576 mean=107 dark=0.00
+  diag: normalized/default: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+  diag: normalized/cpu: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+[bananas] kind=nothing uncertain=true server=false
+  labels: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18, people 0.04, adult 0.04
+  items: 
+  alternatives: 
+  diag: uiImage 768×576 @1.0x orient=0
+  diag: original cg 768×576 bpc=8 alpha=5 mean=107 dark=0.00
+  diag: original/default: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+  diag: original/cpu: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+  diag: normalized cg 768×576 mean=107 dark=0.00
+  diag: normalized/default: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
+  diag: normalized/cpu: outdoor 0.49, night_sky 0.49, sky 0.49, celestial_body 0.18, moon 0.18
