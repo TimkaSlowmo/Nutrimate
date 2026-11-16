@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:ui' show ImageFilter, PlatformDispatcher;
 
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -11,15 +12,40 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'food_icons.dart';
 import 'l10n.dart';
+import 'photo_add.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
-  await appState.load(); // данные сохраняются между запусками (localStorage в браузере)
+  await appState.load(); // данные сохраняются между запусками (localStorage в браузере, shared_preferences в приложениях)
+  // Скриншоты в CI: Android — `am start --es route /shot/fridge`, ПК — `NutriMate --shot fridge`.
+  // Демо-данные только в памяти: в этом режиме ничего не сохраняется.
+  final route = PlatformDispatcher.instance.defaultRouteName;
+  final k = args.indexOf('--shot');
+  final shot = route.startsWith('/shot/') ? route.substring(6) : (k >= 0 && k + 1 < args.length ? args[k + 1] : null);
+  if (shot != null && shot.isNotEmpty) appState.startShot(shot);
   runApp(const CalorieApp());
 }
 
 // Номер версии: ночной агент увеличивает его на 1 при каждом обновлении.
-const appVersion = 35;
+const appVersion = 36;
+
+/// Платформа для сервера Нутрика (заголовок x-nutrimate-client: android/36, windows/36, web/36…).
+String get clientPlatform => kIsWeb
+    ? 'web'
+    : switch (defaultTargetPlatform) {
+        TargetPlatform.android => 'android',
+        TargetPlatform.iOS => 'ios',
+        TargetPlatform.windows => 'windows',
+        TargetPlatform.macOS => 'macos',
+        TargetPlatform.linux => 'linux',
+        _ => 'app',
+      };
+String get clientTag => '$clientPlatform/$appVersion';
+
+/// Вкладка, с которой открывается главный экран (скриншоты), и запросы «открой вкладку / найди …» из листов.
+int shotTab = 0;
+final tabRequest = ValueNotifier<int?>(null);
+final searchRequest = ValueNotifier<String?>(null);
 
 const burgundy = Color(0xFF6A041C);
 const cream = Color(0xFFF5F1E5);
@@ -2989,6 +3015,10 @@ class AppState extends ChangeNotifier {
   final dislikes = <String>{};
   final chat = <ChatMessage>[ChatMessage('Hi! I\'m your AI Chef 👩‍🍳 Ask me what to cook, what expires soon, how to store food — or tell me what you don\'t like.', isUser: false)];
   bool showTutorial = false, registered = false;
+  /// Умный Нутрик (онлайн-ИИ: чат и фото). Выключен — всё офлайн, фото не используются.
+  bool smartAi = true, photoNoticeSeen = false;
+  /// Режим скриншотов CI: демо-данные, ничего не сохраняется.
+  bool shotMode = false;
   int wasted = 0, suggestIndex = 0, _id = 0;
   String name = 'Guest', email = '';
   bool isMan = true;
@@ -3259,6 +3289,48 @@ class AppState extends ChangeNotifier {
     nutrikEvent('add');
   }
 
+  /// Скриншоты CI: «home|search|fridge|recipes|chat|profile|onboarding», можно с языком: «fridge-ru».
+  void startShot(String what) {
+    shotMode = true;
+    final parts = what.split('-');
+    if (parts.length > 1 && appLangs.contains(parts[1])) appLang = parts[1];
+    final tab = parts.first;
+    showTutorial = false;
+    if (tab == 'onboarding') {
+      registered = false;
+      return;
+    }
+    registered = true;
+    if (name == 'Guest') name = 'Aru';
+    if (pantry.isEmpty) loadDemo();
+    shotTab = const {'home': 0, 'search': 1, 'fridge': 2, 'recipes': 3, 'chat': 4}[tab] ?? 0;
+  }
+
+  void setSmartAi(bool v) {
+    smartAi = v;
+    notifyListeners();
+  }
+
+  void markPhotoNoticeSeen() {
+    photoNoticeSeen = true;
+    notifyListeners();
+  }
+
+  /// Добавление по фото: у каждого продукта своё количество и место (холодильник / морозилка / шкаф).
+  void addPlaced(List<(FoodItem, int, Storage)> items) {
+    final n = now();
+    for (final (f, q, st) in items) {
+      final days = st == Storage.freezer ? max(f.shelf, 90) : f.shelf;
+      for (var i = 0; i < q; i++) {
+        pantry.add(PantryItem(_id++, f, n, n.add(Duration(days: days)), st));
+      }
+      if (shopping.remove(f.name)) bought++;
+    }
+    nutrikEvent('add');
+    _check();
+    notifyListeners();
+  }
+
   void eat(PantryItem p, int grams, {bool finished = true}) {
     rememberUndo();
     if (finished) {
@@ -3406,9 +3478,12 @@ class AppState extends ChangeNotifier {
     'money': [rescuedMoney, wastedMoney],
     'streak': streakStart.millisecondsSinceEpoch,
     'waste': [for (final w in wasteLog) [w.food.name, w.reason.index, w.money]],
+    'smartAi': smartAi,
+    'photoNotice': photoNoticeSeen,
   };
 
   Future<void> save() async {
+    if (shotMode) return; // скриншоты CI: демо-данные не затирают настоящие
     try {
       _prefs ??= await SharedPreferences.getInstance();
       await _prefs!.setString(_key, jsonEncode(toJson()));
@@ -3464,6 +3539,8 @@ class AppState extends ChangeNotifier {
     {
       DateTime d(dynamic ms) => DateTime.fromMillisecondsSinceEpoch((ms as num).toInt());
       registered = j['registered'] == true;
+      smartAi = j['smartAi'] != false;
+      photoNoticeSeen = j['photoNotice'] == true;
       name = j['name'] ?? name;
       email = j['email'] ?? email;
       isMan = j['isMan'] ?? isMan;
@@ -3578,7 +3655,8 @@ class SmartAiService implements AiService {
     return NutrikActions.parse(message) != null;
   }
 
-  Future<String> _device() async {
+  /// Анонимный id устройства для дневных лимитов сервера (чат и фото).
+  Future<String> deviceId() async {
     if (_deviceId != null) return _deviceId!;
     var id = '';
     try {
@@ -3586,11 +3664,11 @@ class SmartAiService implements AiService {
       id = prefs.getString('nutrik_device_id') ?? '';
       if (id.isEmpty) {
         final r = Random.secure();
-        id = 'web-${List.generate(24, (_) => 'abcdefghijklmnopqrstuvwxyz0123456789'[r.nextInt(36)]).join()}';
+        id = '$clientPlatform-${List.generate(24, (_) => 'abcdefghijklmnopqrstuvwxyz0123456789'[r.nextInt(36)]).join()}';
         await prefs.setString('nutrik_device_id', id);
       }
     } catch (_) {
-      id = 'web-${DateTime.now().millisecondsSinceEpoch}';
+      id = '$clientPlatform-${DateTime.now().millisecondsSinceEpoch}';
     }
     return _deviceId = id;
   }
@@ -3617,7 +3695,7 @@ class SmartAiService implements AiService {
 
   @override
   Future<String> reply(String message, AppState s) async {
-    if (serverUrl.isEmpty || isLocalCommand(message) || _pausedDay == todayNum()) return _local.reply(message, s);
+    if (serverUrl.isEmpty || !s.smartAi || isLocalCommand(message) || _pausedDay == todayNum()) return _local.reply(message, s);
     try {
       final history = s.chat.skip(1).toList();
       final msgs = history
@@ -3627,8 +3705,8 @@ class SmartAiService implements AiService {
       if (msgs.isEmpty || msgs.last['role'] != 'user') msgs.add({'role': 'user', 'content': message});
       final res = await http
           .post(Uri.parse('$serverUrl/chat'),
-              headers: {'content-type': 'application/json', 'x-nutrimate-client': 'web'},
-              body: jsonEncode({'deviceId': await _device(), 'messages': msgs, 'context': _context(s), 'actions': true}))
+              headers: {'content-type': 'application/json', 'x-nutrimate-client': clientTag},
+              body: jsonEncode({'deviceId': await deviceId(), 'messages': msgs, 'context': _context(s), 'actions': true}))
           .timeout(const Duration(seconds: 12));
       if (res.statusCode == 429) _pausedDay = todayNum();
       if (res.statusCode == 200) {
@@ -4062,7 +4140,46 @@ class CalorieApp extends StatelessWidget {
         ).copyWith(surface: cream, surfaceTint: Colors.transparent, secondaryContainer: const Color(0xFFE8DFC8), primaryContainer: const Color(0xFFE8DFC8)),
         scaffoldBackgroundColor: cream,
       ),
-      home: appState.registered ? MainScreen(state: appState, ai: aiService) : RegisterScreen(state: appState, ai: aiService),
+      // На широком окне (ПК, планшет, браузер) телефонный интерфейс не растягивается: колонка по центру на фирменном фоне.
+      builder: (context, child) => WideFrame(child: child ?? const SizedBox()),
+      // Стартовый экран. Маршрут из Android-intent (скриншоты CI: /shot/…) не ищем в таблице — всегда он.
+      onGenerateInitialRoutes: (_) => [_startRoute()],
+      onGenerateRoute: (_) => _startRoute(),
+    );
+  }
+
+  static Route<void> _startRoute() => MaterialPageRoute(
+    builder: (_) => appState.registered ? MainScreen(state: appState, ai: aiService) : RegisterScreen(state: appState, ai: aiService),
+  );
+}
+
+/// Широкое окно: колонка 600 px по центру (MediaQuery подменён, чтобы экраны и листы считали ширину колонки),
+/// вокруг — бордовый градиент. Узкое окно / телефон — без изменений.
+class WideFrame extends StatelessWidget {
+  final Widget child;
+  const WideFrame({super.key, required this.child});
+  static const maxWidth = 600.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    if (mq.size.width <= maxWidth + 80) return child;
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF8E1230), Color(0xFF4A0213)]),
+      ),
+      child: Center(
+        child: Container(
+          width: maxWidth,
+          decoration: BoxDecoration(
+            color: cream,
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 40, spreadRadius: 2)],
+          ),
+          child: ClipRect(
+            child: MediaQuery(data: mq.copyWith(size: Size(maxWidth, mq.size.height)), child: child),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -6069,9 +6186,23 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
-  int i = 0;
+  int i = shotTab;
   late final AnimationController fade = AnimationController(vsync: this, duration: const Duration(milliseconds: 260), value: 1);
   bool _iconsCached = false;
+
+  @override
+  void initState() {
+    super.initState();
+    tabRequest.addListener(_onTabRequest);
+  }
+
+  // «Найти вручную» из листа фото и т. п.: переключить вкладку
+  void _onTabRequest() {
+    final v = tabRequest.value;
+    if (v == null) return;
+    tabRequest.value = null;
+    _tab(v);
+  }
 
   @override
   void didChangeDependencies() {
@@ -6084,6 +6215,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
 
   @override
   void dispose() {
+    tabRequest.removeListener(_onTabRequest);
     fade.dispose();
     super.dispose();
   }
@@ -8758,7 +8890,26 @@ class _SearchPageState extends State<SearchPage> {
   String? cat;
 
   @override
+  void initState() {
+    super.initState();
+    searchRequest.addListener(_onSearchRequest);
+  }
+
+  // «Найти вручную» из листа фото: поиск с готовым запросом
+  void _onSearchRequest() {
+    final v = searchRequest.value;
+    if (v == null) return;
+    searchRequest.value = null;
+    _c.text = v;
+    setState(() {
+      q = v;
+      cat = null;
+    });
+  }
+
+  @override
   void dispose() {
+    searchRequest.removeListener(_onSearchRequest);
     _c.dispose();
     super.dispose();
   }
@@ -8931,6 +9082,11 @@ class _SearchPageState extends State<SearchPage> {
             Row(
               children: [
                 Expanded(child: Text(tr('Search products'), style: titleStyle)),
+                IconButton(
+                  tooltip: tr('Add by photo'),
+                  onPressed: () => photoAddSheet(context, widget.state),
+                  icon: const Icon(Icons.photo_camera_outlined, color: burgundy),
+                ),
                 TextButton.icon(
                   onPressed: () => quickAddSheet(context, widget.state),
                   icon: const Icon(Icons.playlist_add, color: burgundy),
@@ -9031,6 +9187,7 @@ class _PantryPageState extends State<PantryPage> {
             Row(
               children: [
                 Expanded(child: Text(tr('Your fridge'), style: titleStyle)),
+                IconButton.filledTonal(tooltip: tr('Add by photo'), onPressed: () => photoAddSheet(context, s), icon: const Icon(Icons.photo_camera_outlined)),
                 if (all.isNotEmpty) IconButton.filledTonal(tooltip: tr('Add products'), onPressed: widget.onSearch, icon: const Icon(Icons.add)),
               ],
             ),
@@ -9963,6 +10120,16 @@ class ProfilePage extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
+            SwitchListTile(
+              secondary: const Icon(Icons.auto_awesome, color: burgundy),
+              title: Text(tr('Smart Nutrik (online AI)')),
+              subtitle: Text(
+                tr('Chat answers and photo recognition through the free NutriMate server. Off — Nutrik answers offline and photos are not used.'),
+                style: const TextStyle(fontSize: 12),
+              ),
+              value: state.smartAi,
+              onChanged: state.setSmartAi,
             ),
             SwitchListTile(
               title: Text(tr('Male')),
