@@ -57,8 +57,9 @@ fi
 grep -E "E/flutter" "$LOG/logcat-release.txt" | head -20 || true
 echo "Release APK: FAIL=$FAIL"
 
-# ── 2. скриншоты (profile-сборка поверх, та же подпись) ──
+# ── 2. скриншоты (profile-сборка ставится начисто: Flutter подписывает profile стандартным debug-ключом) ──
 if [ -f "$SHOTS_APK" ]; then
+  adb uninstall kz.innotech.nutrimate.app >/dev/null 2>&1 || true  # профиль-сборка подписана другим (отладочным) ключом
   adb install -r -d -g "$SHOTS_APK" || { echo "::error::adb install of the profile APK failed"; exit 1; }
   adb logcat -c || true
   shot 01-home /shot/home
