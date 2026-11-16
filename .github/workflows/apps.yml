@@ -66,11 +66,24 @@ jobs:
           APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
           "$APKSIGNER" verify --print-certs NutriMate-android.apk | grep -E "SHA-256|DN" || true
           unzip -l NutriMate-android.apk | grep -E "lib/.*libapp.so"
+      - name: Build profile APK for emulator screenshots (not published)
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          flutter build apk --profile --target-platform android-x64
+          cp build/app/outputs/flutter-apk/app-profile.apk NutriMate-android-profile.apk
       - uses: actions/upload-artifact@v4
         with:
           name: NutriMate-android
           path: NutriMate-android.apk
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NutriMate-android-profile
+          path: NutriMate-android-profile.apk
+          retention-days: 3
 
   android-test:
     needs: android
@@ -81,6 +94,9 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: NutriMate-android
+      - uses: actions/download-artifact@v4
+        with:
+          name: NutriMate-android-profile
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -95,7 +111,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
-          script: bash tool/ci/android_smoke.sh NutriMate-android.apk shots/android
+          script: bash tool/ci/android_smoke.sh NutriMate-android.apk NutriMate-android-profile.apk shots/android
       - uses: actions/upload-artifact@v4
         if: always()
         with:

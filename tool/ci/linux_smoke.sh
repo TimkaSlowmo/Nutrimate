@@ -37,5 +37,6 @@ run() { # имя экрана (--shot), имя файла
 
 run home linux-home
 run fridge linux-fridge
+run photoresult linux-photo-review
 ls -la "$OUT"
 exit $FAIL

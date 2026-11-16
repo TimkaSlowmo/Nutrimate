@@ -44,6 +44,7 @@ String get clientTag => '$clientPlatform/$appVersion';
 
 /// Вкладка, с которой открывается главный экран (скриншоты), и запросы «открой вкладку / найди …» из листов.
 int shotTab = 0;
+String shotSheet = '';
 final tabRequest = ValueNotifier<int?>(null);
 final searchRequest = ValueNotifier<String?>(null);
 
@@ -3375,7 +3376,12 @@ class AppState extends ChangeNotifier {
     registered = true;
     if (name == 'Guest') name = 'Aru';
     if (pantry.isEmpty) loadDemo();
-    shotTab = const {'home': 0, 'search': 1, 'fridge': 2, 'recipes': 3, 'chat': 4}[tab] ?? 0;
+    shotTab = const {'home': 0, 'search': 1, 'fridge': 2, 'recipes': 3, 'chat': 4, 'photo': 2, 'photosheet': 1, 'photoresult': 2}[tab] ?? 0;
+    // photo — разовое предупреждение о фото; photosheet — выбор «Продукты / Чек»; photoresult — лист проверки (пример)
+    if (tab.startsWith('photo')) {
+      shotSheet = tab;
+      photoNoticeSeen = tab != 'photo';
+    }
   }
 
   void setSmartAi(bool v) {
@@ -6266,6 +6272,11 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   void initState() {
     super.initState();
     tabRequest.addListener(_onTabRequest);
+    if (shotSheet.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) photoAddSheet(context, widget.state, demo: shotSheet == 'photoresult');
+      });
+    }
   }
 
   // «Найти вручную» из листа фото и т. п.: переключить вкладку

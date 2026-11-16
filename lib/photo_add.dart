@@ -92,7 +92,7 @@ FoodItem? visionMatch(String name) {
 }
 
 /// Кнопка 📷 на «Поиске» и в «Холодильнике».
-Future<void> photoAddSheet(BuildContext ctx, AppState s) async {
+Future<void> photoAddSheet(BuildContext ctx, AppState s, {bool demo = false}) async {
   if (!s.smartAi) {
     final on = await showDialog<bool>(
       context: ctx,
@@ -129,7 +129,7 @@ Future<void> photoAddSheet(BuildContext ctx, AppState s) async {
     backgroundColor: cream,
     showDragHandle: true,
     isScrollControlled: true,
-    builder: (_) => PhotoAddSheet(state: s, host: ctx),
+    builder: (_) => PhotoAddSheet(state: s, host: ctx, demo: demo),
   );
 }
 
@@ -148,7 +148,9 @@ enum _Phase { pick, busy, result, failed }
 class PhotoAddSheet extends StatefulWidget {
   final AppState state;
   final BuildContext host;
-  const PhotoAddSheet({super.key, required this.state, required this.host});
+  /// Скриншоты CI: сразу показать лист проверки с примером ответа сервера (без сети).
+  final bool demo;
+  const PhotoAddSheet({super.key, required this.state, required this.host, this.demo = false});
   @override
   State<PhotoAddSheet> createState() => _PhotoAddSheetState();
 }
@@ -159,6 +161,20 @@ class _PhotoAddSheetState extends State<PhotoAddSheet> {
   VisionFail? fail;
   final rows = <_Row>[];
   final unknown = <String>[];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.demo) {
+      _apply(const [
+        VisionItem('Bananas', 5, 0.92),
+        VisionItem('Eggs', 10, 0.88),
+        VisionItem('Whole Milk', 1, 0.81),
+        VisionItem('Cherry Tomato', 1, 0.42),
+        VisionItem('Dragon fruit sauce', 1, 0.6),
+      ], null);
+    }
+  }
 
   static bool get _hasCamera => !kIsWeb && (defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS);
 
@@ -193,6 +209,11 @@ class _PhotoAddSheetState extends State<PhotoAddSheet> {
     }
     final (items, f) = await VisionService.recognize(jpeg, mode);
     if (!mounted) return;
+    setState(() => _apply(items, f));
+  }
+
+  /// Ответ сервера → строки листа (одинаковые продукты складываются) + «видел, но нет в базе».
+  void _apply(List<VisionItem> items, VisionFail? f) {
     rows.clear();
     unknown.clear();
     for (final it in items) {
@@ -213,10 +234,8 @@ class _PhotoAddSheetState extends State<PhotoAddSheet> {
         rows.add(_Row(food, it.name, it.qty, it.confidence));
       }
     }
-    setState(() {
-      fail = f;
-      phase = f == null ? _Phase.result : _Phase.failed;
-    });
+    fail = f;
+    phase = f == null ? _Phase.result : _Phase.failed;
   }
 
   void _searchManually() {
