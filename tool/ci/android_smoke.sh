@@ -20,6 +20,8 @@ A install -r -g "$APK" || { echo "::error::adb install failed"; exit 1; }
 A shell dumpsys package $PKG | grep -E "versionName|versionCode" | head -2
 A logcat -c || true
 
+# живой лог в файл: если эмулятор упадёт, последние строки покажут, что было перед этим
+(adb logcat -v time > "$LOG/live.txt" 2>&1 &)
 FAIL=0
 alive() { A shell pidof $PKG >/dev/null; }
 shot() { # имя, экран (пусто — обычный запуск), ожидание
@@ -43,6 +45,11 @@ shot() { # имя, экран (пусто — обычный запуск), ож
   fi
   [ "$size" -gt 1000 ] || { echo "::warning::empty screenshot $name"; rm -f "$OUT/$name.png"; }
   echo "📸 $name ($size bytes) $(date -u +%T)"
+  if ! timeout 10 adb get-state >/dev/null 2>&1; then
+    echo "::error::emulator went offline during $name — last log lines:"
+    grep -vE " [VD]/" "$LOG/live.txt" | tail -60
+    exit 1
+  fi
 }
 
 shot 00-onboarding "" 20
