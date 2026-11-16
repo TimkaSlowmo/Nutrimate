@@ -253,12 +253,16 @@ enum PhotoScan {
         for (i, (f, o)) in whole.enumerated() where i == 0 || (o.confidence >= 0.3 && i < 3) {
             record(f, o, counted: false)
         }
-        let top = order.map { conf[$0.name] ?? 0 }.max() ?? 0
-        let items = order
-            .filter { (conf[$0.name] ?? 0) >= max(minLabel, top * 0.4) }
-            .sorted { (conf[$0.name] ?? 0) > (conf[$1.name] ?? 0) }
-            .prefix(4)
-            .map { ScanItem(food: $0, qty: max(1, count[$0.name] ?? 0), confidence: conf[$0.name] ?? 0, source: source[$0.name] ?? "") }
+        func c(_ f: Food) -> Double { conf[f.name] ?? 0 }
+        let top: Double = order.map(c).max() ?? 0
+        let minConf: Double = max(minLabel, top * 0.4)
+        var kept: [Food] = order.filter { c($0) >= minConf }
+        kept.sort { c($0) > c($1) }
+        var items: [ScanItem] = []
+        for f in kept.prefix(4) {
+            let n: Int = max(1, count[f.name] ?? 0)
+            items.append(ScanItem(food: f, qty: n, confidence: c(f), source: source[f.name] ?? ""))
+        }
         let uncertain = items.isEmpty || top < confident
         // варианты: что ещё похоже + подсказки общих меток («fruit» → яблоко, банан, апельсин)
         var alts: [Food] = uncertain ? items.map(\.food) : []
@@ -272,7 +276,7 @@ enum PhotoScan {
             }
         }
         let query = uncertain ? (alts.first.map { N($0.name) } ?? "") : ""
-        return (Array(items), uncertain, Array(alts.prefix(3)), query)
+        return (items, uncertain, Array(alts.prefix(3)), query)
     }
 
     /// Ответ сервера → продукты базы (одинаковые складываются). Неизвестные имена — отдельно (для поиска).
@@ -366,16 +370,22 @@ enum PhotoScan {
 
         // несколько продуктов в кадре: вырезаем до 4 заметных объектов и классифицируем каждый
         let W = CGFloat(cg.width), H = CGFloat(cg.height)
-        let boxes = (saliency.results?.first?.salientObjects ?? [])
-            .map(\.boundingBox)
-            .filter { $0.width * $0.height >= 0.02 && $0.width * $0.height <= 0.85 }
-            .sorted { $0.width * $0.height > $1.width * $1.height }
-            .prefix(4)
-        guard boxes.count >= 2 || (boxes.first.map { $0.width * $0.height < 0.5 } ?? false) else { return out }
+        func area(_ r: CGRect) -> CGFloat { r.width * r.height }
+        let objects: [VNRectangleObservation] = saliency.results?.first?.salientObjects ?? []
+        var rects: [CGRect] = objects.map { $0.boundingBox }
+        rects = rects.filter { (r: CGRect) -> Bool in area(r) >= 0.02 && area(r) <= 0.85 }
+        rects.sort { (a: CGRect, b: CGRect) -> Bool in area(a) > area(b) }
+        let boxes = Array(rects.prefix(4))
+        let single: Bool = boxes.count == 1 && area(boxes[0]) < 0.5
+        guard boxes.count >= 2 || single else { return out }
         for b in boxes {
             let pad: CGFloat = 0.08
             let nb = b.insetBy(dx: -b.width * pad, dy: -b.height * pad).intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
-            let rect = CGRect(x: nb.minX * W, y: (1 - nb.maxY) * H, width: nb.width * W, height: nb.height * H).integral
+            let x: CGFloat = nb.minX * W
+            let y: CGFloat = (1 - nb.maxY) * H
+            let w: CGFloat = nb.width * W
+            let h: CGFloat = nb.height * H
+            let rect = CGRect(x: x, y: y, width: w, height: h).integral
             guard rect.width >= 48, rect.height >= 48, let crop = cg.cropping(to: rect) else { continue }
             let req = VNClassifyImageRequest()
             prepare(req)
@@ -413,8 +423,9 @@ enum PhotoScan {
             if m.items.isEmpty {
                 // сервер назвал то, чего нет в базе: подскажем похожее и подставим имя в поиск
                 if let name = m.unknown.first {
-                    let similar = db.search(name, category: nil).prefix(3)
-                    r.alternatives = Array((Array(similar) + r.alternatives).reduce(into: [Food]()) { if !$0.contains($1) { $0.append($1) } }.prefix(3))
+                    var merged: [Food] = Array(db.search(name, category: nil).prefix(3))
+                    for f in r.alternatives where !merged.contains(f) { merged.append(f) }
+                    r.alternatives = Array(merged.prefix(3))
                     r.query = name
                     if r.kind == .nothing && !r.alternatives.isEmpty { r.kind = .products; r.uncertain = true }
                 }
@@ -462,7 +473,11 @@ enum PhotoScan {
         var s = "[\(name)] kind=\(r.kind) uncertain=\(r.uncertain) server=\(r.viaServer)\n"
         s += "  labels: \(fmt(r.labels))\n"
         for (i, c) in r.cropLabels.enumerated() { s += "  crop \(i + 1): \(fmt(c))\n" }
-        s += "  items: " + r.items.map { "\($0.food.name) ×\($0.qty) (\($0.source) \(String(format: "%.2f", $0.confidence)))" }.joined(separator: ", ") + "\n"
+        let found: [String] = r.items.map { (it: ScanItem) -> String in
+            let c = String(format: "%.2f", it.confidence)
+            return "\(it.food.name) ×\(it.qty) (\(it.source) \(c))"
+        }
+        s += "  items: " + found.joined(separator: ", ") + "\n"
         s += "  alternatives: " + r.alternatives.map(\.name).joined(separator: ", ") + "\n"
         if !r.text.isEmpty { s += "  text: " + String(r.text.replacingOccurrences(of: "\n", with: " | ").prefix(300)) + "\n" }
         print(s)
