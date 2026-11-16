@@ -16,6 +16,7 @@ from icons_e import *  # noqa: E402,F401,F403  — зелень, специи, �
 from icons_f import *  # noqa: E402,F401,F403  — фрукты и ягоды
 from icons_g import *  # noqa: E402,F401,F403  — новые продукты
 from icons_h import *  # noqa: E402,F401,F403  — грибы, бобовые, крупы, паста, масла, сахар
+from icons_i import *  # noqa: E402,F401,F403  — мясо и птица
 
 
 def main(only=()):
