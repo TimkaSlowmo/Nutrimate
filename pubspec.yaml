@@ -1,7 +1,7 @@
 name: nutrimate
 description: NutriMate Pro - calories, fridge, recipes and less food waste.
 publish_to: 'none'
-version: 36.0.0+36
+version: 37.0.0+37
 
 environment:
   sdk: ^3.7.0
@@ -18,6 +18,16 @@ dependencies:
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: SourceSerif4
+      fonts:
+        - asset: assets/fonts/SourceSerif4-Regular.ttf
+        - asset: assets/fonts/SourceSerif4-Semibold.ttf
+          weight: 600
+        - asset: assets/fonts/SourceSerif4-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/SourceSerif4-It.ttf
+          style: italic
   assets:
     - assets/icons/e/
     - assets/icons/p/

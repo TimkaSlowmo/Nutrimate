@@ -4211,7 +4211,7 @@ class CalorieApp extends StatelessWidget {
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: ThemeData(
         useMaterial3: true,
-        fontFamily: 'serif',
+        fontFamily: 'SourceSerif4',
         colorScheme: ColorScheme.fromSeed(
           seedColor: burgundy,
           primary: burgundy,
@@ -4760,7 +4760,8 @@ class NutrikSays extends StatefulWidget {
   final double? point;
   final double size;
   final NutrikMode mode;
-  const NutrikSays({super.key, required this.text, this.point, this.size = 96, this.mode = NutrikMode.idle});
+  final VoidCallback? onTap;
+  const NutrikSays({super.key, required this.text, this.point, this.size = 96, this.mode = NutrikMode.idle, this.onTap});
   @override
   State<NutrikSays> createState() => _NutrikSaysState();
 }
@@ -4787,24 +4788,40 @@ class _NutrikSaysState extends State<NutrikSays> with SingleTickerProviderStateM
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Nutrik(size: widget.size, talking: c.value < 1, point: widget.point, mode: widget.mode),
-            const SizedBox(width: 4),
+            const SizedBox(width: 10),
             Expanded(
               child: GestureDetector(
-                onTap: () => c.value = 1, // тап — показать весь текст сразу
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: burgundy, width: 1.5),
-                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3))],
-                  ),
-                  child: Stack(
-                    children: [
-                      Opacity(opacity: 0, child: Text(widget.text, style: const TextStyle(fontSize: 15))),
-                      Text(widget.text.substring(0, n), style: const TextStyle(fontSize: 15, color: Colors.black87)),
-                    ],
-                  ),
+                onTap: () {
+                  if (c.value < 1) {
+                    c.value = 1; // тап — показать весь текст сразу
+                  } else {
+                    widget.onTap?.call();
+                  }
+                },
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned(
+                      left: -5,
+                      top: 26,
+                      child: Transform.rotate(angle: pi / 4, child: Container(width: 14, height: 14, color: Colors.white.withValues(alpha: 0.92))),
+                    ),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: [BoxShadow(color: burgundy.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, 4))],
+                      ),
+                      child: Stack(
+                        children: [
+                          Opacity(opacity: 0, child: Text(widget.text, style: const TextStyle(fontSize: 18, height: 1.3))),
+                          Text(widget.text.substring(0, n), style: const TextStyle(fontSize: 18, height: 1.3, color: burgundy)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -5402,8 +5419,6 @@ class _TutorialState extends State<TutorialOverlay> with TickerProviderStateMixi
     TourStep('Everything you own, sorted by urgency. Swipe right to eat, left to throw away. Filter by fridge, freezer or pantry.', target: Tour.fridgeTop, tab: 2),
     TourStep('Hungry? Tap Recipes 👇', target: Tour.nav[3], tab: 2, kind: TourKind.tap, opens: 3),
     TourStep('Recipes that use up your spoiling food come first. Try the ♻️ Rescue food and 🌱 Zero-waste filters!', target: Tour.recipeFilters, tab: 3),
-    TourStep('Last tab: tap AI Chef 👇', target: Tour.nav[4], tab: 3, kind: TourKind.tap, opens: 4),
-    TourStep('Ask me anything: what to cook, how to store tomatoes, whether you can freeze bread...', target: Tour.chatInput, tab: 4),
     const TourStep('One more secret: I live at the bottom of your screen! Grab me and drag me around. Go on, try it now! 👆', kind: TourKind.drag, tab: 0),
     const TourStep('Purr-fect! 🎉 Tap me to pet me, double-tap to make me jump, or throw me if you dare 😼 Now let\'s go save some food!', kind: TourKind.finish, tab: 0),
   ];
@@ -5818,7 +5833,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           decoration: BoxDecoration(color: sel ? burgundy : sand, borderRadius: BorderRadius.circular(14)),
           child: AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 250),
-            style: TextStyle(fontFamily: 'serif', fontWeight: FontWeight.bold, color: sel ? Colors.white : Colors.black87),
+            style: TextStyle(fontFamily: 'SourceSerif4', fontWeight: FontWeight.bold, color: sel ? Colors.white : Colors.black87),
             child: Text(t),
           ),
         ),
@@ -6119,9 +6134,11 @@ class GlassNav extends StatefulWidget {
 class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin {
   late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 850))..value = 1;
   double from = 0;
-  late double to = widget.index.toDouble();
-  static const icons = [Icons.home_rounded, Icons.search_rounded, Icons.kitchen_rounded, Icons.restaurant_menu_rounded, Icons.chat_bubble_rounded];
-  static const labels = ['Home', 'Search', 'Fridge', 'Recipes', 'AI'];
+  late double to = order.indexOf(widget.index).toDouble();
+  static const icons = [Icons.home_rounded, Icons.search_rounded, Icons.kitchen_rounded, Icons.restaurant_rounded, Icons.account_circle_rounded];
+  static const labels = ['Home', 'Search', 'Fridge', 'Recipes', 'Profile'];
+  /// Порядок как на iOS: Главная, Холодильник, Поиск, Рецепты, Профиль (позиция → номер вкладки).
+  static const order = [0, 2, 1, 3, 4];
 
   double get _pos => from + (to - from) * Curves.elasticOut.transform(c.value);
 
@@ -6130,7 +6147,7 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
     super.didUpdateWidget(old);
     if (old.index != widget.index) {
       from = _pos;
-      to = widget.index.toDouble();
+      to = order.indexOf(widget.index).toDouble();
       c.forward(from: 0);
     }
   }
@@ -6143,7 +6160,7 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
 
   Widget _item(int i) {
     final on = widget.index == i;
-    final col = on ? burgundy : Colors.black87;
+    final col = on ? cream : burgundy;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -6155,12 +6172,17 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
           child: Badge(
             isLabelVisible: i == 2 && widget.fridge > 0,
             label: Text('${widget.fridge}'),
-            child: Icon(icons[i], color: col, size: 25),
+            child: Icon(icons[i], color: col, size: 26),
           ),
         ),
-        Text(
-          tr(labels[i]),
-          style: TextStyle(fontSize: 10, color: col, fontWeight: on ? FontWeight.bold : FontWeight.w500),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            tr(labels[i]),
+            maxLines: 1,
+            softWrap: false,
+            style: TextStyle(fontSize: 10.5, color: col, fontWeight: on ? FontWeight.bold : FontWeight.w600),
+          ),
         ),
       ],
     );
@@ -6183,17 +6205,17 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(32),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 2.5, sigmaY: 2.5),
+                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Colors.white.withValues(alpha: 0.2), Colors.white.withValues(alpha: 0.03)]),
+                        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Colors.white.withValues(alpha: 0.55), Colors.white.withValues(alpha: 0.3)]),
                       ),
                       child: AnimatedBuilder(
                         animation: c,
                         builder: (_, _) {
                           final sq = sin(c.value * pi).abs();
                           final dist = min((to - from).abs(), 3.0);
-                          final w = (seg - 8) * (1 + 0.2 * sq * dist);
+                          final w = (seg + 8) * (1 + 0.1 * sq * dist);
                           final h = 54 * (1 - 0.12 * sq);
                           final left = _pos * seg + (seg - w) / 2;
                           return Stack(
@@ -6203,32 +6225,18 @@ class _GlassNavState extends State<GlassNav> with SingleTickerProviderStateMixin
                                 top: (64 - h) / 2,
                                 width: w,
                                 height: h,
-                                child: RawMagnifier(
-                                  size: Size(w, h),
-                                  magnificationScale: 1.35,
-                                  decoration: MagnifierDecoration(
-                                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(27))),
-                                    shadows: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 3))],
-                                  ),
-                                  child: CustomPaint(
-                                    foregroundPainter: RimPainter(27, [Colors.white, const Color(0xAAF2C879), const Color(0x889B1B33), const Color(0xCCFFFFFF)], shadow: false),
-                                    child: DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(27),
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                          stops: const [0, 0.5],
-                                          colors: [Colors.white.withValues(alpha: 0.4), Colors.white.withValues(alpha: 0)],
-                                        ),
-                                      ),
-                                    ),
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(27),
+                                    gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF8E1230), burgundy]),
+                                    border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                                    boxShadow: [BoxShadow(color: burgundy.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
                                   ),
                                 ),
                               ),
                               Row(
                                 children: [
-                                  for (var i = 0; i < 5; i++)
+                                  for (final i in order)
                                     Expanded(
                                       child: KeyedSubtree(
                                         key: Tour.nav[i],
@@ -6321,7 +6329,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
       case 3:
         return RecipesPage(state: s);
       default:
-        return ChatPage(state: s, ai: widget.ai);
+        return ProfilePage(state: s, ai: widget.ai);
     }
   }
 
@@ -6349,7 +6357,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                   ),
                 ),
                 // В чате пол Нутрик поднят над полем ввода.
-                NutrikRoamer(paused: s.showTutorial, bottom: 76 + pad + (i == 4 ? 128 : 6), state: s),
+                NutrikRoamer(paused: s.showTutorial, bottom: 76 + pad + 6, state: s),
               ],
             ),
             bottomNavigationBar: GlassNav(index: i, fridge: s.pantry.length, onTap: _tab),
@@ -6400,7 +6408,7 @@ class Glass extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         borderRadius: r,
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [(tint ?? Colors.white).withValues(alpha: 0.7), (tint ?? Colors.white).withValues(alpha: 0.28)]),
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [(tint ?? Colors.white).withValues(alpha: 0.72), (tint ?? const Color(0xFFFBF8F1)).withValues(alpha: 0.58)]),
         border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 1.2),
         boxShadow: [BoxShadow(color: burgundy.withValues(alpha: 0.07), blurRadius: 14, offset: const Offset(0, 6))],
       ),
@@ -6686,7 +6694,7 @@ class RingPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = w
-        ..color = Colors.black12,
+        ..color = burgundy.withValues(alpha: 0.1),
     );
     canvas.drawArc(
       r,
@@ -8038,205 +8046,576 @@ class _HomePageState extends State<HomePage> {
     onPressed: f,
   );
 
+  int? _tip;
+
+  static String _dateLine(DateTime d) {
+    const wdRu = ['понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье'];
+    const wdKk = ['дүйсенбі', 'сейсенбі', 'сәрсенбі', 'бейсенбі', 'жұма', 'сенбі', 'жексенбі'];
+    const wdEn = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const moRu = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+    const moKk = ['қаңтар', 'ақпан', 'наурыз', 'сәуір', 'мамыр', 'маусым', 'шілде', 'тамыз', 'қыркүйек', 'қазан', 'қараша', 'желтоқсан'];
+    const moEn = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    final i = d.weekday - 1, m = d.month - 1;
+    if (appLang == 'ru') return '${wdRu[i]}, ${d.day} ${moRu[m]}';
+    if (appLang == 'kk') return '${d.day} ${moKk[m]}, ${wdKk[i]}';
+    return '${wdEn[i]}, ${moEn[m]} ${d.day}';
+  }
+
+  Widget _gc(Widget child, {double radius = 22, EdgeInsets padding = const EdgeInsets.all(16), VoidCallback? onTap}) {
+    final w = SizedBox(
+      width: double.infinity,
+      child: Glass(radius: radius, padding: padding, child: child),
+    );
+    return onTap == null ? w : GestureDetector(behavior: HitTestBehavior.opaque, onTap: onTap, child: w);
+  }
+
+  Widget _chev([Color? c]) => Icon(Icons.chevron_right_rounded, size: 20, color: c ?? burgundy.withValues(alpha: 0.5));
+
+  Widget _chatCard() {
+    final last = state.chat.lastWhere((m) => !m.isUser, orElse: () => ChatMessage('', isUser: false)).text;
+    return _gc(
+      radius: 18,
+      padding: const EdgeInsets.all(12),
+      onTap: () => Navigator.push(context, fadeSlide(Material(color: cream, child: ChatPage(state: state, ai: widget.ai)))),
+      Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF8E1230), burgundy])),
+            child: const Icon(Icons.forum_rounded, color: cream, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tr('Ask Nutrik'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: burgundy)),
+                const SizedBox(height: 2),
+                Text(
+                  last.isEmpty ? tr('What can I cook? What expires soon? How to store…') : last,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+          _chev(),
+        ],
+      ),
+    );
+  }
+
+  Widget _caloriesCard() {
+    final eaten = state.eatenCalories, target = max(1, state.targetCalories), left = target - eaten;
+    return _gc(
+      Row(
+        children: [
+          SizedBox(
+            width: 96,
+            height: 96,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(end: (eaten / target).clamp(0.0, 1.0).toDouble()),
+              duration: const Duration(milliseconds: 900),
+              curve: Curves.easeOutCubic,
+              builder: (_, v, _) => CustomPaint(
+                painter: RingPainter(v, burgundy, 12),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('$eaten', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: burgundy)),
+                      Text(tr('kcal'), style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tr('Today'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: burgundy)),
+                const SizedBox(height: 6),
+                Text(tr('Goal {0} kcal', [target]), style: const TextStyle(fontSize: 15, color: Colors.black54)),
+                const SizedBox(height: 6),
+                Text(
+                  left >= 0 ? tr('{0} kcal left', [left]) : tr('{0} kcal over', [-left]),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: left >= 0 ? const Color(0xFF2E7D32) : const Color(0xFFE65100)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _bmiCard() {
+    final bmi = state.weight / pow(state.height / 100, 2);
+    final cat = bmi < 18.5
+        ? tr('Underweight')
+        : bmi < 25
+        ? tr('Normal')
+        : bmi < 30
+        ? tr('Overweight')
+        : tr('Obese');
+    final col = bmi < 18.5
+        ? const Color(0xFF6DB3FF)
+        : bmi < 25
+        ? const Color(0xFF6CC070)
+        : bmi < 30
+        ? const Color(0xFFFFB454)
+        : const Color(0xFFFF6B66);
+    return GestureDetector(
+      onTap: () => Navigator.push(context, fadeSlide(WeightPage(state: state))),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(26),
+          gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF5A1426), Color(0xFF2E000C)]),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          boxShadow: [BoxShadow(color: burgundy.withValues(alpha: 0.3), blurRadius: 18, offset: const Offset(0, 8))],
+        ),
+        child: Row(
+          children: [
+            SizedBox(width: 104, height: 66, child: CustomPaint(painter: BmiGaugePainter(bmi))),
+            const SizedBox(width: 18),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${tr('BMI')} ${bmi.toStringAsFixed(1)}', style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700, color: cream)),
+                  const SizedBox(height: 2),
+                  Text(cat, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: col)),
+                  const SizedBox(height: 2),
+                  Text(tr('Goal {0} kcal · {1}', [state.targetCalories, tr('Light')]), style: const TextStyle(fontSize: 13, color: Colors.white70)),
+                ],
+              ),
+            ),
+            _chev(Colors.white54),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pantryRow(PantryItem p) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onTap: () => itemSheet(context, state, p),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.65), border: Border.all(color: Colors.white)),
+            child: FoodIcon(p.food, size: 30),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tn(p.food.name), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: burgundy)),
+                const SizedBox(height: 3),
+                Text(p.status, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: p.color)),
+                const SizedBox(height: 5),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: Stack(
+                    children: [
+                      Container(height: 6, color: burgundy.withValues(alpha: 0.08)),
+                      FractionallySizedBox(
+                        widthFactor: max(0.05, p.fresh),
+                        child: Container(height: 6, color: p.color),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _rescueCard(List<PantryItem> exp) {
+    final risk = state.moneyAtRisk;
+    return KeyedSubtree(
+      key: Tour.useFirst,
+      child: _gc(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(tr('Use these first'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: burgundy)),
+                const Spacer(),
+                if (risk > 0) Text(tr('{0} at risk', [money(risk, 1)]), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFE65100))),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (exp.isEmpty)
+              Text(tr('Nothing is about to expire. 🎉'), style: const TextStyle(fontSize: 16, color: Colors.black54))
+            else ...[
+              for (final p in exp.take(5)) _pantryRow(p),
+              if (exp.length > 5)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: GestureDetector(
+                    onTap: () => widget.onTab(2),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(color: burgundy.withValues(alpha: 0.09), borderRadius: BorderRadius.circular(20)),
+                      child: Text(tr('See all {0} in Fridge', [exp.length]), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: burgundy)),
+                    ),
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _recipeOfDay() {
+    final urgent = {for (final p in state.expiringSoon.where((p) => p.daysLeft >= 0)) p.food.name};
+    final ranked = rankRecipes(state);
+    if (ranked.isEmpty) return const SizedBox.shrink();
+    Recipe r = ranked[todayNum() % min(12, ranked.length)];
+    var rescues = <String>[];
+    if (urgent.isNotEmpty) {
+      for (final c in ranked) {
+        final hit = c.ingredients.map((i) => i.name).where(urgent.contains).toList();
+        if (hit.isNotEmpty) {
+          r = c;
+          rescues = hit;
+          break;
+        }
+      }
+    }
+    final resc = rescues.isNotEmpty;
+    return _gc(
+      radius: 20,
+      padding: const EdgeInsets.all(14),
+      onTap: () => Navigator.push(context, fadeSlide(RecipePage(state: state, recipe: r))),
+      Row(
+        children: [
+          Container(
+            width: 62,
+            height: 62,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.65)),
+            child: Text(r.emoji, style: const TextStyle(fontSize: 36)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tr(resc ? 'RESCUE RECIPE OF THE DAY' : 'RECIPE OF THE DAY'),
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: resc ? const Color(0xFFE65100) : burgundy.withValues(alpha: 0.6)),
+                ),
+                const SizedBox(height: 4),
+                Text(tn(r.name), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: burgundy)),
+                const SizedBox(height: 4),
+                Text(
+                  resc ? tr('Uses {0} before it spoils', [rescues.take(3).map(tn).join(', ')]) : tr('⏱ {0} · {1} kcal/serving', [trTime(r.time), r.kcal]),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+          _chev(),
+        ],
+      ),
+    );
+  }
+
+  Widget _stat(String e, String v, String l) => Expanded(
+    child: Glass(
+      radius: 18,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+      child: Column(
+        children: [
+          Text(e, style: const TextStyle(fontSize: 20)),
+          const SizedBox(height: 2),
+          FittedBox(fit: BoxFit.scaleDown, child: Text(v, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: burgundy))),
+          FittedBox(fit: BoxFit.scaleDown, child: Text(l, style: const TextStyle(fontSize: 11, color: Colors.black54))),
+        ],
+      ),
+    ),
+  );
+
+  Widget _ecoBanner() => _gc(
+    radius: 18,
+    padding: const EdgeInsets.all(14),
+    onTap: () => Navigator.push(context, fadeSlide(ImpactPage(state: state))),
+    Row(
+      children: [
+        const Text('🌍', style: TextStyle(fontSize: 32)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(tr('Eco Impact'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: burgundy)),
+              const SizedBox(height: 2),
+              Text(
+                tr('{0} kg food · {1} kg CO₂ · {2} saved', [(state.rescued * 0.3).toStringAsFixed(1), state.co2.toStringAsFixed(1), money(state.rescuedMoney)]),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+            ],
+          ),
+        ),
+        _chev(),
+      ],
+    ),
+  );
+
+  Widget _quick(String e, String title, String sub, VoidCallback f) => Expanded(
+    child: GestureDetector(
+      onTap: f,
+      child: Glass(
+        radius: 18,
+        padding: const EdgeInsets.all(12),
+        child: SizedBox(
+          width: double.infinity,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(e, style: const TextStyle(fontSize: 24)),
+              const SizedBox(height: 2),
+              FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: burgundy))),
+              FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(sub, style: const TextStyle(fontSize: 12, color: Colors.black54))),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final hr = now().hour;
     final greet = hr < 5
-        ? tr('Hello, night owl')
+        ? tr('Good night')
         : hr < 12
         ? tr('Good morning')
         : hr < 18
         ? tr('Good afternoon')
         : tr('Good evening');
     final exp = state.expiringSoon;
-    final today = state.log.where((e) => e.day == todayNum()).toList();
+    final soon = exp.where((p) => p.daysLeft >= 0).toList();
+    final dead = state.pantry.where((p) => p.daysLeft < 0).length;
+    String line;
+    NutrikMode mood;
+    if (_tip != null) {
+      line = tr(tips[_tip! % tips.length]);
+      mood = NutrikMode.idle;
+    } else if (state.pantry.isEmpty) {
+      line = tr('Your fridge is empty! Let\'s add what you have 🧺');
+      mood = NutrikMode.sad;
+    } else if (soon.isNotEmpty) {
+      final f = soon.first;
+      line = f.daysLeft == 0 ? tr('Psst! {0} {1} needs to be eaten today!', [f.food.emoji, tn(f.food.name)]) : tr('{0} will expire soon — let\'s rescue them 🦸', [trp(soon.length, 'product|products')]);
+      mood = f.daysLeft == 0 ? NutrikMode.eat : NutrikMode.idle;
+    } else if (dead > 0) {
+      line = tr('Some food has expired 😿 Check your fridge.');
+      mood = NutrikMode.sad;
+    } else {
+      line = tr('Everything is fresh! You\'re a zero-waste star ⭐');
+      mood = NutrikMode.wave;
+    }
+    final todayLog = state.log.where((e) => e.day == todayNum()).length;
     return Stack(
       children: [
         const Positioned.fill(child: LiquidBg()),
         SafeArea(
+          bottom: false,
           child: ListView(
             controller: sc,
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 130),
             children: [
               Appear(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(greet, style: const TextStyle(color: Colors.black54)),
-                          Text('${state.name} 👋', maxLines: 1, overflow: TextOverflow.ellipsis, style: titleStyle),
-                        ],
-                      ),
-                    ),
-                    Tooltip(
-                      message: tr('Days without throwing food away'),
-                      child: Glass(
-                        radius: 20,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        child: Row(
-                          children: [
-                            Pulse(child: const Text('🔥', style: TextStyle(fontSize: 18))),
-                            const SizedBox(width: 4),
-                            Text(tr('{0}d', [state.streakDays]), style: const TextStyle(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    GestureDetector(
-                      onTap: () => Navigator.push(context, fadeSlide(ProfilePage(state: state, ai: widget.ai))),
-                      child: CircleAvatar(
-                        backgroundColor: burgundy,
-                        child: Text(state.name.isEmpty ? '?' : state.name[0].toUpperCase(), style: const TextStyle(color: Colors.white)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Appear(
-                index: 1,
-                child: AnimatedBuilder(
-                  animation: sc,
-                  builder: (_, child) {
-                    final o = sc.hasClients ? sc.offset.clamp(0.0, 400.0).toDouble() : 0.0;
-                    return Opacity(
-                      opacity: (1 - o / 700).clamp(0.4, 1.0).toDouble(),
-                      child: Transform.scale(scale: 1 - o / 2400, child: child),
-                    );
-                  },
-                  child: KeyedSubtree(key: Tour.hero, child: _hero()),
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (state.pantry.isEmpty) Appear(index: 2, child: _emptyFridge()),
-              if (exp.isNotEmpty) ...[
-                Appear(
-                  index: 2,
-                  child: Row(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8, bottom: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(tr('Use these first ⚠️'), style: headStyle),
-                      const Spacer(),
-                      Text(tr('tap for options'), style: TextStyle(color: Colors.black.withValues(alpha: 0.4), fontSize: 12)),
+                      Text(_dateLine(now()), style: TextStyle(fontSize: 15, color: burgundy.withValues(alpha: 0.65))),
+                      const SizedBox(height: 2),
+                      Text(tr('{0}, {1}!', [greet, state.name]), style: const TextStyle(fontSize: 34, height: 1.1, fontWeight: FontWeight.bold, color: burgundy)),
                     ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  key: Tour.useFirst,
-                  height: 182,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    clipBehavior: Clip.none,
-                    itemCount: exp.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 10),
-                    itemBuilder: (_, i) => _expiryCard(exp[i], i),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
+              ),
+              const SizedBox(height: 6),
               Appear(
-                index: 3,
+                index: 1,
+                child: KeyedSubtree(
+                  key: Tour.hero,
+                  child: NutrikSays(key: ValueKey(line), text: line, mode: mood, size: 92, onTap: () => setState(() => _tip = (_tip ?? -1) + 1)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Appear(index: 2, child: _chatCard()),
+              const SizedBox(height: 16),
+              Appear(index: 3, child: _caloriesCard()),
+              const SizedBox(height: 16),
+              Appear(index: 4, child: _bmiCard()),
+              const SizedBox(height: 16),
+              Appear(index: 5, child: _rescueCard(exp)),
+              const SizedBox(height: 16),
+              Appear(index: 6, child: _recipeOfDay()),
+              const SizedBox(height: 16),
+              Row(
+                spacing: 10,
+                children: [
+                  _stat('🧊', '${state.pantry.length}', tr('in fridge')),
+                  _stat('🦸', '${state.rescued}', tr('rescued')),
+                  _stat('💰', money(state.rescuedMoney), tr('saved')),
+                  _stat('🌍', '${state.ecoScore}', tr('eco score')),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _ecoBanner(),
+              const SizedBox(height: 16),
+              KeyedSubtree(
+                key: Tour.tiles,
                 child: Row(
-                  key: Tour.tiles,
+                  spacing: 12,
                   children: [
-                    QuickTile(
-                      emoji: '🌍',
-                      label: 'Impact',
-                      onTap: (c) => Navigator.push(c, circleReveal(ImpactPage(state: state), centerOf(c))),
-                    ),
-                    QuickTile(
-                      emoji: '🛒',
-                      label: 'Shopping',
-                      badge: state.shopping.length,
-                      onTap: (c) => Navigator.push(c, circleReveal(ShoppingPage(state: state), centerOf(c))),
-                    ),
-                    QuickTile(
-                      emoji: '⚖️',
-                      label: 'Weight',
-                      onTap: (c) => Navigator.push(c, circleReveal(WeightPage(state: state), centerOf(c))),
-                    ),
-                    QuickTile(
-                      emoji: '🏆',
-                      label: '${state.unlocked.length}/${medals.length}',
-                      onTap: (c) => Navigator.push(c, circleReveal(MedalsPage(state: state), centerOf(c))),
-                    ),
+                    _quick('🛒', tr('Shopping'), trp(state.shopping.length, 'item|items'), () => Navigator.push(context, fadeSlide(ShoppingPage(state: state)))),
+                    _quick('📒', tr('Diary'), tr('{0} today', [todayLog]), () => Navigator.push(context, fadeSlide(DiaryPage(state: state)))),
+                    _quick('🏆', tr('Achievements'), '${state.unlocked.length}/${medals.length}', () => Navigator.push(context, fadeSlide(MedalsPage(state: state)))),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              if (state.pantry.isNotEmpty) ...[Appear(index: 4, child: _health()), const SizedBox(height: 12)],
-              Appear(
-                index: 5,
-                child: GestureDetector(
-                  onTap: state.nextTip,
-                  child: Glass(
-                    child: Row(
-                      children: [
-                        const Text('💡', style: TextStyle(fontSize: 26)),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 400),
-                            child: Text(
-                              tr(tips[state.tipIndex % tips.length]),
-                              key: ValueKey(state.tipIndex),
-                              style: const TextStyle(color: Colors.black87),
-                            ),
-                          ),
-                        ),
-                        const Icon(Icons.refresh, size: 18, color: Colors.black38),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Appear(index: 6, child: _calories()),
-              const SizedBox(height: 16),
-              Text(tr('Eaten today'), style: headStyle),
-              const SizedBox(height: 8),
-              if (today.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Center(
-                    child: Text(tr('Nothing eaten yet. Tap a product, then Eat.'), style: const TextStyle(color: Colors.black45)),
-                  ),
-                ),
-              for (final e in today)
-                Dismissible(
-                  key: ValueKey('log_${e.id}'),
-                  direction: DismissDirection.endToStart,
-                  onDismissed: (_) => state.removeLog(e),
-                  background: Container(
-                    color: Colors.red.shade900,
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 20),
-                    child: const Icon(Icons.delete, color: Colors.white),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Glass(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Emo(e.emoji, food: e.name.split(' · ').first, size: 30),
-                        title: Text(e.name.split(' · ').map(tn).join(' · ')),
-                        trailing: Text(
-                          '${e.kcal} kcal',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: burgundy),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
             ],
           ),
         ),
       ],
     );
   }
+}
+
+/// Рисунок-«спидометр» ИМТ: четыре цветные дуги и стрелка (как на главной iOS).
+class BmiGaugePainter extends CustomPainter {
+  final double bmi;
+  BmiGaugePainter(this.bmi);
+
+  @override
+  void paint(Canvas c, Size s) {
+    final r = s.width / 2 - 6;
+    final ctr = Offset(s.width / 2, s.height - 6);
+    final rect = Rect.fromCircle(center: ctr, radius: r);
+    const cols = [Color(0xFF4DA3FF), Color(0xFF4CC36B), Color(0xFFFFB020), Color(0xFFFF4D4D)];
+    for (var i = 0; i < 4; i++) {
+      c.drawArc(
+        rect,
+        pi + i * pi / 4 + 0.05,
+        pi / 4 - 0.1,
+        false,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 9
+          ..strokeCap = StrokeCap.round
+          ..color = cols[i],
+      );
+    }
+    final t = ((bmi - 15) / 20).clamp(0.0, 1.0).toDouble();
+    final a = pi + t * pi;
+    c.drawLine(
+      ctr,
+      ctr + Offset(cos(a), sin(a)) * (r - 12),
+      Paint()
+        ..color = cream
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round,
+    );
+    c.drawCircle(ctr, 8, Paint()..color = const Color(0xFFD9D2C0));
+    c.drawCircle(ctr, 3, Paint()..color = burgundy);
+  }
+
+  @override
+  bool shouldRepaint(covariant BmiGaugePainter o) => o.bmi != bmi;
+}
+
+/// Дневник калорий за сегодня (как «Diary» на iOS).
+class DiaryPage extends StatelessWidget {
+  final AppState state;
+  const DiaryPage({super.key, required this.state});
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: state,
+    builder: (context, _) {
+      final today = state.log.where((e) => e.day == todayNum()).toList();
+      return Scaffold(
+        appBar: AppBar(title: Text(tr('Food diary'), style: headStyle), backgroundColor: Colors.transparent),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            Glass(
+              child: Row(
+                children: [
+                  Text(tr('Eaten today'), style: const TextStyle(fontSize: 16)),
+                  const Spacer(),
+                  Text('${state.eatenCalories} / ${state.targetCalories} ${tr('kcal')}', style: const TextStyle(fontWeight: FontWeight.bold, color: burgundy)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (today.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Center(child: Text(tr('Nothing eaten yet. Tap a product, then Eat.'), style: const TextStyle(color: Colors.black45))),
+              ),
+            for (final e in today.reversed)
+              Dismissible(
+                key: ValueKey('log_${e.id}'),
+                direction: DismissDirection.endToStart,
+                onDismissed: (_) => state.removeLog(e),
+                background: Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(color: Colors.red.shade900, borderRadius: BorderRadius.circular(18)),
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  child: const Icon(Icons.delete, color: Colors.white),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Glass(
+                    radius: 18,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Emo(e.emoji, food: e.name.split(' · ').first, size: 30),
+                      title: Text(e.name.split(' · ').map(tn).join(' · ')),
+                      trailing: Text('${e.kcal} ${tr('kcal')}', style: const TextStyle(fontWeight: FontWeight.bold, color: burgundy)),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    },
+  );
 }
 
 // ───────────────────────── ДЕЙСТВИЯ С ПРОДУКТОМ (шторки) ─────────────────────────

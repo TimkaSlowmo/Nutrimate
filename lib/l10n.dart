@@ -109,7 +109,7 @@ List<String> trSteps(String recipe, List<String> en) {
 /// Язык системы браузера, если он ru/kk, иначе en.
 String systemLang(String? code) {
   final c = (code ?? '').toLowerCase();
-  if (c.startsWith('ru')) return 'ru';
+  if (c.startsWith('ru') || c.startsWith('uk') || c.startsWith('be')) return 'ru';
   if (c.startsWith('kk')) return 'kk';
   return 'en';
 }
