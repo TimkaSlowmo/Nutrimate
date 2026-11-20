@@ -1,5 +1,5 @@
 # NutriMate — Android emulator (API 34, Pixel 6)
-Build 3dd06f2, 2026-11-16 13:43 UTC.
+Build 6b80770, 2026-11-20 12:58 UTC.
 
 ### 00-onboarding
 <img src="00-onboarding.png" width="300">
