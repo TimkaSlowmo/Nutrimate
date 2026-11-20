@@ -20,9 +20,22 @@
   <title>NutriMate Pro</title>
   <style>
     html, body { margin: 0; height: 100%; background: #F5F1E5; overscroll-behavior: none; }
+    #splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #F5F1E5; color: #6A041C; font-family: Georgia, 'Times New Roman', serif; z-index: 10; transition: opacity .35s; }
+    #splash b { font-size: 30px; letter-spacing: .02em; }
+    #splash i { width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(106,4,28,.18); border-top-color: #6A041C; animation: nm-spin .8s linear infinite; }
+    @keyframes nm-spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
+  <div id="splash" role="status" aria-label="Loading"><b>NutriMate</b><i></i></div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var el = document.getElementById('splash');
+      if (!el) return;
+      el.style.opacity = '0';
+      setTimeout(function () { el.remove(); }, 400);
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
