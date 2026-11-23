@@ -136,9 +136,10 @@ struct SearchView: View {
         let r = results
         return LazyVStack(alignment: .leading, spacing: 8) {
             Text(r.isEmpty ? L("Nothing found 🤔 Try another word.") : L("{0} found", r.count))
+                .font(r.isEmpty ? .body : .caption)
                 .font(.caption).foregroundStyle(.secondary)
             ForEach(r.prefix(300)) { f in
-                FoodRow(food: f, inFridge: store.pantryNames.contains(f.name)) { store.add(f) }
+                FoodRow(food: f, count: store.count(of: f.name), onAdd: { store.add(f) }, onRemove: { store.decrementAny(f.name) })
                     .onTapGesture { addFood = f }
                     .contextMenu {
                         Button { store.add(f) } label: { Label(L("Add to fridge"), systemImage: "refrigerator") }
@@ -152,8 +153,9 @@ struct SearchView: View {
 
 struct FoodRow: View {
     let food: Food
-    var inFridge = false
+    var count = 0
     let onAdd: () -> Void
+    var onRemove: () -> Void = {}
     @State private var pressed = false
 
     var body: some View {
@@ -165,23 +167,34 @@ struct FoodRow: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            if inFridge {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.freshGreen.opacity(0.8))
+            if count > 0 {
+                HStack(spacing: 0) {
+                    Button { onRemove() } label: { Image(systemName: "minus").font(.headline).frame(width: 38, height: 38) }
+                        .accessibilityLabel(L("One less"))
+                    Text("\(count)").font(.headline.weight(.bold)).monospacedDigit().frame(minWidth: 26)
+                        .contentTransition(.numericText())
+                    Button { onAdd() } label: { Image(systemName: "plus").font(.headline).frame(width: 38, height: 38) }
+                        .accessibilityLabel(L("One more"))
+                }
+                .foregroundStyle(Color.cream)
+                .background(Capsule().fill(Color.brand))
+                .buttonStyle(.plain)
+            } else {
+                Button {
+                    pressed = true
+                    onAdd()
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.4)) { pressed = false }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.headline)
+                        .foregroundStyle(Color.cream)
+                        .frame(width: 40, height: 40)
+                        .background(Circle().fill(Color.brand))
+                        .scaleEffect(pressed ? 0.7 : 1)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L("Add {0}", N(food.name)))
             }
-            Button {
-                pressed = true
-                onAdd()
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.4)) { pressed = false }
-            } label: {
-                Image(systemName: "plus")
-                    .font(.headline)
-                    .foregroundStyle(Color.cream)
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(Color.brand))
-                    .scaleEffect(pressed ? 0.7 : 1)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(L("Add {0}", N(food.name)))
         }
         .glassCard(radius: 16, padding: 10)
     }

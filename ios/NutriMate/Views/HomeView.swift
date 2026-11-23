@@ -73,22 +73,18 @@ struct HomeView: View {
                     }
                     .padding(.top, 8)
 
-                    NutrikSays(text: shownLine.0, mood: shownLine.1) {
-                        withAnimation { tipIndex = (tipIndex ?? -1) + 1 }
+                    if store.data.pantry.isEmpty {
+                        NutrikSays(text: shownLine.0, mood: shownLine.1) {
+                            withAnimation { tipIndex = (tipIndex ?? -1) + 1 }
+                        }
                     }
 
-                    chatCard
-                    caloriesCard
-                    Button { showBody = true } label: { BodyMiniCard() }.buttonStyle(.plain)
                     rescueCard
                     recipeOfDayCard
-                    Button { showQuests = true } label: { ChallengesCard(w: store.challenges) }.buttonStyle(.plain)
-                    statsRow
-                    ecoBanner
+                    caloriesCard
                     HStack(spacing: 12) {
-                        quick("🛒", L("Shopping"), Lp(store.data.shopping.count, "item|items")) { showShopping = true }
-                        quick("📒", L("Diary"), L("{0} today", store.todayLog.count)) { showDiary = true }
-                        quick("📊", L("Week"), L("score {0}", WeekStats(store: store).score)) { showWeek = true }
+                        bigButton("plus.circle.fill", L("Add products"), primary: true) { withAnimation { tab = .search } }
+                        bigButton("cart.fill", L("Shopping"), primary: false) { showShopping = true }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -252,6 +248,21 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity)
         .glassCard(radius: 18, padding: 10)
+    }
+
+    private func bigButton(_ icon: String, _ title: String, primary: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: icon).font(.system(size: 26, weight: .semibold))
+                Text(title).font(.headline).lineLimit(1).minimumScaleFactor(0.75)
+            }
+            .foregroundStyle(primary ? Color.cream : Color.burgundy)
+            .frame(maxWidth: .infinity, minHeight: 84)
+            .background(RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(primary ? AnyShapeStyle(LinearGradient(colors: [.brandLight, .brand], startPoint: .top, endPoint: .bottom)) : AnyShapeStyle(Color.paper.opacity(0.85))))
+            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Color.burgundy.opacity(primary ? 0 : 0.12), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     private func quick(_ e: String, _ title: String, _ sub: String, action: @escaping () -> Void) -> some View {

@@ -52,7 +52,12 @@ struct FridgeView: View {
                             Button { openItem = p } label: { PantryRow(item: p) }
                                 .buttonStyle(.plain)
                                 .listRowBackground(rowBackground)
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                .contextMenu {
+                                    Button(role: .destructive) { withAnimation { store.delete(p.first.id) } } label: { Label(L("Delete"), systemImage: "trash") }
+                                    Button { wasteItem = p } label: { Label(L("Bin"), systemImage: "trash.slash") }
+                                }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) { withAnimation { store.delete(p.first.id) } } label: { Label(L("Delete"), systemImage: "xmark.bin.fill") }.tint(.red)
                                     Button { wasteItem = p } label: { Label(L("Bin"), systemImage: "trash") }.tint(.badRed)
                                     if DBCanFreeze(p) {
                                         Button { store.freeze(p.first.id) } label: { Label(L("Freeze"), systemImage: "snowflake") }.tint(.blue)
@@ -64,7 +69,7 @@ struct FridgeView: View {
                                 }
                         }
                     } footer: {
-                        Text(L("Same products stack into one row (×2). Swipe right — ate one · swipe left — freeze or bin. Tap for details."))
+                        Text(L("Swipe right — ate it · swipe left — delete, bin or freeze. Tap for details."))
                             .font(.caption)
                     }
                 }
@@ -211,8 +216,15 @@ struct ItemSheet: View {
                             Button { askReason = true } label: { tile(g.qty > 1 ? L("Bin 1") : L("Bin"), "trash") }
                                 .buttonStyle(TileButtonStyle())
                         }
-                        Button(L("Remove without counting"), role: .destructive) { store.delete(id); dismiss() }
-                            .font(.footnote)
+                        Button { store.delete(id); dismiss() } label: {
+                            Label(L("Delete"), systemImage: "xmark.bin.fill")
+                                .font(.headline).foregroundStyle(.white)
+                                .frame(maxWidth: .infinity, minHeight: 50)
+                                .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.red))
+                        }
+                        .buttonStyle(.plain)
+                        Text(L("Delete removes it without any statistics. You can undo."))
+                            .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
                     }
                     .padding(20)
                 }

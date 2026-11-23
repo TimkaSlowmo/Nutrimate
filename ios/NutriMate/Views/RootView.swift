@@ -100,8 +100,6 @@ struct RootView: View {
             case .profile: ProfileView()
             }
         }
-        .id(tab)
-        .transition(.opacity)
         .overlay(alignment: .bottomLeading) {
             if store.data.profile.tutorialDone && store.data.nutrikBuddy {
                 NutrikBuddy()
@@ -206,8 +204,6 @@ struct MedalUnlockedView: View {
 struct GlassTabBar: View {
     @Binding var selection: AppTab
     @Namespace private var ns
-    @State private var squishX: CGFloat = 1
-    @State private var bounce: AppTab?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -216,7 +212,6 @@ struct GlassTabBar: View {
                     VStack(spacing: 3) {
                         Image(systemName: t.icon)
                             .font(.system(size: 19, weight: .semibold))
-                            .scaleEffect(bounce == t ? 1.25 : 1)
                         Text(t.title).font(.system(size: 10, weight: .semibold, design: .rounded))
                             .lineLimit(1).minimumScaleFactor(0.6).allowsTightening(true)
                             .padding(.horizontal, 5) // длинное «Холодильник» не упирается в края капсулы
@@ -233,7 +228,6 @@ struct GlassTabBar: View {
                                     Capsule().fill(Color.white.opacity(0.22)).frame(height: 8).padding(.horizontal, 10).padding(.top, 3)
                                 }
                                 .shadow(color: Color.brand.opacity(0.35), radius: 8, y: 4)
-                                .scaleEffect(x: squishX, y: 2 - squishX)
                                 .matchedGeometryEffect(id: "pill", in: ns)
                         }
                     }
@@ -255,12 +249,6 @@ struct GlassTabBar: View {
     private func tap(_ t: AppTab) {
         guard t != selection else { return }
         UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.68)) { selection = t }
-        squishX = 1.22
-        bounce = t
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.32).delay(0.06)) {
-            squishX = 1
-            bounce = nil
-        }
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) { selection = t }
     }
 }

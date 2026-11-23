@@ -53,6 +53,10 @@ final class AppStore: ObservableObject {
         // v9: одинаковые продукты складываются в одну строку — мягко объединяем старые сохранения
         let merged = AppStore.normalized(data.pantry)
         if merged.count != data.pantry.count { data.pantry = merged }
+        // v34: ккал продукта — только из базы (раньше копия в сохранении могла «испортиться»)
+        for i in data.pantry.indices where !data.pantry[i].leftover {
+            if let f = FoodDB.shared.byName[data.pantry[i].name], f.kcal != data.pantry[i].kcal { data.pantry[i].kcal = f.kcal }
+        }
         // v10: дата начала для профиля — один раз берём самую раннюю запись
         if data.profile.registered && data.profile.joined == nil { data.profile.joined = joinedDate }
         if data.notifications { Reminders.reschedule(data) }
@@ -310,6 +314,12 @@ final class AppStore: ObservableObject {
         haptic()
     }
 
+    /// − в строке поиска: убрать одну штуку продукта (самую свежую партию), без статистики.
+    func decrementAny(_ name: String) {
+        guard let g = sortedPantry.last(where: { $0.name == name }) else { return }
+        decrement(g.id)
+    }
+
     private func use(_ p: PantryItem) {
         data.stats.consumed += 1
         if p.daysLeft >= 0 && p.daysLeft <= 2 {
@@ -377,7 +387,8 @@ final class AppStore: ObservableObject {
             use(p)
             takeOne(p.id)
         }
-        data.log.append(LogEntry(emoji: p.emoji, name: "\(N(p.name)) · \(grams) \(L("g"))", kcal: Int((Double(p.kcal) * Double(grams) / 100).rounded())))
+        let per100 = p.isLeftover ? p.kcal : (FoodDB.shared.byName[p.name]?.kcal ?? p.kcal)
+        data.log.append(LogEntry(emoji: p.emoji, name: "\(N(p.name)) · \(grams) \(L("g"))", kcal: Int((Double(per100) * Double(grams) / 100).rounded())))
         haptic(.medium)
         react(.eat, finished && p.daysLeft >= 0 && p.daysLeft <= 2 ? L("Rescued & yummy! {0} logged 🦸", N(p.name)) : L("Yum! {0} logged", N(p.name)), emoji: p.emoji)
         checkMedals()

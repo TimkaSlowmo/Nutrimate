@@ -250,7 +250,97 @@ struct FoodDB {
             else if names.contains(where: { $0.contains(" " + q) }) { b.append(f) }
             else if names.contains(where: { $0.contains(q) }) || f.category.lowercased().hasPrefix(q) { c.append(f) }
         }
-        return a.sorted { $0.name.count < $1.name.count } + b + c
+        let exact = a.sorted { $0.name.count < $1.name.count } + b + c
+        if exact.count >= 6 || q.count < 2 { return exact }
+        // мало точных совпадений → «умный» поиск: опечатки, раскладка, формы слов
+        let have = Set(exact.map(\.name))
+        let fuzzy = fuzzySearch(q, pool: pool).filter { !have.contains($0.name) }
+        return exact + fuzzy
+    }
+
+    // MARK: Нечёткий поиск (v34)
+
+    private static let enKeys = Array("qwertyuiop[]asdfghjkl;'zxcvbnm,.")
+    private static let ruKeys = Array("йцукенгшщзхъфывапролджэячсмитьбю")
+
+    /// Опечатки не должны мешать: нижний регистр, без диакритики, ё=е, казахские буквы ≈ русские.
+    static func fuzzyNorm(_ s: String) -> String {
+        var t = s.lowercased().folding(options: [.diacriticInsensitive], locale: nil)
+        let map: [Character: Character] = ["ё": "е", "ә": "а", "ғ": "г", "қ": "к", "ң": "н", "ө": "о", "ұ": "у", "ү": "у", "һ": "х", "і": "и", "ъ": "ь"]
+        t = String(t.map { map[$0] ?? $0 })
+        return t.replacingOccurrences(of: "-", with: " ")
+    }
+
+    /// Набрали «vjkjrj» вместо «молоко» (или наоборот) — переводим раскладку.
+    static func swapLayout(_ s: String) -> String? {
+        let chars = Array(s.lowercased())
+        let isLatin = chars.contains { $0.isASCII && $0.isLetter }
+        let isCyr = chars.contains { !$0.isASCII && $0.isLetter }
+        guard isLatin != isCyr else { return nil }
+        var out = ""
+        for ch in chars {
+            if isLatin, let i = enKeys.firstIndex(of: ch) { out.append(ruKeys[i]) }
+            else if isCyr, let i = ruKeys.firstIndex(of: ch) { out.append(enKeys[i]) }
+            else { out.append(ch) }
+        }
+        return out
+    }
+
+    /// Расстояние Дамерау — Левенштейна с ранним выходом.
+    static func editDistance(_ a: [Character], _ b: [Character], limit: Int) -> Int {
+        if abs(a.count - b.count) > limit { return limit + 1 }
+        if a.isEmpty { return b.count }
+        if b.isEmpty { return a.count }
+        var prev2 = [Int](repeating: 0, count: b.count + 1)
+        var prev = Array(0...b.count)
+        var cur = [Int](repeating: 0, count: b.count + 1)
+        for i in 1...a.count {
+            cur[0] = i
+            var rowMin = cur[0]
+            for j in 1...b.count {
+                let cost = a[i - 1] == b[j - 1] ? 0 : 1
+                var v = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+                if i > 1, j > 1, a[i - 1] == b[j - 2], a[i - 2] == b[j - 1] { v = min(v, prev2[j - 2] + 1) }
+                cur[j] = v
+                rowMin = min(rowMin, v)
+            }
+            if rowMin > limit { return limit + 1 }
+            prev2 = prev; prev = cur
+        }
+        return prev[b.count]
+    }
+
+    private func fuzzySearch(_ q: String, pool: [Food]) -> [Food] {
+        var variants = [FoodDB.fuzzyNorm(q)]
+        if let sw = FoodDB.swapLayout(q) { variants.append(FoodDB.fuzzyNorm(sw)) }
+        let qWords = variants.map { $0.split(separator: " ").map { Array($0) } }
+        var scored: [(Food, Int)] = []
+        for f in pool {
+            var best = Int.max
+            for n in [f.name, f.ru ?? "", f.kk ?? ""] where !n.isEmpty {
+                let words = FoodDB.fuzzyNorm(n).split(separator: " ").map { Array($0) }
+                for qw in qWords {
+                    var total = 0
+                    var ok = !qw.isEmpty
+                    for w in qw {
+                        let allow = w.count <= 3 ? 0 : (w.count <= 5 ? 1 : 2)
+                        var wBest = Int.max
+                        for nw in words {
+                            // слово целиком или его начало («томатн» ~ «томатная»)
+                            let d1 = FoodDB.editDistance(w, nw, limit: allow)
+                            let d2 = nw.count > w.count ? FoodDB.editDistance(w, Array(nw.prefix(w.count)), limit: allow) : d1
+                            wBest = min(wBest, min(d1, d2 + 1))
+                            if wBest == 0 { break }
+                        }
+                        if wBest > allow { ok = false; break }
+                        total += wBest
+                    }
+                    if ok { best = min(best, total * 10 + n.count / 4) }
+                }
+            }
+            if best != Int.max { scored.append((f, best)) }
+        }
+        return scored.sorted { $0.1 != $1.1 ? $0.1 < $1.1 : $0.0.name.count < $1.0.name.count }.prefix(40).map { $0.0 }
     }
 }
 
@@ -369,7 +459,12 @@ struct PantryGroup: Identifiable, Hashable {
     var isLeftover: Bool { first.isLeftover }
     var opened: Date? { first.opened }
     /// «Съел» по умолчанию: 100 г продукта или одна порция остатков
-    var defaultGrams: Int { isLeftover ? (FoodDB.shared.recipeByName[name]?.portionGrams ?? 100) : 100 }
+    /// Для плотной еды (орехи, масло, шоколад, крупы) порция меньше — «съел» не пишет 900 ккал за горсть риса
+    var defaultGrams: Int {
+        if isLeftover { return FoodDB.shared.recipeByName[name]?.portionGrams ?? 100 }
+        let k = FoodDB.shared.byName[name]?.kcal ?? kcal
+        return k >= 500 ? 30 : k >= 300 ? 60 : 150
+    }
 
     static func make(_ items: [PantryItem]) -> [PantryGroup] {
         var order: [String] = []

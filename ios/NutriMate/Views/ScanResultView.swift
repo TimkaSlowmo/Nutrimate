@@ -91,8 +91,10 @@ struct ScanResultView: View {
                 row(r)
                 if r.id != rows.last?.id { Divider().opacity(0.5) }
             }
-            Text(L("Tap the place icon to switch fridge / freezer / pantry."))
-                .font(.caption2).foregroundStyle(.secondary)
+            Button { showSearch = true } label: {
+                Label(L("Add another product"), systemImage: "plus.circle.fill").frame(maxWidth: .infinity)
+            }
+            .buttonStyle(SoftButtonStyle())
         }
         .glassCard()
     }
@@ -100,51 +102,59 @@ struct ScanResultView: View {
     private func row(_ r: ScanItem) -> some View {
         let f = r.food
         let isOn = !off.contains(f.name)
-        return HStack(spacing: 10) {
-            Button {
-                UISelectionFeedbackGenerator().selectionChanged()
-                if isOn { off.insert(f.name) } else { off.remove(f.name) }
-            } label: {
-                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
-                    .font(.title3).foregroundStyle(isOn ? Color.freshGreen : Color.secondary)
-            }
-            .accessibilityLabel(isOn ? L("Don't add") : L("Add"))
-            EmojiBadge(emoji: f.emoji, size: 40)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(N(f.name)).font(.subheadline.weight(.semibold)).foregroundStyle(Color.burgundy).lineLimit(2)
-                Text(L("keeps ~{0}", ScanResultView.shelfText(f.shelf)))
-                    .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                if store.data.shopping.contains(f.name) {
-                    Text(L("🛒 on your list")).font(.caption2.weight(.semibold)).foregroundStyle(Color.freshGreen)
+        return VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Button {
+                    UISelectionFeedbackGenerator().selectionChanged()
+                    if isOn { off.insert(f.name) } else { off.remove(f.name) }
+                } label: {
+                    Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                        .font(.title2).foregroundStyle(isOn ? Color.freshGreen : Color.secondary)
+                        .frame(width: 36, height: 36)
                 }
-            }
-            Spacer(minLength: 4)
-            Menu {
-                ForEach(StorageKind.allCases) { k in
-                    Button { place[f.name] = k } label: { Text("\(k.emoji) \(k.title)") }
+                .accessibilityLabel(isOn ? L("Don't add") : L("Add"))
+                EmojiBadge(emoji: f.emoji, size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(N(f.name)).font(.headline).foregroundStyle(Color.burgundy).lineLimit(2)
+                    Text(L("keeps ~{0}", ScanResultView.shelfText(f.shelf)))
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    if store.data.shopping.contains(f.name) {
+                        Text(L("🛒 on your list")).font(.caption2.weight(.semibold)).foregroundStyle(Color.freshGreen)
+                    }
                 }
-            } label: {
-                Text(storage(f).emoji).font(.title3)
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(Color.burgundy.opacity(0.08)))
+                Spacer(minLength: 4)
+                Button { withAnimation { rows.removeAll { $0.food == f } } } label: {
+                    Image(systemName: "xmark").font(.subheadline.weight(.bold)).foregroundStyle(Color.burgundy.opacity(0.7))
+                        .frame(width: 34, height: 34).background(Circle().fill(Color.burgundy.opacity(0.08)))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L("Not this"))
             }
-            .accessibilityLabel(storage(f).title)
-            HStack(spacing: 0) {
-                Button { setQty(f, r.qty - 1) } label: { Image(systemName: "minus").frame(width: 28, height: 32) }
-                    .disabled(r.qty <= 1)
-                Text("×\(r.qty)").font(.subheadline.weight(.bold)).monospacedDigit().frame(minWidth: 30)
-                Button { setQty(f, r.qty + 1) } label: { Image(systemName: "plus").frame(width: 28, height: 32) }
+            HStack(spacing: 10) {
+                Menu {
+                    ForEach(StorageKind.allCases) { k in
+                        Button { place[f.name] = k } label: { Text("\(k.emoji) \(L(k.title))") }
+                    }
+                } label: {
+                    Text("\(storage(f).emoji) \(L(storage(f).title))").font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.burgundy)
+                        .padding(.horizontal, 12).frame(height: 40)
+                        .background(Capsule().fill(Color.burgundy.opacity(0.08)))
+                }
+                Spacer(minLength: 4)
+                HStack(spacing: 0) {
+                    Button { setQty(f, r.qty - 1) } label: { Image(systemName: "minus").font(.headline).frame(width: 44, height: 40) }
+                        .disabled(r.qty <= 1)
+                    Text("×\(r.qty)").font(.headline.weight(.bold)).monospacedDigit().frame(minWidth: 40)
+                    Button { setQty(f, r.qty + 1) } label: { Image(systemName: "plus").font(.headline).frame(width: 44, height: 40) }
+                }
+                .foregroundStyle(Color.burgundy)
+                .background(Capsule().fill(Color.burgundy.opacity(0.08)))
+                .buttonStyle(.plain)
             }
-            .foregroundStyle(Color.burgundy)
-            .background(Capsule().fill(Color.burgundy.opacity(0.08)))
-            .buttonStyle(.plain)
+            .padding(.leading, 46)
         }
         .opacity(isOn ? 1 : 0.45)
-        .contextMenu {
-            Button(role: .destructive) { withAnimation { rows.removeAll { $0.food == f } } } label: {
-                Label(L("Not this"), systemImage: "xmark.circle")
-            }
-        }
     }
 
     private func setQty(_ f: Food, _ n: Int) {
@@ -226,7 +236,8 @@ struct ScanResultView: View {
             dismiss()
             onAdded()
         } label: {
-            Label(units == 0 ? L("Nothing to add yet") : L("Add {0}", Lp(units, "product|products")), systemImage: "refrigerator.fill")
+            Label(units == 0 ? L("Nothing to add yet") : L("Add all ({0})", units), systemImage: "refrigerator.fill")
+                .font(.title3.weight(.bold)).frame(maxWidth: .infinity, minHeight: 36)
         }
         .buttonStyle(PrimaryButtonStyle())
         .disabled(units == 0)

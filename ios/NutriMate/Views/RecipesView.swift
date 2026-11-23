@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct RecipesView: View {
+struct AllRecipesView: View {
     @EnvironmentObject var store: AppStore
     @State private var mode = 0 // 0 все, 1 можно готовить, 2 zero-waste
     @State private var query = ""
@@ -26,7 +26,7 @@ struct RecipesView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        Group {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     Picker(L("Show"), selection: $mode) {
@@ -66,8 +66,68 @@ struct RecipesView: View {
             }
             .scrollDismissesKeyboard(.immediately)
             .background(LiveBackground())
-            .navigationTitle(L("Recipes"))
+            .navigationTitle(L("All recipes"))
+            .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showPlan) { PlanView() }
+        }
+    }
+}
+
+/// Вкладка «Рецепты» (v34): только то, что реально можно приготовить, и то, где не хватает 1–2 продуктов.
+/// Весь каталог — отдельная страница «Все рецепты».
+struct RecipesView: View {
+    @EnvironmentObject var store: AppStore
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                let have = store.pantryNames
+                let urgent = Set(store.toRescue.map(\.name))
+                let ranked = store.rankedRecipes()
+                let ready = ranked.filter { $0.missing(have).isEmpty }
+                let almost = ranked.filter { r in
+                    let m = r.missing(have).count
+                    return m >= 1 && m <= 2 && r.ingredients.count > m
+                }.prefix(12)
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    if !ready.isEmpty {
+                        SectionTitle(text: L("Can cook now"))
+                        ForEach(ready.prefix(15)) { r in
+                            NavigationLink(value: r) { RecipeCard(recipe: r, have: have, urgent: urgent).equatable() }.buttonStyle(.plain)
+                        }
+                    }
+                    if !almost.isEmpty {
+                        SectionTitle(text: L("Almost there — buy 1–2 things"))
+                        ForEach(Array(almost)) { r in
+                            VStack(alignment: .leading, spacing: 4) {
+                                NavigationLink(value: r) { RecipeCard(recipe: r, have: have, urgent: urgent).equatable() }.buttonStyle(.plain)
+                                Text(L("Need to buy: {0}", r.missing(have).map { N($0) }.joined(separator: ", ")))
+                                    .font(.footnote.weight(.semibold)).foregroundStyle(Color.warnOrange).padding(.horizontal, 6)
+                            }
+                        }
+                    }
+                    if ready.isEmpty && almost.isEmpty {
+                        VStack(spacing: 10) {
+                            NutrikView(mood: .sad, size: 100)
+                            Text(store.data.pantry.isEmpty ? L("Add a few products and I'll suggest what to cook.") : L("Nothing matches your fridge yet. Browse all recipes or add more products."))
+                                .multilineTextAlignment(.center).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity).padding(.top, 20)
+                    }
+                    NavigationLink { AllRecipesView() } label: {
+                        Label(L("All recipes ({0})", store.db.recipes.count), systemImage: "books.vertical.fill")
+                            .font(.headline).foregroundStyle(Color.burgundy)
+                            .frame(maxWidth: .infinity, minHeight: 54)
+                            .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.paper.opacity(0.85)))
+                            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.burgundy.opacity(0.12), lineWidth: 1))
+                    }
+                    .padding(.top, 6)
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 20)
+            }
+            .background(LiveBackground())
+            .navigationTitle(L("Recipes"))
             .navigationDestination(for: Recipe.self) { r in RecipeDetail(recipe: r) }
         }
     }
@@ -82,7 +142,6 @@ struct RecipeCard: View, Equatable {
 
     var body: some View {
         let haveCount = recipe.ingredients.filter { have.contains($0.name) }.count
-        let rescues = recipe.ingredients.filter { urgent.contains($0.name) }.count
         HStack(spacing: 12) {
             Group {
                 if UIShot.perfOff.contains("emoji") { Color.clear } else { Text(recipe.emoji).font(.system(size: 38)) }
@@ -94,8 +153,6 @@ struct RecipeCard: View, Equatable {
                 Text(L("⏱ {0} · {1} kcal/serving", recipe.localTime, recipe.kcal)).font(.caption).foregroundStyle(.secondary)
                 HStack(spacing: 6) {
                     tag(L("{0}/{1} in fridge", haveCount, recipe.ingredients.count), haveCount == recipe.ingredients.count ? .freshGreen : .burgundy)
-                    if rescues > 0 { tag(L("rescues {0} 🦸", rescues), .warnOrange) }
-                    if recipe.zeroWaste { tag("♻️", .freshGreen) }
                 }
             }
             Spacer(minLength: 0)
