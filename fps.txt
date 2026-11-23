@@ -1,0 +1,4 @@
+home avg=60.0 min=60 hitches=0 frames=360 scrolled=0pt
+fridge avg=58.3 min=17 hitches=6 frames=350 scrolled=370pt
+search avg=58.3 min=13 hitches=7 frames=350 scrolled=316pt
+recipes avg=58.0 min=22 hitches=9 frames=348 scrolled=864pt
